@@ -1,72 +1,95 @@
 import os
-import pandas as pd
 import tensorflow as tf
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import layers, models
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
+from config import IMG_SIZE, EPOCHS, BATCH_SIZE, LEARNING_RATE
+from data_loader import load_datasets
 
-# Путь к данным
-image_dir = 'data/'
-
-# Генератор для подготовки данных
-train_datagen = ImageDataGenerator(rescale=1./255)  # Нормализация изображений
-test_datagen = ImageDataGenerator(rescale=1./255)
-
-# Подготовим генератор для тренировки
-train_generator = train_datagen.flow_from_directory(
-    image_dir,  # Папка с изображениями
-    target_size=(224, 224),  # Размер изображений для модели
-    batch_size=32,  # Размер батча
-    class_mode='categorical'  # Используем one-hot кодирование для меток
-)
-
-# Подготовим генератор для тестирования
-test_generator = test_datagen.flow_from_directory(
-    image_dir,  # Папка с изображениями
-    target_size=(224, 224),
-    batch_size=32,
-    class_mode='categorical'
-)
-
-from tensorflow.keras.applications import ResNet50
-
-# Загружаем предобученную модель ResNet50
-base_model = ResNet50(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
-
-# Замораживаем слои базы модели
-base_model.trainable = False
-
-# Строим модель
-model = Sequential([
-    base_model,
-    GlobalAveragePooling2D(),
-    Dropout(0.5),
-    Dense(512, activation='relu'),
-    Dropout(0.5),
-    Dense(8, activation='softmax')  # 8 эмоций
-])
-
-# Компилируем модель
-model.compile(optimizer=Adam(learning_rate=0.0001), loss='categorical_crossentropy', metrics=['accuracy'])
-
-# Обзор модели
-model.summary()
+# Загружаем данные
+train_ds, test_ds = load_datasets(True, True)
 
 
-# Обучаем модель
-history = model.fit(
-    train_generator,
-    epochs=10,  # Количество эпох
-    validation_data=test_generator
-)
+# Определяем модель
+def create_model():
+    model = models.Sequential([
+        layers.InputLayer(input_shape=(IMG_SIZE, IMG_SIZE, 3)),  # Входной слой для изображений размером 224x224
+        layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
+        layers.MaxPooling2D((2, 2)),
+        layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
+        layers.MaxPooling2D((2, 2)),
+        layers.Conv2D(128, (3, 3), activation='relu', padding='same'),
+        layers.MaxPooling2D((2, 2)),
+        layers.Flatten(),
+        layers.Dense(128, activation='relu'),
+        layers.Dense(10, activation='softmax')  # Количество классов - 10
+    ])
 
-# Сохраняем модель
-model.save('emotion_recognition_model.h5')
-model.save('emotion_recognition_model.keras')
-
-# Оценка на тестовых данных
-test_loss, test_acc = model.evaluate(test_generator)
-print(f"Test accuracy: {test_acc}")
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+    return model
 
 
+# Колбеки для обучения
+def get_callbacks():
+    # Папка для хранения логов и модели
+    checkpoint_dir = os.path.join('model', 'checkpoints')
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
+    # Колбек для сохранения лучшей модели по валидационной точности
+    checkpoint_callback = ModelCheckpoint(
+        os.path.join(checkpoint_dir, 'best_model.keras'),
+        save_best_only=True,
+        monitor='val_accuracy',
+        mode='max',
+        verbose=1
+    )
+
+    # Колбек для ранней остановки, если валидационная точность не улучшается
+    early_stopping_callback = EarlyStopping(
+        monitor='val_accuracy',
+        patience=3,  # Останавливаем обучение после 3 эпох без улучшений
+        restore_best_weights=True,
+        verbose=1
+    )
+
+    # Колбек для TensorBoard
+    tensorboard_callback = TensorBoard(
+        log_dir=os.path.join('model', 'logs'),
+        histogram_freq=1,
+        write_graph=True,
+        write_images=True
+    )
+
+    return [checkpoint_callback, early_stopping_callback, tensorboard_callback]
+
+
+# Обучение модели
+def train_model():
+    model = create_model()
+
+    # Получаем колбеки
+    callbacks = get_callbacks()
+
+    # Обучаем модель
+    history = model.fit(train_ds,
+                        epochs=EPOCHS,
+                        validation_data=test_ds,
+                        verbose=1,
+                        callbacks=callbacks)
+
+    # Сохраняем модель в конце обучения
+    model.save(os.path.join('model', 'final_model.keras'))
+    print("Модель сохранена!")
+
+    return history
+
+
+if __name__ == "__main__":
+    # Начинаем обучение
+    history = train_model()
+
+    # Выводим результаты обучения
+    print("История обучения:", history.history)
+    print(
+        f"Лучший результат: {max(history.history['val_accuracy']):.4f} на эпохе {history.history['val_accuracy'].index(max(history.history['val_accuracy'])) + 1}")
