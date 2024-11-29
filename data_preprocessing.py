@@ -40,12 +40,12 @@ def process_batch(batch, label_mapping):
             # Загружаем и изменяем размер изображения
             img = load_img(img_path, target_size=(IMG_SIZE, IMG_SIZE))
             img_array = img_to_array(img) / 255.0  # Нормализация
-            images.append(img_array.astype(np.float16))  # Используем float32
+            images.append(img_array.astype(np.float32))  # Используем float32
             labels.append(label_mapping[row['label']])
         except Exception as e:
             logger.error(f"Ошибка обработки {img_path}: {e}")
 
-    return np.array(images), np.array(labels, dtype=np.int16)  # Используем int32 для меток
+    return np.array(images), np.array(labels, dtype=np.int32)  # Используем int32 для меток
 
 
 def save_data_as_npy_batched():

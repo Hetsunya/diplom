@@ -1,13 +1,13 @@
 import os
 import tensorflow as tf
 from tensorflow.keras import layers, models
-from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 from config import IMG_SIZE, EPOCHS, BATCH_SIZE, LEARNING_RATE
 from data_loader import load_datasets
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard, ReduceLROnPlateau, CSVLogger, BackupAndRestore
+import os
 
 # Загружаем данные
 train_ds, test_ds = load_datasets(True, True)
-
 
 # Определяем модель
 def create_model():
@@ -30,13 +30,12 @@ def create_model():
     return model
 
 
-# Колбеки для обучения
 def get_callbacks():
     # Папка для хранения логов и модели
     checkpoint_dir = os.path.join('model', 'checkpoints')
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    # Колбек для сохранения лучшей модели по валидационной точности
+    # ModelCheckpoint для сохранения лучшей модели
     checkpoint_callback = ModelCheckpoint(
         os.path.join(checkpoint_dir, 'best_model.keras'),
         save_best_only=True,
@@ -45,15 +44,15 @@ def get_callbacks():
         verbose=1
     )
 
-    # Колбек для ранней остановки, если валидационная точность не улучшается
+    # EarlyStopping для остановки обучения, если модель не улучшается
     early_stopping_callback = EarlyStopping(
-        monitor='val_accuracy',
-        patience=3,  # Останавливаем обучение после 3 эпох без улучшений
+        monitor='val_loss',
+        patience=3,
         restore_best_weights=True,
         verbose=1
     )
 
-    # Колбек для TensorBoard
+    # TensorBoard для логирования и визуализации данных
     tensorboard_callback = TensorBoard(
         log_dir=os.path.join('model', 'logs'),
         histogram_freq=1,
@@ -61,8 +60,33 @@ def get_callbacks():
         write_images=True
     )
 
-    return [checkpoint_callback, early_stopping_callback, tensorboard_callback]
+    # ReduceLROnPlateau для уменьшения learning rate, если нет улучшений
+    reduce_lr_callback = ReduceLROnPlateau(
+        monitor='val_loss',
+        factor=0.5,
+        patience=2,
+        verbose=1,
+        min_lr=1e-6
+    )
 
+    # CSVLogger для записи истории обучения в CSV файл
+    csv_logger = CSVLogger(os.path.join('model', 'training_log.csv'), append=True)
+
+    # BackUpAndRestore для создания резервных копий модели в процессе обучения
+    backup_restore_callback = BackupAndRestore(
+        backup_dir=os.path.join('model', 'backup'),
+        save_freq='epoch'
+    )
+
+
+    return [
+        checkpoint_callback,
+        early_stopping_callback,
+        tensorboard_callback,
+        reduce_lr_callback,
+        csv_logger,
+        backup_restore_callback
+    ]
 
 # Обучение модели
 def train_model():
