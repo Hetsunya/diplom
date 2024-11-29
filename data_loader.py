@@ -6,11 +6,11 @@ from config import PROCESSED_DIR, BATCH_SIZE, IMG_SIZE
 AUTO = tf.data.AUTOTUNE  # Автоматическая настройка для параллельной загрузки данных
 
 
-def load_npy_batches(data_type):
+def load_npy_batches(data_type, batch_size=1000):
     """
-    Загружает данные (train или test) из .npy файлов.
-
+    Загружает данные (train или test) из .npy файлов по частям.
     :param data_type: Тип данных ('train' или 'test').
+    :param batch_size: Размер пакета для загрузки.
     :return: Кортеж (изображения, метки).
     """
     images = []
@@ -25,11 +25,22 @@ def load_npy_batches(data_type):
     for img_file, lbl_file in zip(image_files, label_files):
         img_path = os.path.join(PROCESSED_DIR, img_file)
         lbl_path = os.path.join(PROCESSED_DIR, lbl_file)
-        images.append(np.load(img_path))  # Загружаем изображения
-        labels.append(np.load(lbl_path))  # Загружаем метки
+        img_batch = np.load(img_path)  # Загружаем изображения
+        lbl_batch = np.load(lbl_path)  # Загружаем метки
 
-    # Конкатенируем все батчи в один массив
-    return np.concatenate(images, axis=0), np.concatenate(labels, axis=0)
+        # Сохраняем в списки
+        images.append(img_batch)
+        labels.append(lbl_batch)
+
+        # Если достигнут размер батча, возвращаем данные
+        if len(images) >= batch_size:
+            yield np.concatenate(images, axis=0), np.concatenate(labels, axis=0)
+            images = []  # Сбрасываем список
+            labels = []  # Сбрасываем список
+
+    # Обработка оставшихся данных
+    if len(images) > 0:
+        yield np.concatenate(images, axis=0), np.concatenate(labels, axis=0)
 
 
 def create_tf_dataset(images, labels, shuffle=True, augment=False):
@@ -59,7 +70,7 @@ def create_tf_dataset(images, labels, shuffle=True, augment=False):
     return dataset
 
 
-def load_datasets(shuffle, augment):
+def load_datasets(shuffle=True, augment=False):
     """
     Загружает данные из обработанных файлов и создает tf.data.Dataset.
 
@@ -68,11 +79,17 @@ def load_datasets(shuffle, augment):
     :return: Кортеж (train_dataset, test_dataset).
     """
     print("Загрузка TRAIN данных...")
-    train_images, train_labels = load_npy_batches("train")
-    print(f"TRAIN: {train_images.shape}, {train_labels.shape}")
+    train_generator = load_npy_batches("train", batch_size=100)
 
     print("Загрузка TEST данных...")
-    test_images, test_labels = load_npy_batches("test")
+    test_generator = load_npy_batches("test", batch_size=100)
+
+
+    # Далее создаем датасеты для TensorFlow
+    train_images, train_labels = next(train_generator)  # Загрузим первый батч
+    test_images, test_labels = next(test_generator)  # Загрузим первый батч
+
+    print(f"TRAIN: {train_images.shape}, {train_labels.shape}")
     print(f"TEST: {test_images.shape}, {test_labels.shape}")
 
     # Создаем TensorFlow датасеты
