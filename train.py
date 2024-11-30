@@ -1,32 +1,50 @@
 import os
 import tensorflow as tf
-from tensorflow.keras import layers, models
-from config import IMG_SIZE, EPOCHS, BATCH_SIZE, LEARNING_RATE
+from tensorflow.keras import layers, models, regularizers
+from config import IMG_SIZE, EPOCHS, BATCH_SIZE, LEARNING_RATE, LABELS
 from data_loader import load_datasets
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard, ReduceLROnPlateau, CSVLogger, BackupAndRestore
-import os
-
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard, ReduceLROnPlateau, CSVLogger, \
+    BackupAndRestore
 # Загружаем данные
-train_ds, test_ds = load_datasets(True, True)
+train_ds, test_ds = load_datasets(True, False, batch_size=1200)
 
 # Определяем модель
 def create_model():
+    # Загружаем MobileNetV2 с предварительно обученными весами (imagenet)
+    base_model = tf.keras.applications.MobileNetV2(input_shape=(IMG_SIZE, IMG_SIZE, 3),
+                                                   include_top=False,
+                                                   weights='imagenet')
+
+    # Замораживаем веса базовой модели
+    base_model.trainable = True
+
+    # Размораживаем последние несколько слоев
+    # for layer in base_model.layers[-20:]:
+    #     layer.trainable = True
+
+    # Создаем модель
     model = models.Sequential([
-        layers.InputLayer(input_shape=(IMG_SIZE, IMG_SIZE, 3)),  # Входной слой для изображений размером 224x224
-        layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
-        layers.MaxPooling2D((2, 2)),
-        layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
-        layers.MaxPooling2D((2, 2)),
-        layers.Conv2D(128, (3, 3), activation='relu', padding='same'),
-        layers.MaxPooling2D((2, 2)),
-        layers.Flatten(),
-        layers.Dense(128, activation='relu'),
-        layers.Dense(10, activation='softmax')  # Количество классов - 10
+        base_model,
+        layers.GlobalAveragePooling2D(),
+        # layers.Dense(512, activation='relu', kernel_regularizer=regularizers.l2(0.01)),
+        # layers.BatchNormalization(),
+        # layers.Dropout(0.5),
+        # layers.Dense(2048, activation='relu', kernel_regularizer=regularizers.l2(0.01)),
+        # layers.BatchNormalization(),
+        # layers.Dropout(0.5),
+        # layers.Dense(1024, activation='relu', kernel_regularizer=regularizers.l2(0.01)),
+        # layers.BatchNormalization(),
+        # layers.Dropout(0.5),
+        layers.Dense(LABELS, activation='softmax')
     ])
 
+    # model.compile(optimizer=tf.keras.optimizers.RMSprop(learning_rate=LEARNING_RATE),
+    #               loss='sparse_categorical_crossentropy',
+    #               metrics=['accuracy'])
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
                   loss='sparse_categorical_crossentropy',
                   metrics=['accuracy'])
+
     return model
 
 
@@ -63,10 +81,10 @@ def get_callbacks():
     # ReduceLROnPlateau для уменьшения learning rate, если нет улучшений
     reduce_lr_callback = ReduceLROnPlateau(
         monitor='val_loss',
-        factor=0.5,
+        factor=0.3,
         patience=2,
         verbose=1,
-        min_lr=1e-6
+        min_lr=1e-16
     )
 
     # CSVLogger для записи истории обучения в CSV файл
@@ -78,15 +96,15 @@ def get_callbacks():
         save_freq='epoch'
     )
 
-
     return [
         checkpoint_callback,
         early_stopping_callback,
         tensorboard_callback,
         reduce_lr_callback,
         csv_logger,
-        backup_restore_callback
+        backup_restore_callback,
     ]
+
 
 # Обучение модели
 def train_model():
