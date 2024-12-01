@@ -6,7 +6,7 @@ from data_loader import load_datasets
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard, ReduceLROnPlateau, CSVLogger, \
     BackupAndRestore
 # Загружаем данные
-train_ds, test_ds = load_datasets(True, False, batch_size=1200)
+train_ds, test_ds = load_datasets(True, True, batch_size=200000)
 
 # Определяем модель
 def create_model():
@@ -26,13 +26,10 @@ def create_model():
     model = models.Sequential([
         base_model,
         layers.GlobalAveragePooling2D(),
-        # layers.Dense(512, activation='relu', kernel_regularizer=regularizers.l2(0.01)),
-        # layers.BatchNormalization(),
-        # layers.Dropout(0.5),
-        # layers.Dense(2048, activation='relu', kernel_regularizer=regularizers.l2(0.01)),
-        # layers.BatchNormalization(),
-        # layers.Dropout(0.5),
         # layers.Dense(1024, activation='relu', kernel_regularizer=regularizers.l2(0.01)),
+        # layers.BatchNormalization(),
+        # layers.Dropout(0.5),
+        # layers.Dense(256, activation='relu', kernel_regularizer=regularizers.l2(0.01)),
         # layers.BatchNormalization(),
         # layers.Dropout(0.5),
         layers.Dense(LABELS, activation='softmax')
@@ -84,7 +81,7 @@ def get_callbacks():
         factor=0.3,
         patience=2,
         verbose=1,
-        min_lr=1e-16
+        min_lr=1e-19
     )
 
     # CSVLogger для записи истории обучения в CSV файл
