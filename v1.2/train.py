@@ -5,6 +5,58 @@ from tensorflow.keras import layers, models, regularizers
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 from config import IMG_SIZE, BATCH_SIZE, EPOCHS, LEARNING_RATE, DATASET_PATH
 
+from tensorflow.keras.applications import EfficientNetB0
+
+from tensorflow.keras.applications import ResNet50
+
+def create_model_ResNet50(img_size, num_classes):
+    base_model = ResNet50(
+        input_shape=(img_size, img_size, 3),
+        include_top=False,
+        weights="imagenet"
+    )
+    base_model.trainable = False  # Замораживаем веса базовой модели
+
+    model = models.Sequential([
+        base_model,
+        layers.GlobalAveragePooling2D(),
+        layers.Dense(256, activation='relu', kernel_regularizer=regularizers.l2(0.01)),
+        layers.Dropout(0.5),
+        layers.Dense(num_classes, activation="softmax")
+    ])
+
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
+        loss='sparse_categorical_crossentropy',
+        metrics=['accuracy']
+    )
+
+    return model
+
+def create_model_EfficientNetB0(img_size, num_classes):
+    base_model = EfficientNetB0(
+        input_shape=(img_size, img_size, 3),
+        include_top=False,
+        weights="imagenet"
+    )
+    base_model.trainable = False  # Замораживаем веса базовой модели
+
+    model = models.Sequential([
+        base_model,
+        layers.GlobalAveragePooling2D(),
+        layers.Dense(256, activation='relu', kernel_regularizer=regularizers.l2(0.01)),
+        layers.Dropout(0.5),
+        layers.Dense(num_classes, activation="softmax")
+    ])
+
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
+        loss='sparse_categorical_crossentropy',
+        metrics=['accuracy']
+    )
+
+    return model
+
 # Параметры
 SEED = 123  # Для воспроизводимости
 
@@ -71,7 +123,7 @@ def create_model(img_size, num_classes):
     return model
 
 # Инициализация модели
-model = create_model(IMG_SIZE, num_classes=len(train_generator.class_indices))
+model = create_model_ResNet50(IMG_SIZE, num_classes=len(train_generator.class_indices))
 
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard, ReduceLROnPlateau, CSVLogger, \
     BackupAndRestore
@@ -112,7 +164,7 @@ def get_callbacks():
         factor=0.3,
         patience=2,
         verbose=1,
-        min_lr=1e-19
+        min_lr=1e-9
     )
 
     # CSVLogger для записи истории обучения в CSV файл
@@ -144,5 +196,5 @@ history = model.fit(
 )
 
 # Сохранение итоговой модели
-model.save("final_model.keras")
+model.save("model/final_model.keras")
 print("Модель сохранена!")

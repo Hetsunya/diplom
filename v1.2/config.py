@@ -22,7 +22,7 @@ label_mapping = {
 }
 
 # Гиперпараметры
-IMG_SIZE = 254  # Размер изображений
+IMG_SIZE = 48  # Размер изображений
 BATCH_SIZE = 16
 EPOCHS = 100
 LEARNING_RATE = 1e-5
