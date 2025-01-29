@@ -27,7 +27,7 @@ def predict_image(img_path):
     return predicted_label, predictions[0][predicted_idx]  # Возвращаем метку и вероятность
 
 # Пример использования
-img_path = 'data/sad/image0030370.jpg'
+img_path = 'v1.3/data/sad/image0030370.jpg'
 predicted_label, confidence = predict_image(img_path)
 
 print(f"Предсказанная метка: {predicted_label}, вероятность: {confidence}")

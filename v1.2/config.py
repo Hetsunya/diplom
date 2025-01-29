@@ -1,12 +1,12 @@
 # Конфигурация проекта
 
 # Пути к данным
-DATA_DIR = './data'  # Папка с изображениями и CSV
+DATA_DIR = '../data'  # Папка с изображениями и CSV
 PROCESSED_DIR = 'processed_data'  # Папка для сохранения .npy
 MODEL_DIR = './models'
 MODEL = "./model/final_model.keras"
 BEST_MODEL = "./model/checkpoints/best_model.keras"
-DATASET_PATH = "./data"
+DATASET_PATH = "../data"
 
 
 #Если изменить labels.csv то могут поменяться!!!
