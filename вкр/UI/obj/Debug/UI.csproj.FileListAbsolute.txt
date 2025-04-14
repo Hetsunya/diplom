@@ -1,0 +1,16 @@
+C:\Users\vital\OneDrive\Рабочий стол\diplom\вкр\UI\obj\Debug\UI.csproj.AssemblyReference.cache
+C:\Users\vital\OneDrive\Рабочий стол\diplom\вкр\UI\obj\Debug\MainWindow.g.cs
+C:\Users\vital\OneDrive\Рабочий стол\diplom\вкр\UI\obj\Debug\App.g.cs
+C:\Users\vital\OneDrive\Рабочий стол\diplom\вкр\UI\obj\Debug\GeneratedInternalTypeHelper.g.cs
+C:\Users\vital\OneDrive\Рабочий стол\diplom\вкр\UI\obj\Debug\UI_MarkupCompile.cache
+C:\Users\vital\OneDrive\Рабочий стол\diplom\вкр\UI\obj\Debug\UI_MarkupCompile.lref
+C:\Users\vital\OneDrive\Рабочий стол\diplom\вкр\UI\obj\Debug\UI.exe
+C:\Users\vital\OneDrive\Рабочий стол\diplom\вкр\UI\obj\Debug\UI.pdb
+C:\Users\vital\OneDrive\Рабочий стол\diplom\вкр\UI\bin\Debug\UI.exe.config
+C:\Users\vital\OneDrive\Рабочий стол\diplom\вкр\UI\bin\Debug\UI.exe
+C:\Users\vital\OneDrive\Рабочий стол\diplom\вкр\UI\bin\Debug\UI.pdb
+C:\Users\vital\OneDrive\Рабочий стол\diplom\вкр\UI\obj\Debug\MainWindow.baml
+C:\Users\vital\OneDrive\Рабочий стол\diplom\вкр\UI\obj\Debug\UI.g.resources
+C:\Users\vital\OneDrive\Рабочий стол\diplom\вкр\UI\obj\Debug\UI.Properties.Resources.resources
+C:\Users\vital\OneDrive\Рабочий стол\diplom\вкр\UI\obj\Debug\UI.csproj.GenerateResource.cache
+C:\Users\vital\OneDrive\Рабочий стол\diplom\вкр\UI\obj\Debug\UI.csproj.CoreCompileInputs.cache

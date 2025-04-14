@@ -1,0 +1,112 @@
+﻿<Window x:Class="UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:UI"
+        mc:Ignorable="d"
+        Title="Мультимодальная система распознавания эмоций" Height="600" Width="1000">
+    <Grid>
+        <!-- Определяем строки и столбцы -->
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200"/>
+            <!-- Панель настроек -->
+            <ColumnDefinition Width="*"/>
+            <!-- Видео и график -->
+            <ColumnDefinition Width="300"/>
+            <!-- Уведомления и статистика -->
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Заголовок -->
+            <RowDefinition Height="*"/>
+            <!-- Основная область -->
+            <RowDefinition Height="Auto"/>
+            <!-- Кнопки управления -->
+        </Grid.RowDefinitions>
+
+        <!-- Заголовок -->
+        <TextBlock Grid.Column="0" Grid.ColumnSpan="3" Text="Анализ эмоций для HR" FontSize="20" FontWeight="Bold" 
+                   Margin="10" HorizontalAlignment="Center"/>
+
+        <!-- Панель настроек (слева) -->
+        <StackPanel Grid.Row="1" Grid.Column="0" Margin="10">
+            <TextBlock Text="Настройки" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
+            <TextBlock Text="Источник данных:" Margin="0,0,0,5"/>
+            <ComboBox>
+                <ComboBoxItem>Камера</ComboBoxItem>
+                <ComboBoxItem>Микрофон</ComboBoxItem>
+                <ComboBoxItem>Файл</ComboBoxItem>
+            </ComboBox>
+            <TextBlock Text="Категории эмоций:" Margin="0,10,0,5"/>
+            <CheckBox Content="Радость" IsChecked="True" Margin="0,2"/>
+            <CheckBox Content="Грусть" IsChecked="True" Margin="0,2"/>
+            <CheckBox Content="Гнев" IsChecked="True" Margin="0,2"/>
+            <TextBlock Text="Сценарий:" Margin="0,10,0,5"/>
+            <ComboBox>
+                <ComboBoxItem>Собеседование</ComboBoxItem>
+                <ComboBoxItem>Мониторинг</ComboBoxItem>
+            </ComboBox>
+            <Button Content="Запуск анализа" Margin="0,20,0,0" Padding="5"/>
+        </StackPanel>
+
+        <!-- Основная область (видео и график) -->
+        <Grid Grid.Row="1" Grid.Column="1" Margin="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <!-- Видео -->
+            <Border Grid.Row="0" BorderBrush="Gray" BorderThickness="1" Margin="0,0,0,10">
+                <Grid>
+                    <Rectangle Fill="LightGray"/>
+                    <!-- Заглушка для видео -->
+                    <TextBlock Text="Видеопоток" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
+                    <TextBlock Text="Радость, 85%" Background="White" Opacity="0.8" 
+                               HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="5"/>
+                </Grid>
+            </Border>
+            <!-- График -->
+            <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1">
+                <Grid>
+                    <Rectangle Fill="LightBlue"/>
+                    <!-- Заглушка для графика -->
+                    <TextBlock Text="График эмоций (Радость: 60%, Грусть: 20%)" 
+                               HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Уведомления и статистика (справа) -->
+        <StackPanel Grid.Row="1" Grid.Column="2" Margin="10">
+            <!-- Уведомления -->
+            <TextBlock Text="Уведомления" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
+            <Border BorderBrush="Red" BorderThickness="1" Margin="0,0,0,10" MinHeight="100">
+                <TextBlock Text="Высокий уровень стресса" Margin="5" Foreground="Red"/>
+            </Border>
+            <!-- Статистика -->
+            <TextBlock Text="Статистика" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
+            <DataGrid AutoGenerateColumns="False" Height="150" Margin="0,0,0,10">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Эмоция" Binding="{Binding Emotion}" Width="*"/>
+                    <DataGridTextColumn Header="Вероятность" Binding="{Binding Probability}" Width="*"/>
+                </DataGrid.Columns>
+                <DataGrid.Items>
+                    <local:EmotionItem Emotion="Радость" Probability="60%"/>
+                    <local:EmotionItem Emotion="Грусть" Probability="20%"/>
+                    <local:EmotionItem Emotion="Нейтральное" Probability="20%"/>
+                </DataGrid.Items>
+            </DataGrid>
+            <Button Content="Экспорт в PDF/CSV" Padding="5"/>
+        </StackPanel>
+
+        <!-- Кнопки управления (снизу) -->
+        <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" 
+                    HorizontalAlignment="Center" Margin="10">
+            <Button Content="Пауза" Padding="5" Margin="5"/>
+            <Button Content="Возобновить" Padding="5" Margin="5"/>
+            <Button Content="Сохранить данные" Padding="5" Margin="5"/>
+            <Button Content="Сформировать отчёт" Padding="5" Margin="5"/>
+        </StackPanel>
+    </Grid>
+</Window>

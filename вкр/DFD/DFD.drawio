@@ -1,13 +1,13 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/26.1.1 Chrome/132.0.6834.210 Electron/34.3.3 Safari/537.36" version="26.1.1">
   <diagram name="DFD" id="combined-level">
-    <mxGraphModel dx="1988" dy="1305" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+    <mxGraphModel dx="2603" dy="1663" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="D1" value="D1: База данных" style="shape=datastore;html=1;" parent="1" vertex="1">
+        <mxCell id="D1" value="D1: База данных" style="shape=datastore;html=1;labelBackgroundColor=light-dark(#b7db00, #ededed);fillColor=light-dark(#b7db00, #ededed);" parent="1" vertex="1">
           <mxGeometry x="-120" y="60" width="100" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="D2" value="D2: Отчет" style="shape=datastore;html=1;" parent="1" vertex="1">
+        <mxCell id="D2" value="D2: Отчет" style="shape=datastore;html=1;fillColor=light-dark(#b7db00, #ededed);labelBackgroundColor=light-dark(#b7db00, #ededed);" parent="1" vertex="1">
           <mxGeometry x="-50" y="520" width="100" height="60" as="geometry" />
         </mxCell>
         <mxCell id="flow1" value="Запрос на анализ" style="edgeStyle=orthogonalEdgeStyle;html=1;curved=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="1" source="capahisjug572n1s8so4-5" target="capahisjug572n1s8so4-8" edge="1">
