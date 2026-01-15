@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Видеосессия: {{ session.type }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container video-container">
+        <header class="video-header">
+            <h1>{{ session.type }} • {{ session.start_time.split('T')[1] }}</h1>
+            <div class="participants-list">
+                Участники: {{ session.participants|join(', ') }}
+            </div>
+        </header>
+        
+        <div class="video-grid">
+            {% for participant in session.participants %}
+            <div class="video-tile">
+                <div class="participant-name">{{ participant }}</div>
+                <div class="video-placeholder">
+                    <div class="fake-video">
+                        <div class="face-placeholder"></div>
+                        <div class="emotion-indicator neutral"></div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="controls">
+            <button class="control-btn mic-btn" id="mic-btn">
+                <span class="icon">🎤</span> Микрофон
+            </button>
+            <button class="control-btn cam-btn" id="cam-btn">
+                <span class="icon">📹</span> Камера
+            </button>
+            <button class="control-btn share-btn">
+                <span class="icon">🖥️</span> Экран
+            </button>
+            <form action="/session/{{ session.id }}/end" method="post" class="end-form">
+                <button type="submit" class="end-btn">Завершить сессию</button>
+            </form>
+        </div>
+
+        <div class="status-bar">
+            <span class="analysis-status">Анализ эмоций: <span id="analysis-state">Активен</span></span>
+            <span class="recording-indicator">⏺️ Запись идет</span>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const micBtn = document.getElementById('mic-btn');
+            const camBtn = document.getElementById('cam-btn');
+            const states = ['Активен', 'Анализ голоса', 'Обработка данных', 'Стабилен'];
+            
+            // Переключение микрофона
+            micBtn.addEventListener('click', function() {
+                this.classList.toggle('active');
+                this.querySelector('.icon').textContent = 
+                    this.classList.contains('active') ? '🎤' : '🔇';
+            });
+            
+            // Переключение камеры
+            camBtn.addEventListener('click', function() {
+                this.classList.toggle('active');
+                this.querySelector('.icon').textContent = 
+                    this.classList.contains('active') ? '📹' : '❌';
+            });
+            
+            // Анимация статуса анализа
+            setInterval(() => {
+                const randomState = states[Math.floor(Math.random() * states.length)];
+                document.getElementById('analysis-state').textContent = randomState;
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

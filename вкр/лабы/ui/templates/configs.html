@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Конструктор конфигураций</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Конструктор конфигураций анализа</h1>
+            <p class="subtitle">Настройте параметры распознавания эмоций под ваши задачи</p>
+        </header>
+
+        <!-- ГОТОВЫЕ ШАБЛОНЫ -->
+        <div class="config-section">
+            <h2>Готовые шаблоны</h2>
+            <div class="templates-grid">
+                {% for config in configs %}
+                <div class="template-card" onclick="selectTemplate({{ config.id }})">
+                    <h3>{{ config.name }}</h3>
+                    <p class="template-desc">{{ config.description }}</p>
+                    <div class="template-params">
+                        <span class="param-tag">Видео: {{ config.video_model }}</span>
+                        <span class="param-tag">Аудио: {{ config.audio_model }}</span>
+                        <span class="param-tag">Порог: {{ config.min_confidence }}%</span>
+                        <span class="param-tag">Отчёт: {{ config.report_type }}</span>
+                    </div>
+                    <button class="apply-btn" onclick="applyTemplate({{ config.id }})">
+                        Применить
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- СОЗДАНИЕ НОВОЙ КОНФИГУРАЦИИ -->
+        <div class="config-section">
+            <h2>Создать новую конфигурацию</h2>
+
+            <form id="new-config-form">
+                <!-- ОСНОВНЫЕ ДАННЫЕ -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="config-name">Название конфигурации</label>
+                        <input type="text" id="config-name" name="name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="config-desc">Описание</label>
+                        <input type="text" id="config-desc" name="description" required>
+                    </div>
+                </div>
+
+                <!-- МОДЕЛИ -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="video-model">Модель анализа видео</label>
+                        <select id="video-model" name="video_model">
+                            <option value="vgg-face">VGG-Face (высокая точность)</option>
+                            <option value="mobile-net" selected>MobileNet (оптимальная)</option>
+                            <option value="resnet">ResNet (баланс)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="audio-model">Модель анализа аудио</label>
+                        <select id="audio-model" name="audio_model">
+                            <option value="lstm-ravdess" selected>LSTM (RAVDESS)</option>
+                            <option value="wav2vec">Wav2Vec 2.0</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- ЭМОЦИИ -->
+                <div class="form-group">
+                    <label>Отслеживаемые эмоции</label>
+                    <div class="emotion-selector">
+                        <label><input type="checkbox" name="emotions" value="стресс" checked> Стресс</label>
+                        <label><input type="checkbox" name="emotions" value="вовлеченность" checked> Вовлечённость</label>
+                        <label><input type="checkbox" name="emotions" value="радость"> Радость</label>
+                        <label><input type="checkbox" name="emotions" value="раздражение"> Раздражение</label>
+                        <label><input type="checkbox" name="emotions" value="обман"> Обман</label>
+                    </div>
+                </div>
+
+                <!-- ПАРАМЕТРЫ АНАЛИЗА -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="min-confidence">Минимальная уверенность (%)</label>
+                        <input type="range" id="min-confidence" name="min_confidence"
+                               min="50" max="99" value="80">
+                        <span id="confidence-value">80%</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="interval-sec">Интервал анализа</label>
+                        <select id="interval-sec" name="interval_sec">
+                            <option value="1">1 сек (максимальная детализация)</option>
+                            <option value="2" selected>2 сек (оптимально)</option>
+                            <option value="5">5 сек (экономия ресурсов)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- ТИП ОТЧЁТА -->
+                <div class="form-group">
+                    <label for="report-type">Тип формируемого отчёта</label>
+                    <select id="report-type" name="report_type">
+                        <option value="individual" selected>Индивидуальный отчёт</option>
+                        <option value="group">Групповой отчёт</option>
+                        <option value="comparative">Сравнительный отчёт</option>
+                        <option value="summary">Сводный аналитический отчёт</option>
+                    </select>
+                </div>
+
+                <!-- КОНФИДЕНЦИАЛЬНОСТЬ -->
+                <div class="form-group privacy-section">
+                    <h4>Параметры конфиденциальности (152-ФЗ)</h4>
+                    <label>
+                        <input type="checkbox" name="anonymize" checked>
+                        Анонимизация лиц в записях
+                    </label>
+                    <label>
+                        Срок хранения исходных данных:
+                        <select name="retention_days">
+                            <option value="1" selected>1 день</option>
+                            <option value="3">3 дня</option>
+                            <option value="7">7 дней</option>
+                        </select>
+                    </label>
+                </div>
+
+                <button type="submit" class="primary-btn">
+                    Создать конфигурацию
+                </button>
+            </form>
+        </div>
+
+        <div class="back-link">
+            <a href="/">← Вернуться на главную</a>
+        </div>
+    </div>
+
+    <!-- JS -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+
+            const confidenceSlider = document.getElementById('min-confidence');
+            const confidenceValue = document.getElementById('confidence-value');
+
+            confidenceSlider.addEventListener('input', function () {
+                confidenceValue.textContent = this.value + '%';
+            });
+
+            window.selectTemplate = function (configId) {
+                const cards = document.querySelectorAll('.template-card');
+                cards.forEach(card => card.classList.remove('selected'));
+                event.currentTarget.classList.add('selected');
+            };
+
+            window.applyTemplate = function (configId) {
+                alert(
+                    `Конфигурация ID ${configId} выбрана.\n` +
+                    `В реальной системе она будет привязана к новым сессиям.`
+                );
+            };
+
+            document.getElementById('new-config-form').addEventListener('submit', function (e) {
+                e.preventDefault();
+
+                const formData = {
+                    name: document.getElementById('config-name').value,
+                    description: document.getElementById('config-desc').value,
+                    video_model: document.getElementById('video-model').value,
+                    audio_model: document.getElementById('audio-model').value,
+                    emotions: Array.from(
+                        document.querySelectorAll('input[name="emotions"]:checked')
+                    ).map(el => el.value),
+                    min_confidence: document.getElementById('min-confidence').value,
+                    interval_sec: document.getElementById('interval-sec').value,
+                    report_type: document.getElementById('report-type').value,
+                    anonymize: document.querySelector('input[name="anonymize"]').checked,
+                    retention_days: document.querySelector('select[name="retention_days"]').value
+                };
+
+                alert(
+                    'Новая конфигурация создана:\n' +
+                    JSON.stringify(formData, null, 2)
+                );
+
+                this.reset();
+                confidenceValue.textContent = '80%';
+            });
+        });
+    </script>
+</body>
+</html>

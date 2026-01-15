@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Мои сессии</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Запланированные сессии</h1>
+        
+        <!-- Кнопка создания новой сессии -->
+        <div class="page-actions">
+            <a href="/new_session">
+                <button class="primary-btn">➕ Создать новую сессию</button>
+            </a>
+        </div>
+        
+        <div class="date-filter">
+            <label>
+                Фильтр по дате:
+                <input type="date" id="date-filter">
+            </label>
+        </div>
+
+        <table class="sessions-table">
+            <thead>
+                <tr>
+                    <th>Время</th>
+                    <th>Тип</th>
+                    <th>Участники</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for session in sessions %}
+                <tr>
+                    <td>{{ session.start_time.replace('T', ' ') }}</td>
+                    <td>{{ session.type }}</td>
+                    <td>{{ session.participants|join(', ') }}</td>
+                    <td>
+                        <span class="status 
+                            {% if session.status == 'completed' %}status-completed
+                            {% elif session.status == 'active' %}status-active
+                            {% elif session.status == 'ready' %}status-ready
+                            {% else %}status-planned
+                            {% endif %}">
+                            {{ session.status }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if session.status == 'ready' %}
+                        <form action="/session/{{ session.id }}/start" method="post">
+                            <button type="submit" class="action-btn">Запустить</button>
+                        </form>
+                        {% elif session.status == 'completed' %}
+                        <a href="/session/{{ session.id }}/report">
+                            <button class="action-btn">Отчет</button>
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="calendar-section">
+            <h2>Календарь</h2>
+            <div class="calendar">
+                <div class="calendar-header">
+                    <span class="calendar-month">Апрель 2025</span>
+                </div>
+                <div class="calendar-days">
+                    <div class="calendar-day-header">Пн</div>
+                    <div class="calendar-day-header">Вт</div>
+                    <div class="calendar-day-header">Ср</div>
+                    <div class="calendar-day-header today">Чт</div>
+                    <div class="calendar-day-header">Пт</div>
+                    <div class="calendar-day-header">Сб</div>
+                    <div class="calendar-day-header">Вс</div>
+                    
+                    {% for i in range(1, 31) %}
+                    <div class="calendar-day {% if i == 17 %}calendar-day-event{% endif %}">
+                        {{ i }}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="back-link">
+            <a href="/">← Вернуться на главную</a>
+        </div>
+        
+        <!-- Плавающая кнопка для мобильных -->
+        <div class="mobile-fab">
+            <a href="/new_session">
+                <button class="fab-btn">➕</button>
+            </a>
+        </div>
+    </div>
+    
+    <script src="/static/script.js"></script>
+</body>
+</html>

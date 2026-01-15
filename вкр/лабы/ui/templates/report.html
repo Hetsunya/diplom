@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Отчет по сессии</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container report-container">
+        <header>
+            <h1>Отчет: {{ session.type }} от {{ session.end_time }}</h1>
+            <div class="session-meta">
+                Участники: {{ session.participants|join(', ') }} • 
+                Длительность: 30 минут
+            </div>
+        </header>
+        
+        <div class="summary-box">
+            <h2>Ключевые инсайты</h2>
+            <ul class="risks-list">
+                {% for risk in session.emotions.risks %}
+                <li class="risk-item">⚠️ {{ risk }}</li>
+                {% endfor %}
+            </ul>
+            
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <h3>Средний стресс</h3>
+                    <div class="metric-value stress">68%</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Вовлеченность</h3>
+                    <div class="metric-value engagement">72%</div>
+                </div>
+                <div class="metric-card">
+                    <h3>Эмоциональная синхронность</h3>
+                    <div class="metric-value neutral">Средняя</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="charts-section">
+            <div class="chart-container">
+                <h2>Динамика эмоций</h2>
+                <canvas id="timelineChart" height="120"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <h2>Распределение эмоций</h2>
+                <canvas id="pieChart" height="120"></canvas>
+            </div>
+        </div>
+
+        <div class="participant-section">
+            <h2>Детализация по участникам</h2>
+            <table class="participants-table">
+                <thead>
+                    <tr>
+                        <th>Участник</th>
+                        <th>Пик стресса</th>
+                        <th>Пик вовлеченности</th>
+                        <th>Рекомендации</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for name, data in session.emotions.participants.items() %}
+                    <tr>
+                        <td><strong>{{ name }}</strong></td>
+                        <td>{{ data.стресс|sort(reverse=true)|first }}% (20 мин)</td>
+                        <td>{{ data.вовлеченность|sort(reverse=true)|first }}% (10 мин)</td>
+                        <td>Индивидуальная беседа</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="recommendations">
+            <h2>Рекомендации для HR</h2>
+            <ul>
+                <li>Провести индивидуальную беседу с Сидоровой для снижения уровня стресса</li>
+                <li>Включить Петрова в обсуждение с первых минут совещания</li>
+                <li>Сократить продолжительность совещаний с участием этой группы</li>
+            </ul>
+        </div>
+
+        <div class="action-buttons">
+            <a href="/dashboard">
+                <button class="secondary-btn">К аналитике</button>
+            </a>
+            <a href="/">
+                <button class="primary-btn">На главную</button>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // График динамики
+            const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+            new Chart(timelineCtx, {
+                type: 'line',
+                data: {
+                    labels: {{ session.emotions.timeline | tojson }},
+                    datasets: [
+                        {
+                            label: 'Стресс (среднее)',
+                            data: [45, 52, 68, 72, 65, 58, 50],
+                            borderColor: '#ff6b6b',
+                            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+                            tension: 0.3,
+                            fill: true
+                        },
+                        {
+                            label: 'Вовлеченность (среднее)',
+                            data: [60, 65, 70, 68, 62, 55, 60],
+                            borderColor: '#4ecdc4',
+                            backgroundColor: 'rgba(78, 205, 196, 0.1)',
+                            tension: 0.3,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+
+            // Круговая диаграмма
+            const pieCtx = document.getElementById('pieChart').getContext('2d');
+            new Chart(pieCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Стресс', 'Вовлеченность', 'Радость', 'Нейтрально'],
+                    datasets: [{
+                        data: [35, 25, 20, 20],
+                        backgroundColor: [
+                            '#ff6b6b',
+                            '#4ecdc4',
+                            '#ffd166',
+                            '#a8d1e6'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
