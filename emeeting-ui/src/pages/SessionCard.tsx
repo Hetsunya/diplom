@@ -1,16 +1,17 @@
 import { Link } from "react-router-dom";
+import type { Session } from "../types/db";
 
-// src/components/SessionCard.tsx
-interface SessionCardProps {
-  session: { id: string; title: string; date: string };
+interface Props {
+  session: Session;
 }
 
-const SessionCard = ({ session }: SessionCardProps) => {
+const SessionCard = ({ session }: Props) => {
   return (
-    <div>
+    <div className="session-card">
       <h3>{session.title}</h3>
-      <p>{session.date}</p>
-      <Link to={`/sessions/${session.id}`}>Join</Link>
+      <p>Запланировано: {session.startDatetime ? new Date(session.startDatetime).toLocaleString() : 'Не указано'}</p>
+      <p>Тип: {session.sessionType}</p>
+      <Link to={`/sessions/${session.sessionId}`}>Открыть</Link>
     </div>
   );
 };

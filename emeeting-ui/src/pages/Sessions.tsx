@@ -1,55 +1,21 @@
-// src/pages/Sessions.tsx
-import { useEffect, useState } from 'react';
-import { getSessions } from '../api/sessions';
-import SessionCard from '../components/SessionCard';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from "react";
+import { getSessions } from "../api/sessions";
+import { type Session } from "../types/db";
+import SessionCard from "../components/SessionCard";
 
 const Sessions = () => {
-  const [sessions, setSessions] = useState([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
 
   useEffect(() => {
-    const fetchSessions = async () => {
-      try {
-        const data = await getSessions();
-        setSessions(data);
-      } catch (error) {
-        console.error(error);
-      }
-    };
-    fetchSessions();
+    getSessions().then(setSessions).catch(console.error);
   }, []);
 
   return (
     <div>
-      <header>
-        <h1>Сессии</h1>
-      </header>
-      <div className="date-filter">
-        <input type="date" />
-      </div>
-      <table className="sessions-table">
-        <thead>
-          <tr>
-            <th>Название</th>
-            <th>Дата</th>
-            <th>Статус</th>
-            <th>Действия</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sessions.map((session: any) => (
-            <SessionCard key={session.id} session={session} />
-          ))}
-        </tbody>
-      </table>
-      <div className="page-actions">
-        <Link className="secondary-btn" to="/sessions/new">Новая сессия</Link>
-      </div>
-      <div className="calendar-section">
-        <div className="calendar">
-          {/* Календарь */}
-        </div>
-      </div>
+      <h2>Сессии</h2>
+      {sessions.map((s) => (
+        <SessionCard key={s.id} session={s} />
+      ))}
     </div>
   );
 };
