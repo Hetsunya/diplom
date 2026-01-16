@@ -1,4 +1,3 @@
--- ENUMы
 CREATE TYPE session_type_enum AS ENUM (
     'interview',
     'meeting',
@@ -18,7 +17,27 @@ CREATE TYPE data_source_enum AS ENUM (
     'multimodal'
 );
 
--- Справочники
+CREATE TABLE auth_user (
+    auth_user_id SERIAL PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP
+);
+
+CREATE TABLE auth_role (
+    auth_role_id SERIAL PRIMARY KEY,
+    code TEXT UNIQUE NOT NULL,
+    description TEXT
+);
+
+CREATE TABLE auth_user_role (
+    auth_user_id INT REFERENCES auth_user(auth_user_id) ON DELETE CASCADE,
+    auth_role_id INT REFERENCES auth_role(auth_role_id),
+    PRIMARY KEY (auth_user_id, auth_role_id)
+);
+
 CREATE TABLE session_role (
     session_role_id SERIAL PRIMARY KEY,
     code TEXT UNIQUE NOT NULL,
@@ -45,7 +64,6 @@ CREATE TABLE report_type (
     description TEXT
 );
 
--- Основные сущности
 CREATE TABLE person (
     person_id SERIAL PRIMARY KEY,
     last_name TEXT NOT NULL,
@@ -57,6 +75,7 @@ CREATE TABLE person (
 CREATE TABLE profile (
     profile_id SERIAL PRIMARY KEY,
     person_id INT NOT NULL REFERENCES person(person_id),
+    auth_user_id INT UNIQUE REFERENCES auth_user(auth_user_id),
     employee_number TEXT UNIQUE,
     position TEXT,
     department TEXT,
@@ -73,7 +92,8 @@ CREATE TABLE session (
     start_datetime TIMESTAMP,
     end_datetime TIMESTAMP,
     location_type location_type_enum,
-    physical_location TEXT
+    physical_location TEXT,
+    created_by INT REFERENCES auth_user(auth_user_id)
 );
 
 CREATE TABLE session_participant (
@@ -81,6 +101,8 @@ CREATE TABLE session_participant (
     session_id INT NOT NULL REFERENCES session(session_id) ON DELETE CASCADE,
     profile_id INT NOT NULL REFERENCES profile(profile_id),
     session_role_id INT REFERENCES session_role(session_role_id),
+    join_datetime TIMESTAMP,
+    leave_datetime TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE,
     comment TEXT,
     UNIQUE (session_id, profile_id)
@@ -94,6 +116,7 @@ CREATE TABLE video_stream (
     resolution TEXT,
     duration_sec INT,
     codec TEXT,
+    recorded_by INT REFERENCES auth_user(auth_user_id),
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -105,6 +128,7 @@ CREATE TABLE audio_stream (
     channels INT,
     duration_sec INT,
     codec TEXT,
+    recorded_by INT REFERENCES auth_user(auth_user_id),
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -139,7 +163,8 @@ CREATE TABLE emotion_record (
     time_end_sec NUMERIC(8,3),
     intensity INT CHECK (intensity BETWEEN 0 AND 100),
     confidence INT CHECK (confidence BETWEEN 0 AND 100),
-    data_source data_source_enum NOT NULL
+    data_source data_source_enum NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE report (
