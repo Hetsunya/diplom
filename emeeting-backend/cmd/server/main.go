@@ -35,6 +35,7 @@ func main() {
 	// Роуты API
 	r.POST("/sessions", handler.Create)
 	r.GET("/sessions", handler.List)
+	r.GET("/ws/sessions/:id", handler.WS)
 
 	log.Println("Server running on :8080")
 	if err := r.Run(":8080"); err != nil {
