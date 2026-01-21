@@ -4,7 +4,7 @@ export const useSessionWS = (sessionId: string) => {
   const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    ws.current = new WebSocket(`ws://localhost:8080/ws/${sessionId}`);
+    ws.current = new WebSocket(`ws://localhost:8080/ws/sessions/${sessionId}`);
 
     ws.current.onopen = () => console.log("WS connected");
     ws.current.onmessage = (msg) => console.log("WS:", msg.data);
