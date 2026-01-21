@@ -12,10 +12,10 @@ const SessionCard = ({ session }: SessionCardProps) => {
 
 
       <p>
-        Запланировано: {new Date(session.scheduledAt).toLocaleString()}
+        Запланировано: {new Date(session.startDatetime).toLocaleString()}
       </p>
 
-      <Link to={`/sessions/${session.id}`}>Join</Link>
+      <Link to={`/sessions/${session.sessionId}`}>Join</Link>
     </div>
   );
 };

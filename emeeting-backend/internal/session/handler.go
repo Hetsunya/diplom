@@ -13,10 +13,11 @@ import (
 
 type Handler struct {
 	repo *Repository
+	hub  *SessionHub
 }
 
-func NewHandler(repo *Repository) *Handler {
-	return &Handler{repo: repo}
+func NewHandler(repo *Repository, hub *SessionHub) *Handler {
+	return &Handler{repo: repo, hub: hub}
 }
 
 // DTO для создания сессии

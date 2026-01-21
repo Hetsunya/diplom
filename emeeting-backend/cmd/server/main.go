@@ -11,20 +11,20 @@ import (
 )
 
 func main() {
-	// Подключаемся через твой модуль
-	database, err := db.NewPostgres("") // DSN внутри db.NewPostgres уже захардкожен
+	// DB
+	database, err := db.NewPostgres("")
 	if err != nil {
 		log.Fatal("DB connection failed:", err)
 	}
 
-	// Репозиторий и хендлер сессий
+	// session module
 	repo := session.NewRepository(database)
-	handler := session.NewHandler(repo)
+	hub := session.NewSessionHub()
+	handler := session.NewHandler(repo, hub)
 
-	// Настройка Gin
+	// gin
 	r := gin.Default()
 
-	// CORS
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:5173"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -32,9 +32,11 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	// Роуты API
+	// REST
 	r.POST("/sessions", handler.Create)
 	r.GET("/sessions", handler.List)
+
+	// WS
 	r.GET("/ws/sessions/:id", handler.WS)
 
 	log.Println("Server running on :8080")

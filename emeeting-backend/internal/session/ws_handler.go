@@ -12,44 +12,41 @@ import (
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true // для dev
+		return true // для разработки
 	},
 }
 
 type WSMessage struct {
-	Type      string      `json:"type"`
-	SessionID int         `json:"session_id"`
-	Payload   interface{} `json:"payload"`
-	Timestamp time.Time   `json:"timestamp"`
+	Type      string    `json:"type"`
+	SessionID int       `json:"session_id"`
+	Payload   any       `json:"payload"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 func (h *Handler) WS(c *gin.Context) {
 	sessionIDStr := c.Param("id")
 	sessionID, err := strconv.Atoi(sessionIDStr)
 	if err != nil {
-		log.Println("[WS] invalid session id:", sessionIDStr)
-		c.AbortWithStatus(http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid session id"})
 		return
 	}
 
-	log.Printf("[WS] incoming connection for session=%d\n", sessionID)
+	log.Printf("[WS] incoming connection for session=%d", sessionID)
 
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Println("[WS] upgrade failed:", err)
 		return
 	}
-	defer func() {
-		log.Printf("[WS] connection closed session=%d\n", sessionID)
-		conn.Close()
-	}()
+	defer conn.Close()
 
-	log.Printf("[WS] CONNECTED session=%d remote=%s\n",
-		sessionID,
-		conn.RemoteAddr(),
-	)
+	log.Printf("[WS] CONNECTED session=%d remote=%s", sessionID, conn.RemoteAddr())
 
-	// ping loop (чтобы видеть что соединение живо)
+	// регистрируем в хабе
+	h.hub.Add(sessionID, conn)
+	defer h.hub.Remove(sessionID, conn)
+
+	// ping loop
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
@@ -60,39 +57,29 @@ func (h *Handler) WS(c *gin.Context) {
 				SessionID: sessionID,
 				Timestamp: time.Now(),
 			}
-
-			if err := conn.WriteJSON(msg); err != nil {
-				log.Println("[WS] ping failed:", err)
-				return
-			}
-
-			log.Printf("[WS] ping sent session=%d\n", sessionID)
+			h.hub.Broadcast(sessionID, msg)
+			log.Printf("[WS] ping sent session=%d", sessionID)
 		}
 	}()
 
 	// read loop
 	for {
-		var incoming map[string]interface{}
-		err := conn.ReadJSON(&incoming)
-		if err != nil {
-			log.Println("[WS] read error:", err)
-			return
+		var payload map[string]any
+		if err := conn.ReadJSON(&payload); err != nil {
+			log.Printf("[WS] DISCONNECT session=%d err=%v", sessionID, err)
+			break
 		}
 
-		log.Printf("[WS] RECEIVED session=%d payload=%v\n", sessionID, incoming)
+		log.Printf("[WS] RECEIVED session=%d payload=%v", sessionID, payload)
 
-		resp := WSMessage{
+		msg := WSMessage{
 			Type:      "echo",
 			SessionID: sessionID,
-			Payload:   incoming,
+			Payload:   payload,
 			Timestamp: time.Now(),
 		}
 
-		if err := conn.WriteJSON(resp); err != nil {
-			log.Println("[WS] write error:", err)
-			return
-		}
-
-		log.Printf("[WS] SENT session=%d\n", sessionID)
+		h.hub.Broadcast(sessionID, msg)
+		log.Printf("[WS] SENT session=%d", sessionID)
 	}
 }

@@ -14,7 +14,7 @@ const Sessions = () => {
     <div>
       <h2>Сессии</h2>
       {sessions.map((s) => (
-        <SessionCard key={s.id} session={s} />
+        <SessionCard key={s.sessionId} session={s} />
       ))}
     </div>
   );
