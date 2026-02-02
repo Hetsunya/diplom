@@ -16,12 +16,13 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-type WSMessage struct {
-	Type      string    `json:"type"`
-	SessionID int       `json:"session_id"`
-	Payload   any       `json:"payload"`
-	Timestamp time.Time `json:"timestamp"`
-}
+// Это страрое и уехало в contracts.go
+// type WSMessage struct {
+// 	Type      string    `json:"type"`
+// 	SessionID int       `json:"session_id"`
+// 	Payload   any       `json:"payload"`
+// 	Timestamp time.Time `json:"timestamp"`
+// }
 
 func (h *Handler) WS(c *gin.Context) {
 	sessionIDStr := c.Param("id")
@@ -64,22 +65,28 @@ func (h *Handler) WS(c *gin.Context) {
 
 	// read loop
 	for {
-		var payload map[string]any
-		if err := conn.ReadJSON(&payload); err != nil {
+		var msg WSMessage
+		if err := conn.ReadJSON(&msg); err != nil {
 			log.Printf("[WS] DISCONNECT session=%d err=%v", sessionID, err)
 			break
 		}
 
-		log.Printf("[WS] RECEIVED session=%d payload=%v", sessionID, payload)
+		log.Printf(
+			"[WS] RECEIVED type=%s session=%d participant=%s",
+			msg.Type, msg.SessionID, msg.Participant,
+		)
 
-		msg := WSMessage{
-			Type:      "echo",
-			SessionID: sessionID,
-			Payload:   payload,
-			Timestamp: time.Now(),
+		//todo
+		switch msg.Type {
+		// case "frame":
+		// 	h.handleFrame(sessionID, msg)
+
+		// case "analytics":
+		// 	h.handleAnalytics(sessionID, msg)
+
+		default:
+			h.hub.Broadcast(sessionID, msg)
 		}
-
-		h.hub.Broadcast(sessionID, msg)
-		log.Printf("[WS] SENT session=%d", sessionID)
 	}
+
 }

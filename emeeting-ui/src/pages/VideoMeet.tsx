@@ -1,16 +1,30 @@
+import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useMediaStream } from "../hooks/useMediaStream";
 import { useSessionWS } from "../hooks/useSessionWS";
 import { useScreenShare } from "../hooks/useScreenShare";
 
 const VideoMeet = () => {
-  const { id = "" } = useParams();
+  const { id = "" } = useParams(); // session ID
+  const participantId = localStorage.getItem("participant_id") || "anon"; // или берём реальный id
 
-  const { videoRef, toggleMic, toggleCam, micEnabled, camEnabled } =
+  const { videoRef, captureFrame, toggleMic, toggleCam, micEnabled, camEnabled } =
     useMediaStream();
 
   const { startShare } = useScreenShare();
-  useSessionWS(id);
+  const { send } = useSessionWS(id, participantId); // передаём participantId
+
+  // Отправка кадра каждые 2 секунды
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const frame = captureFrame();
+      if (!frame) return;
+
+      send("frame", { frame });
+    }, 2000);
+
+    return () => clearInterval(timer);
+  }, [captureFrame, send]);
 
   return (
     <div className="video-container">

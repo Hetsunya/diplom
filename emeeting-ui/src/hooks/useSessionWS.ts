@@ -1,6 +1,9 @@
 import { useEffect, useRef } from "react";
 
-export const useSessionWS = (sessionId: string) => {
+export const useSessionWS = (
+  sessionId: string,
+  participantId: string
+) => {
   const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -12,8 +15,16 @@ export const useSessionWS = (sessionId: string) => {
     return () => ws.current?.close();
   }, [sessionId]);
 
-  const send = (data: unknown) => {
-    ws.current?.send(JSON.stringify(data));
+  const send = (type: string, payload?: unknown) => {
+    ws.current?.send(
+      JSON.stringify({
+        type,
+        session_id: Number(sessionId),
+        participant_id: participantId,
+        payload,
+        timestamp: new Date().toISOString(),
+      })
+    );
   };
 
   return { send };
