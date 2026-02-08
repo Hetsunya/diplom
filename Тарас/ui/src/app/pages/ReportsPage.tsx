@@ -13,7 +13,8 @@ import {
   Frown,
   Brain,
   Lightbulb,
-  Sparkles
+  Sparkles,
+  Video
 } from 'lucide-react';
 import { 
   BarChart, 

@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router';
-import { Video, Calendar, BarChart3, LogOut, Phone } from 'lucide-react';
+import { Calendar, BarChart3, LogOut, Phone, Video as VideoIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export function Sidebar() {
@@ -24,7 +24,7 @@ export function Sidebar() {
       <div className="p-6 border-b border-gray-700">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center size-10 bg-purple-600 rounded-xl">
-            <Video className="size-6 text-white" />
+            <VideoIcon className="size-6 text-white" />
           </div>
           <div>
             <h1 className="text-lg font-bold text-white">EmotiCall</h1>
