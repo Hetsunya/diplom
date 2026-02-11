@@ -14,7 +14,6 @@ export function Sidebar() {
 
   const navItems = [
     { path: '/dashboard', icon: Calendar, label: 'Dashboard' },
-    { path: '/call', icon: Phone, label: 'Join Call' },
     { path: '/reports', icon: BarChart3, label: 'Reports' },
   ];
 

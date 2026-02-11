@@ -83,8 +83,93 @@ app.get("/make-server-837d034e/calls", async (c) => {
 
     // Get calls from KV store
     const callsData = await kv.getByPrefix(`calls:${userId}:`);
-    const calls = callsData.map(item => item.value);
+    console.log('Raw calls data from KV:', callsData);
+    
+    // Filter out null values and delete them from storage
+    const validCallsData = [];
+    const deletePromises = [];
+    for (const item of callsData) {
+      if (item.value == null) {
+        console.log('Found null value, deleting key:', item.key);
+        deletePromises.push(kv.del(item.key));
+      } else {
+        validCallsData.push(item);
+      }
+    }
+    await Promise.all(deletePromises);
+    
+    let calls = validCallsData.map(item => item.value);
 
+    // If no calls exist, create pre-made sample calls for the user
+    if (calls.length === 0) {
+      console.log('No calls found, creating sample calls for user:', userId);
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const nextWeek = new Date(today);
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      const dayAfterTomorrow = new Date(today);
+      dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+
+      const formatDate = (date: Date) => {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+      };
+
+      const formatDateISO = (date: Date) => {
+        return date.toISOString().split('T')[0];
+      };
+
+      const sampleCalls = [
+        {
+          id: crypto.randomUUID(),
+          title: 'Team Standup',
+          date: formatDate(tomorrow),
+          dateISO: formatDateISO(tomorrow),
+          time: '09:00',
+          duration: '30 min',
+          participants: ['Sarah Chen', 'Michael Rodriguez', 'Emily Johnson'],
+          status: 'upcoming',
+          createdAt: new Date().toISOString(),
+          description: 'Daily team sync to discuss progress and blockers',
+        },
+        {
+          id: crypto.randomUUID(),
+          title: 'Product Strategy Review',
+          date: formatDate(dayAfterTomorrow),
+          dateISO: formatDateISO(dayAfterTomorrow),
+          time: '14:00',
+          duration: '60 min',
+          participants: ['David Kim', 'Lisa Anderson', 'James Wilson', 'Maria Garcia'],
+          status: 'upcoming',
+          createdAt: new Date().toISOString(),
+          description: 'Quarterly product roadmap discussion and feature prioritization',
+        },
+        {
+          id: crypto.randomUUID(),
+          title: 'Client Presentation',
+          date: formatDate(nextWeek),
+          dateISO: formatDateISO(nextWeek),
+          time: '11:00',
+          duration: '45 min',
+          participants: ['Robert Taylor', 'Jennifer Brown'],
+          status: 'upcoming',
+          createdAt: new Date().toISOString(),
+          description: 'Demo of new features and Q1 progress report',
+        },
+      ];
+
+      // Store all sample calls in KV store - wait for all to complete
+      const storePromises = sampleCalls.map(call => 
+        kv.set(`calls:${userId}:${call.id}`, call)
+      );
+      await Promise.all(storePromises);
+      console.log('Sample calls created and stored successfully');
+
+      calls = sampleCalls;
+    }
+
+    console.log('Returning calls:', calls);
     return c.json({ calls });
   } catch (error) {
     console.error('Error fetching calls:', error);
@@ -104,10 +189,18 @@ app.post("/make-server-837d034e/calls", async (c) => {
     // Generate unique ID for the call
     const callId = crypto.randomUUID();
     
+    // Format the date for display
+    const formatDateForDisplay = (dateStr: string) => {
+      const dateObj = new Date(dateStr);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${months[dateObj.getMonth()]} ${dateObj.getDate()}, ${dateObj.getFullYear()}`;
+    };
+    
     const newCall = {
       id: callId,
       title,
-      date,
+      date: formatDateForDisplay(date),
+      dateISO: date,
       time,
       duration,
       participants,
