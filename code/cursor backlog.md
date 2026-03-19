@@ -74,7 +74,7 @@ BL-010 [x]: Интерфейсы портов в session/auth
 Результат: Repository/Service/Bus как интерфейсы, handler зависит от абстракций.
 Оценка: 1–2 дн
 DoD: можно подменить репозиторий моками в unit-тестах.
-BL-011: Registry-based WS dispatch
+BL-011 [x]: Registry-based WS dispatch
 
 Цель: легко добавлять новые WS-команды.
 Файлы: emeeting-backend/internal/session/ws_handler.go

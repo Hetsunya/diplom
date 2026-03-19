@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -14,10 +15,18 @@ import (
 type Handler struct {
 	service Service
 	hub     Bus
+	wsMu    sync.RWMutex
+	wsMap   map[string]WSMessageHandler
 }
 
 func NewHandler(service Service, hub Bus) *Handler {
-	return &Handler{service: service, hub: hub}
+	h := &Handler{
+		service: service,
+		hub:     hub,
+		wsMap:   make(map[string]WSMessageHandler),
+	}
+	h.registerDefaultWSHandlers()
+	return h
 }
 
 // DTO для создания сессии

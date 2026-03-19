@@ -16,13 +16,33 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-// Это страрое и уехало в contracts.go
-// type WSMessage struct {
-// 	Type      string    `json:"type"`
-// 	SessionID int       `json:"session_id"`
-// 	Payload   any       `json:"payload"`
-// 	Timestamp time.Time `json:"timestamp"`
-// }
+func (h *Handler) RegisterWSHandler(messageType string, handler WSMessageHandler) {
+	h.wsMu.Lock()
+	defer h.wsMu.Unlock()
+	h.wsMap[messageType] = handler
+}
+
+func (h *Handler) registerDefaultWSHandlers() {
+	// Default behavior for known command types is broadcast.
+	broadcastHandler := func(sessionID int, msg WSMessage) {
+		h.hub.Broadcast(sessionID, msg)
+	}
+	h.RegisterWSHandler("broadcast", broadcastHandler)
+	h.RegisterWSHandler("frame", broadcastHandler)
+	h.RegisterWSHandler("analytics", broadcastHandler)
+}
+
+func (h *Handler) dispatchWSMessage(sessionID int, msg WSMessage) {
+	h.wsMu.RLock()
+	handler, ok := h.wsMap[msg.Type]
+	h.wsMu.RUnlock()
+	if !ok {
+		// Fallback for yet-unregistered types.
+		h.hub.Broadcast(sessionID, msg)
+		return
+	}
+	handler(sessionID, msg)
+}
 
 func (h *Handler) WS(c *gin.Context) {
 	sessionIDStr := c.Param("id")
@@ -76,17 +96,7 @@ func (h *Handler) WS(c *gin.Context) {
 			msg.Type, msg.SessionID, msg.Participant,
 		)
 
-		//todo
-		switch msg.Type {
-		// case "frame":
-		// 	h.handleFrame(sessionID, msg)
-
-		// case "analytics":
-		// 	h.handleAnalytics(sessionID, msg)
-
-		default:
-			h.hub.Broadcast(sessionID, msg)
-		}
+		h.dispatchWSMessage(sessionID, msg)
 	}
 
 }

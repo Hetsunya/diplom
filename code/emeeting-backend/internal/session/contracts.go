@@ -25,6 +25,8 @@ type Bus interface {
 	Broadcast(sessionID int, message any)
 }
 
+type WSMessageHandler func(sessionID int, msg WSMessage)
+
 type WSMessage struct {
 	Type        string    `json:"type"`
 	SessionID   int       `json:"session_id"`
