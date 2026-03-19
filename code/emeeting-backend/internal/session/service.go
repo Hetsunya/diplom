@@ -2,11 +2,17 @@ package session
 
 import "emeeting/internal/models"
 
-type Service struct {
-	repo *Repository
+type RepositoryContract interface {
+	Create(input models.Session) (int, error)
+	List() ([]models.Session, error)
+	Get(id int) (*models.Session, error)
 }
 
-func NewService(repo *Repository) *Service {
+type Service struct {
+	repo RepositoryContract
+}
+
+func NewService(repo RepositoryContract) *Service {
 	return &Service{repo: repo}
 }
 
