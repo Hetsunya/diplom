@@ -7,16 +7,16 @@ import (
 	"emeeting/internal/models"
 )
 
-type Repository struct {
+type PostgresRepository struct {
 	db *sql.DB
 }
 
-func NewRepository(db *sql.DB) *Repository {
-	return &Repository{db: db}
+func NewRepository(db *sql.DB) *PostgresRepository {
+	return &PostgresRepository{db: db}
 }
 
 // Create создает новую сессию и возвращает ее ID
-func (r *Repository) Create(s models.Session) (int, error) {
+func (r *PostgresRepository) Create(s models.Session) (int, error) {
 	var id int
 
 	// sql.Null* для nullable полей
@@ -63,7 +63,7 @@ func (r *Repository) Create(s models.Session) (int, error) {
 }
 
 // List возвращает все сессии
-func (r *Repository) List() ([]models.Session, error) {
+func (r *PostgresRepository) List() ([]models.Session, error) {
 	rows, err := r.db.Query(`
 		SELECT session_id, title, description, session_type, start_datetime, end_datetime, location_type, physical_location, created_by
 		FROM session
@@ -97,7 +97,7 @@ func (r *Repository) List() ([]models.Session, error) {
 }
 
 // Get возвращает одну сессию по ID
-func (r *Repository) Get(id int) (*models.Session, error) {
+func (r *PostgresRepository) Get(id int) (*models.Session, error) {
 	var s models.Session
 	err := r.db.QueryRow(`
 		SELECT session_id, title, description, session_type, start_datetime, end_datetime, location_type, physical_location, created_by

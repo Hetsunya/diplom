@@ -58,7 +58,7 @@ func (r *fakeRepo) Get(id int) (*models.Session, error) {
 	return &s, nil
 }
 
-func setupRouterForSessionTests(repo RepositoryContract) *gin.Engine {
+func setupRouterForSessionTests(repo Repository) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	svc := NewService(repo)
 	handler := NewHandler(svc, NewSessionHub())

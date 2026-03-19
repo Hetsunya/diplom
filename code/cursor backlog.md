@@ -67,7 +67,7 @@ BL-009 [x]: Backend модульная регистрация роутов
 Результат: интерфейс модуля (RegisterRoutes) и сборка через список модулей.
 Оценка: 1–2 дн
 DoD: добавление нового модуля не требует большого рефакторинга main.go.
-BL-010: Интерфейсы портов в session/auth
+BL-010 [x]: Интерфейсы портов в session/auth
 
 Цель: тестируемость и замена реализаций.
 Файлы: emeeting-backend/internal/session/contracts.go, handler.go, repository.go, hub.go

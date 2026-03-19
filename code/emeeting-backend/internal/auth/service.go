@@ -15,13 +15,13 @@ type LoginResponse struct {
 	PasswordHash string  `json:"passwordHash"`
 }
 
-type Service struct{}
+type service struct{}
 
-func NewService() *Service {
-	return &Service{}
+func NewService() Service {
+	return &service{}
 }
 
-func (s *Service) Authenticate(email, password string) (*LoginResponse, error) {
+func (s *service) Authenticate(email, password string) (*LoginResponse, error) {
 	if strings.TrimSpace(email) == "" || strings.TrimSpace(password) == "" {
 		return nil, errors.New("email and password are required")
 	}
