@@ -16,7 +16,7 @@ BL-002 [x]: Убрать хардкод конфигов во всех серв�
 Результат: env-переменные + .env.example в emeeting-backend, emeeting-ui, ai-gateway.
 Оценка: 4–8 ч
 DoD: запуск на новой машине без правки исходников.
-BL-003: Минимально закрыть пустые backend-заготовки
+BL-003 [x]: Минимально закрыть пустые backend-заготовки
 
 Цель: убрать технические “дыры” в критическом пути.
 Файлы: emeeting-backend/internal/auth/handler.go, emeeting-backend/internal/auth/service.go, emeeting-backend/internal/session/service.go, emeeting-backend/internal/ws/handler.go

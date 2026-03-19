@@ -12,12 +12,12 @@ import (
 )
 
 type Handler struct {
-	repo *Repository
-	hub  *SessionHub
+	service *Service
+	hub     *SessionHub
 }
 
-func NewHandler(repo *Repository, hub *SessionHub) *Handler {
-	return &Handler{repo: repo, hub: hub}
+func NewHandler(service *Service, hub *SessionHub) *Handler {
+	return &Handler{service: service, hub: hub}
 }
 
 // DTO для создания сессии
@@ -70,7 +70,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 
 	log.Printf("DEBUG: creating session %+v", session)
-	id, err := h.repo.Create(session)
+	id, err := h.service.Create(session)
 	if err != nil {
 		log.Printf("ERROR: failed to create session: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -82,7 +82,7 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	sessions, err := h.repo.List()
+	sessions, err := h.service.List()
 	if err != nil {
 		log.Printf("ERROR: failed to list sessions: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -100,7 +100,7 @@ func (h *Handler) Get(c *gin.Context) {
 		return
 	}
 
-	session, err := h.repo.Get(id)
+	session, err := h.service.Get(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
 		return

@@ -10,8 +10,10 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
+	"emeeting/internal/auth"
 	"emeeting/internal/db"
 	"emeeting/internal/session"
+	wsmodule "emeeting/internal/ws"
 )
 
 func main() {
@@ -27,8 +29,11 @@ func main() {
 
 	// session module
 	repo := session.NewRepository(database)
+	sessionService := session.NewService(repo)
 	hub := session.NewSessionHub()
-	handler := session.NewHandler(repo, hub)
+	handler := session.NewHandler(sessionService, hub)
+	authHandler := auth.NewHandler(auth.NewService())
+	wsHandler := wsmodule.NewHandler()
 
 	// gin
 	r := gin.Default()
@@ -46,30 +51,9 @@ func main() {
 	r.GET("/sessions", handler.List)
 	r.GET("/sessions/:id", handler.Get)
 
-	// auth stubs to match UI contract
-	r.POST("/auth/login", func(c *gin.Context) {
-		var input struct {
-			Email    string `json:"email"`
-			Password string `json:"password"`
-		}
-		if err := c.ShouldBindJSON(&input); err != nil || input.Email == "" || input.Password == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "email and password are required"})
-			return
-		}
-
-		now := time.Now().UTC().Format(time.RFC3339)
-		c.JSON(http.StatusOK, gin.H{
-			"authUserId":   1,
-			"email":        input.Email,
-			"isActive":     true,
-			"createdAt":    now,
-			"lastLogin":    now,
-			"passwordHash": "",
-		})
-	})
-	r.POST("/auth/logout", func(c *gin.Context) {
-		c.Status(http.StatusNoContent)
-	})
+	// auth
+	r.POST("/auth/login", authHandler.Login)
+	r.POST("/auth/logout", authHandler.Logout)
 
 	// report stub to match UI contract
 	r.GET("/reports/:id", func(c *gin.Context) {
@@ -89,6 +73,7 @@ func main() {
 
 	// WS
 	r.GET("/ws/sessions/:id", handler.WS)
+	r.GET("/ws/health", wsHandler.Health)
 
 	addr := ":" + serverPort
 	log.Printf("Server running on %s", addr)
