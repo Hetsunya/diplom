@@ -1,0 +1,69 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: emeeting-db
+    environment:
+      POSTGRES_DB: emeeting
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1040
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./code/emeeting-backend/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d emeeting"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./code/emeeting-backend
+    container_name: emeeting-backend
+    environment:
+      POSTGRES_DSN: postgres://postgres:1040@db:5432/emeeting?sslmode=disable
+      SERVER_PORT: 8080
+      CORS_ALLOW_ORIGIN: http://localhost:5173
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/ws/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ai-gateway:
+    build:
+      context: ./code/ai-gateway
+    container_name: emeeting-ai-gateway
+    environment:
+      BACKEND_WS_BASE_URL: ws://backend:8080
+      SESSION_ID: 1
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  ui:
+    build:
+      context: ./code/emeeting-ui
+    container_name: emeeting-ui
+    environment:
+      VITE_API_URL: http://localhost:8080
+      VITE_WS_URL: ws://localhost:8080
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "5173:5173"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5173"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

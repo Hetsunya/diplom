@@ -38,7 +38,7 @@ BL-005 [x]: Настроить CI (lint + test + build)
 Результат: пайплайн для emeeting-ui, emeeting-backend, ai-gateway.
 Оценка: 6–10 ч
 DoD: CI падает при поломке тестов/линта.
-BL-006: Воспроизводимый локальный запуск (docker-compose)
+BL-006 [x]: Воспроизводимый локальный запуск (docker-compose)
 
 Цель: запуск всего стека одной командой.
 Файлы: docker-compose.yml (новый), Dockerfile для сервисов, README.md (корень)
