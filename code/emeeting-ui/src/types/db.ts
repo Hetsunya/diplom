@@ -165,7 +165,7 @@ export interface Report {
   version: number;
   createdAt: string;
   updatedAt: string;
-  summaryJson?: any;
-  participantsJson?: any;
-  dashboardJson?: any;
+  summaryJson?: unknown;
+  participantsJson?: unknown;
+  dashboardJson?: unknown;
 }
