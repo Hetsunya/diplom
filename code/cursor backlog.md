@@ -9,7 +9,7 @@ BL-001 [x]: Зафиксировать API-контракт v1 (UI ↔ Backend)
 Результат: документ docs/api-contract.md + backend маршруты соответствуют UI.
 Оценка: 4–6 ч
 DoD: UI не получает 404 на основных сценариях (login/sessions/reports).
-BL-002: Убрать хардкод конфигов во всех сервисах
+BL-002 [x]: Убрать хардкод конфигов во всех сервисах
 
 Цель: переносимость между окружениями.
 Файлы: emeeting-backend/internal/db/postgres.go, emeeting-backend/cmd/server/main.go, emeeting-ui/src/api/http.ts, emeeting-ui/src/hooks/useSessionWS.ts, ai-gateway/main.py

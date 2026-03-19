@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -14,8 +15,12 @@ import (
 )
 
 func main() {
+	postgresDSN := getEnv("POSTGRES_DSN", "postgres://postgres:1040@localhost:5432/emeeting?sslmode=disable")
+	serverPort := getEnv("SERVER_PORT", "8080")
+	corsOrigin := getEnv("CORS_ALLOW_ORIGIN", "http://localhost:5173")
+
 	// DB
-	database, err := db.NewPostgres("")
+	database, err := db.NewPostgres(postgresDSN)
 	if err != nil {
 		log.Fatal("DB connection failed:", err)
 	}
@@ -29,7 +34,7 @@ func main() {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173"},
+		AllowOrigins:     []string{corsOrigin},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
 		AllowCredentials: true,
@@ -85,8 +90,17 @@ func main() {
 	// WS
 	r.GET("/ws/sessions/:id", handler.WS)
 
-	log.Println("Server running on :8080")
-	if err := r.Run(":8080"); err != nil {
+	addr := ":" + serverPort
+	log.Printf("Server running on %s", addr)
+	if err := r.Run(addr); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func getEnv(key, fallback string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	return value
 }

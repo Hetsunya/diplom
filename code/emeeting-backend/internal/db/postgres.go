@@ -3,18 +3,21 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"log"
 
 	_ "github.com/lib/pq"
 )
 
 func NewPostgres(dsn string) (*sql.DB, error) {
+	if dsn == "" {
+		return nil, fmt.Errorf("empty postgres dsn")
+	}
+
 	db, err := sql.Open(
 		"postgres",
-		"postgres://postgres:1040@localhost:5432/emeeting?sslmode=disable",
+		dsn,
 	)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	if err := db.Ping(); err != nil {
