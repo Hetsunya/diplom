@@ -1,73 +1,58 @@
-# React + TypeScript + Vite
+# eMeeting UI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend application for eMeeting built with React, TypeScript, and Vite.
 
-Currently, two official plugins are available:
+## Prerequisites
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Node.js 20+
+- npm
 
-## React Compiler
+## Configuration
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Create `.env` from `.env.example`:
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cp .env.example .env
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Main variables:
+- `VITE_API_URL` - backend HTTP URL (default `http://localhost:8080`)
+- `VITE_WS_URL` - backend WS base URL (default `ws://localhost:8080`)
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Development
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
+
+App runs on `http://localhost:5173` by default.
+
+## Quality checks
+
+```bash
+npm run lint
+npm run build
+```
+
+## API expectations
+
+UI depends on these backend routes:
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /sessions`
+- `POST /sessions`
+- `GET /sessions/:id`
+- `GET /reports/:id`
+- `GET /ws/sessions/:id` (WebSocket)
+
+## Troubleshooting
+
+- **Blank page or build failure**
+  - Run `npm run lint` and fix errors first.
+- **Network errors in browser**
+  - Verify `VITE_API_URL` points to running backend.
+- **WebSocket not connecting**
+  - Verify `VITE_WS_URL` and backend WS endpoint availability.
+- **CORS errors**
+  - Set backend `CORS_ALLOW_ORIGIN` to UI origin.

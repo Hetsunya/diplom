@@ -1,32 +1,72 @@
 # eMeeting Monorepo
 
-## Quick start (Docker Compose)
+## What is inside
+
+- `code/emeeting-ui` - React + TypeScript frontend
+- `code/emeeting-backend` - Go (Gin) backend API + WebSocket
+- `code/ai-gateway` - Python gateway for WS/AI handlers
+- `docker-compose.yml` - local stack orchestration
+
+## Runbook: quick start (Docker Compose)
 
 Requirements:
-- Docker
+- Docker Desktop (or Docker Engine)
 - Docker Compose plugin
 
-Run full stack:
+1) Start full stack:
 
 ```bash
 docker compose up --build
 ```
 
-Services:
+2) Open services:
 - UI: `http://localhost:5173`
 - Backend API: `http://localhost:8080`
+- Backend health: `http://localhost:8080/ws/health`
 - Postgres: `localhost:5432`
 
-Stop and remove containers:
+3) Stop stack:
 
 ```bash
 docker compose down
 ```
 
-Reset DB volume:
+4) Reset DB data (fresh bootstrap):
 
 ```bash
 docker compose down -v
+```
+
+## Runbook: local development (without Docker)
+
+### Backend
+
+```bash
+cd code/emeeting-backend
+go test ./...
+go run ./cmd/server
+```
+
+Default backend URL: `http://localhost:8080`
+
+### UI
+
+```bash
+cd code/emeeting-ui
+npm install
+npm run lint
+npm run build
+npm run dev
+```
+
+Default UI URL: `http://localhost:5173`
+
+### AI gateway
+
+```bash
+cd code/ai-gateway
+python -m pip install -r requirements.txt
+python main.py
 ```
 
 ## Database migrations
@@ -37,7 +77,30 @@ docker compose down -v
 - On fresh startup, `docker compose` auto-applies only `up` scripts via `/docker-entrypoint-initdb.d`.
 - Rollback instructions are documented in `code/emeeting-backend/migrations/README.md`.
 
-## Environment notes
+## Verify checklist
+
+- `docker compose up --build` starts all services without crash loops.
+- `GET http://localhost:8080/ws/health` returns status `ok`.
+- UI opens and can call backend endpoints (`/sessions`, `/auth/login`, `/reports/:id`).
+- Backend tests pass locally: `go test ./...`.
+- UI quality checks pass locally: `npm run lint && npm run build`.
+
+## Debug guide
+
+- **Backend fails to connect DB**
+  - Check `POSTGRES_DSN` in compose/env.
+  - Ensure DB container is healthy before backend start.
+- **UI cannot reach API or WS**
+  - Check `VITE_API_URL` and `VITE_WS_URL`.
+  - Verify backend exposed on port `8080`.
+- **WS closes immediately**
+  - Confirm `GET /ws/sessions/:id` is reachable.
+  - Check backend logs for upgrade errors.
+- **DB schema missing**
+  - Reset volumes (`docker compose down -v`) and start again.
+  - Verify scripts exist in `migrations/up`.
+
+## Environment variables
 
 - Backend config in compose:
   - `POSTGRES_DSN`
