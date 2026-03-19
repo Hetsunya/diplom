@@ -2,7 +2,7 @@
 
 Backlog (приоритетный)
 P0 — Стабильный базовый контур (блокеры)
-BL-001: Зафиксировать API-контракт v1 (UI ↔ Backend)
+BL-001 [x]: Зафиксировать API-контракт v1 (UI ↔ Backend)
 
 Цель: убрать рассинхрон эндпоинтов и payload.
 Файлы: emeeting-ui/src/api/auth.ts, emeeting-ui/src/api/reports.ts, emeeting-ui/src/api/sessions.ts, emeeting-backend/cmd/server/main.go
