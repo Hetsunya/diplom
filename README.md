@@ -29,9 +29,16 @@ Reset DB volume:
 docker compose down -v
 ```
 
+## Database migrations
+
+- Versioned SQL migrations live in:
+  - `code/emeeting-backend/migrations/up`
+  - `code/emeeting-backend/migrations/down`
+- On fresh startup, `docker compose` auto-applies only `up` scripts via `/docker-entrypoint-initdb.d`.
+- Rollback instructions are documented in `code/emeeting-backend/migrations/README.md`.
+
 ## Environment notes
 
-- Backend DB schema is initialized from `code/emeeting-backend/migrations/001_init.sql`.
 - Backend config in compose:
   - `POSTGRES_DSN`
   - `SERVER_PORT`

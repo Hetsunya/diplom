@@ -10,7 +10,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./code/emeeting-backend/migrations:/docker-entrypoint-initdb.d:ro
+      - ./code/emeeting-backend/migrations/up:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d emeeting"]
       interval: 5s
