@@ -9,7 +9,9 @@ const Sessions = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    getSessions().then(setSessions).catch(console.error);
+    getSessions()
+      .then((data) => setSessions(Array.isArray(data) ? data : []))
+      .catch(console.error);
   }, []);
 
   const filtered = useMemo(() => {

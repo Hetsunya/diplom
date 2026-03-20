@@ -162,11 +162,17 @@ const VideoMeet = () => {
           <div key={p.id} className="video-tile">
             <div className="tile-media">
               {isSelf ? (
-                showCamOff ? (
-                  <div className="video-placeholder" />
-                ) : (
-                  <video ref={videoRef} autoPlay playsInline />
-                )
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    className={showCamOff ? "video-hidden" : ""}
+                  />
+                  {showCamOff && (
+                    <div className="video-placeholder video-placeholder--overlay" />
+                  )}
+                </>
               ) : (
                 <div className="fake-video">
                   <div className="face-placeholder" />

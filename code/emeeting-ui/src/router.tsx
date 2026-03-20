@@ -3,6 +3,7 @@ import { createBrowserRouter } from 'react-router-dom';
 import App from './App';
 import { featureRoutes, publicRoutes } from "./config/features";
 import { AuthGate } from "./components/AuthGate";
+import AppError from "./components/AppError";
 
 const protectedKeys = new Set(["sessions", "sessions_new", "video_meet", "report"]);
 
@@ -10,6 +11,7 @@ const router = createBrowserRouter([
   {
     path: '/',
     element: <App />,
+    errorElement: <AppError />,
     children: [
       ...featureRoutes
         .filter((f) => f.enabled)

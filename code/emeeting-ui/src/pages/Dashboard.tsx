@@ -14,7 +14,9 @@ const Dashboard = () => {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
-    getSessions().then(setSessions).catch(console.error);
+    getSessions()
+      .then((data) => setSessions(Array.isArray(data) ? data : []))
+      .catch(console.error);
   }, []);
 
   const goToNewSession = () => {

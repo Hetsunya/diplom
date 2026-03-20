@@ -74,7 +74,8 @@ func (r *PostgresRepository) List() ([]models.Session, error) {
 	}
 	defer rows.Close()
 
-	var sessions []models.Session
+	// Return empty array ([]) instead of null, so UI doesn't crash on `sessions.length`.
+	sessions := make([]models.Session, 0)
 	for rows.Next() {
 		var s models.Session
 		err := rows.Scan(

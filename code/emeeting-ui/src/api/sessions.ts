@@ -4,7 +4,8 @@ import type { Session, CreateSessionDTO } from "../types/db";
 export async function getSessions(): Promise<Session[]> {
   const res = await apiFetch("/sessions");
   if (!res.ok) throw new Error("Failed to fetch sessions");
-  return res.json();
+  const json = await res.json();
+  return Array.isArray(json) ? json : [];
 }
 
 export async function createSession(data: CreateSessionDTO): Promise<Session> {
