@@ -1,8 +1,7 @@
-import asyncio
 from pathlib import Path
 import pkgutil
 from importlib import import_module
-from typing import Any, Awaitable, Callable, Protocol
+from typing import Any, Protocol
 
 
 class Plugin(Protocol):

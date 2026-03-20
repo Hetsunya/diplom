@@ -12,8 +12,9 @@ export const useSessionWS = (
   useEffect(() => {
     ws.current = new WebSocket(`${WS_URL}/ws/sessions/${sessionId}`);
 
-    ws.current.onopen = () => console.log("WS connected");
-    ws.current.onmessage = (msg) => console.log("WS:", msg.data);
+    // Сообщения пока не отображаем в UI (бекенд будет отправлять события в будущем).
+    ws.current.onopen = () => {};
+    ws.current.onmessage = () => {};
 
     return () => ws.current?.close();
   }, [sessionId]);

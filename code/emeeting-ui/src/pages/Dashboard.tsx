@@ -1,13 +1,34 @@
 // src/pages/Dashboard.tsx
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { getSessions } from '../api/sessions';
+import type { Session } from '../types/db';
 
 const Dashboard = () => {
   const { user } = useAuthStore();
   const navigate = useNavigate();
 
+  const [sessions, setSessions] = useState<Session[]>([]);
+
+  useEffect(() => {
+    getSessions().then(setSessions).catch(console.error);
+  }, []);
+
   const goToNewSession = () => {
     navigate('/sessions/new');
+  };
+
+  const stats = useMemo(() => {
+    const total = sessions.length;
+    const meetings = sessions.filter((s) => s.sessionType === 'meeting').length;
+    const interviews = sessions.filter((s) => s.sessionType === 'interview').length;
+    return { total, meetings, interviews };
+  }, [sessions]);
+
+  const formatDate = (value: string) => {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? 'Не указано' : d.toLocaleString();
   };
 
   return (
@@ -18,13 +39,45 @@ const Dashboard = () => {
       </header>
 
       <div className="stats-overview">
-        {/* Добавить статистики если есть данные */}
+        <div className="stat-card">
+          <div className="stat-value engagement">{stats.total}</div>
+          <div>Всего сессий</div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-value engagement">{stats.meetings}</div>
+          <div>Meeting</div>
+        </div>
+
+        <div className="stat-card">
+          <div className="stat-value stress">{stats.interviews}</div>
+          <div>Interview</div>
+        </div>
       </div>
 
       <div className="sessions-list">
-        <h2>Недавние сессии</h2>
+        <h2>Сессии</h2>
         <table className="dashboard-table">
-          {/* Таблица сессий */}
+          <thead>
+            <tr>
+              <th>Название</th>
+              <th>Тип</th>
+              <th>Старт</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sessions.map((s) => (
+              <tr key={s.sessionId}>
+                <td>{s.title}</td>
+                <td>{s.sessionType}</td>
+                <td>{s.startDatetime ? formatDate(s.startDatetime) : 'Не указано'}</td>
+                <td>
+                  <Link to={`/sessions/${s.sessionId}`}>Открыть</Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
 
