@@ -1,28 +1,27 @@
 // src/router.tsx
 import { createBrowserRouter } from 'react-router-dom';
 import App from './App';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Sessions from './pages/Sessions';
-import NewSession from './pages/NewSession';
-import VideoMeet from './pages/VideoMeet';
-import Report from './pages/Report';
-// import Configs from './pages/Configs'; // Если нужно
+import { featureRoutes, publicRoutes } from "./config/features";
 
 const router = createBrowserRouter([
   {
     path: '/',
     element: <App />,
     children: [
-      { path: '/', element: <Dashboard /> },
-      { path: '/sessions', element: <Sessions /> },
-      { path: '/sessions/new', element: <NewSession /> },
-      { path: '/sessions/:id', element: <VideoMeet /> },
-      { path: '/reports/:id', element: <Report /> },
-      // { path: '/configs', element: <Configs /> },
+      ...featureRoutes
+        .filter((f) => f.enabled)
+        .map((f) => {
+          const Component = f.component;
+          return { path: f.path, element: <Component /> };
+        }),
     ],
   },
-  { path: '/login', element: <Login /> },
+  ...publicRoutes
+    .filter((r) => r.enabled)
+    .map((r) => {
+      const Component = r.component;
+      return { path: r.path, element: <Component /> };
+    }),
 ]);
 
 export default router;

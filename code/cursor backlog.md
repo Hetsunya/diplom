@@ -88,7 +88,7 @@ BL-012 [x]: Плагинный AI-pipeline в gateway
 Результат: контракт анализатора (can_handle/process) + реестр плагинов.
 Оценка: 1–2 дн
 DoD: новый анализатор подключается отдельным модулем.
-BL-013: Декларативный feature-config на UI
+BL-013 [x]: Декларативный feature-config на UI
 
 Цель: включать новые инструменты/страницы конфигом.
 Файлы: emeeting-ui/src/router.tsx, emeeting-ui/src/components/Navbar.tsx, emeeting-ui/src/config/features.ts (новый)

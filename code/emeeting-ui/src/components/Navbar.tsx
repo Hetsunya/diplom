@@ -2,6 +2,7 @@
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { logout } from '../api/auth';
+import { featureRoutes } from '../config/features';
 
 const Navbar = () => {
   const { isAuthenticated, setAuth } = useAuthStore();
@@ -13,8 +14,13 @@ const Navbar = () => {
 
   return (
     <nav>
-      <Link to="/">Главная</Link>
-      <Link to="/sessions">Сессии</Link>
+      {featureRoutes
+        .filter((f) => f.enabled && f.nav)
+        .map((f) => (
+          <Link key={f.key} to={f.nav!.to}>
+            {f.nav!.label}
+          </Link>
+        ))}
       {isAuthenticated ? (
         <button className="action-btn" onClick={handleLogout}>Выйти</button>
       ) : (
