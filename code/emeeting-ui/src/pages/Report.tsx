@@ -11,6 +11,17 @@ const Report = () => {
   const [emotionTotal, setEmotionTotal] = useState(0);
   const participantId = sessionStorage.getItem('report_participant_id') || 'report_viewer';
 
+  const normalizeEmotionLabel = (raw: string) => {
+    const normalized = raw.toLowerCase();
+    if (normalized.includes("happy")) return "Happy";
+    if (normalized.includes("surpris")) return "Surprised";
+    if (normalized.includes("neutral")) return "Neutral";
+    if (normalized.includes("fear") || normalized.includes("disgust")) return "Engaged";
+    if (normalized.includes("sad")) return "Focused";
+    if (normalized.includes("angry")) return "Thoughtful";
+    return raw;
+  };
+
   useSessionWS(id!, participantId, (msg) => {
     if (typeof msg !== 'object' || msg === null) return;
     const m = msg as {
@@ -45,7 +56,11 @@ const Report = () => {
 
     if (!label) return;
 
-    setEmotionCounts((prev) => ({ ...prev, [label!]: (prev[label!] ?? 0) + 1 }));
+    const normalizedLabel = normalizeEmotionLabel(label!);
+    setEmotionCounts((prev) => ({
+      ...prev,
+      [normalizedLabel]: (prev[normalizedLabel] ?? 0) + 1,
+    }));
     setEmotionTotal((t) => t + 1);
   });
 
