@@ -81,7 +81,7 @@ BL-011 [x]: Registry-based WS dispatch
 Результат: map[type]handler вместо giant switch.
 Оценка: 6–10 ч
 DoD: новая команда добавляется через регистрацию обработчика.
-BL-012: Плагинный AI-pipeline в gateway
+BL-012 [x]: Плагинный AI-pipeline в gateway
 
 Цель: расширять AI-инструментарий без переписывания центра.
 Файлы: ai-gateway/handlers.py, ai-gateway/main.py, ai-gateway/plugins/* (новые)

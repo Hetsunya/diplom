@@ -1,34 +1,54 @@
 import asyncio
+from pathlib import Path
+import pkgutil
+from importlib import import_module
+from typing import Any, Awaitable, Callable, Protocol
 
 
-async def handle_message(msg: dict):
-    msg_type = msg.get("type")
+class Plugin(Protocol):
+    name: str
 
-    if msg_type == "ping":
-        print(f"[PING] session={msg['session_id']}")
+    def can_handle(self, msg: dict[str, Any]) -> bool: ...
 
-    elif msg_type == "frame":
-        # здесь будет base64 jpeg / bytes
-        await handle_frame(msg["payload"])
-
-    elif msg_type == "audio":
-        await handle_audio(msg["payload"])
-
-    else:
-        print("[WS] message:", msg)
+    async def process(self, msg: dict[str, Any]) -> None: ...
 
 
-async def handle_frame(payload):
+def _load_plugins() -> list[Plugin]:
     """
-    payload пример:
-    {
-      "participant_id": "...",
-      "frame": "base64..."
-    }
+    Auto-discover modules in `plugins/*` and collect plugin instances.
+
+    A new plugin should be added as a single file into `plugins/`.
     """
-    print("[FRAME] received frame")
-    # TODO: decode → inference
+    plugins: list[Plugin] = []
+
+    package = "plugins"
+    plugins_dir = Path(__file__).resolve().parent / "plugins"
+    for mod in pkgutil.iter_modules([str(plugins_dir)]):
+        module_name = f"{package}.{mod.name}"
+        imported = import_module(module_name)
+
+        instance = getattr(imported, "plugin", None)
+        if instance is not None:
+            plugins.append(instance)
+
+    return plugins
 
 
-async def handle_audio(payload):
-    print("[AUDIO] received audio chunk")
+_PLUGINS: list[Plugin] = []
+
+
+def _get_plugins() -> list[Plugin]:
+    global _PLUGINS
+    if not _PLUGINS:
+        _PLUGINS = _load_plugins()
+    return _PLUGINS
+
+
+async def handle_message(msg: dict[str, Any]):
+    for plugin in _get_plugins():
+        if plugin.can_handle(msg):
+            await plugin.process(msg)
+            return
+
+    # Fallback for messages without matching plugin.
+    print("[WS] message:", msg)
