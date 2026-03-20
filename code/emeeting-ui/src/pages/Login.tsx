@@ -5,8 +5,8 @@ import { login } from '../api/auth';
 import { useAuthStore } from '../store/authStore';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('demo1@example.com');
+  const [password, setPassword] = useState('demo1pass');
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
 
@@ -14,6 +14,7 @@ const Login = () => {
     try {
       const user = await login(email, password);
       setAuth(user);
+      // TODO: перейти на cookie-based auth (HttpOnly) вместо хранения только в state.
       navigate('/');
     } catch (error) {
       console.error(error);

@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"database/sql"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -8,8 +10,9 @@ type Module struct {
 	handler *Handler
 }
 
-func NewModule() *Module {
-	service := NewService()
+func NewModule(db *sql.DB) *Module {
+	repo := NewRepository(db)
+	service := NewService(repo)
 	return &Module{
 		handler: NewHandler(service),
 	}

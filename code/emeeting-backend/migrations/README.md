@@ -5,7 +5,7 @@ Versioned migrations are stored in:
 - `migrations/down` - rollback migrations
 
 Current version:
-- `001_init`
+- `002_auth_users`
 
 ## Auto-apply on fresh DB
 
@@ -16,16 +16,23 @@ Current version:
 From repository root:
 
 ```bash
+# пример: выполнить forward-миграции вручную (если нужно)
+# docker-entrypoint-initdb.d содержит только mounted скрипты, а в проде/локально путь может отличаться
 docker compose exec db psql -U postgres -d emeeting -f /docker-entrypoint-initdb.d/001_init.sql
+docker compose exec db psql -U postgres -d emeeting -f /docker-entrypoint-initdb.d/002_auth_users.sql
 ```
 
 ## Manual rollback
 
 Rollback is kept in source under:
 - `code/emeeting-backend/migrations/down/001_init.sql`
+- `code/emeeting-backend/migrations/down/002_auth_users.sql`
 
 Run from host (example with local psql):
 
 ```bash
 psql "postgres://postgres:1040@localhost:5432/emeeting?sslmode=disable" -f code/emeeting-backend/migrations/down/001_init.sql
+# откатить в обратном порядке при наличии нескольких версий:
+# psql ... -f code/emeeting-backend/migrations/down/002_auth_users.sql
+# psql ... -f code/emeeting-backend/migrations/down/001_init.sql
 ```

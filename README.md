@@ -112,3 +112,14 @@ python main.py
 - AI gateway config in compose:
   - `BACKEND_WS_BASE_URL`
   - `SESSION_ID`
+
+## Seed users (demo auth)
+
+Демо пользователи хранятся в таблице `auth_user` (пароль в `password_hash` хранится как SHA-256 hex).
+
+1. `demo1@example.com` / `demo1pass`
+2. `demo2@example.com` / `demo2pass`
+
+В UI поля логина/пароля по умолчанию заполнены для пользователя `demo1`.
+
+TODO: будет cookie-based auth (HttpOnly cookie / session token) вместо хранения только `isAuthenticated` в frontend state.

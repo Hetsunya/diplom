@@ -2,6 +2,9 @@
 import { createBrowserRouter } from 'react-router-dom';
 import App from './App';
 import { featureRoutes, publicRoutes } from "./config/features";
+import { AuthGate } from "./components/AuthGate";
+
+const protectedKeys = new Set(["sessions", "sessions_new", "video_meet", "report"]);
 
 const router = createBrowserRouter([
   {
@@ -12,7 +15,11 @@ const router = createBrowserRouter([
         .filter((f) => f.enabled)
         .map((f) => {
           const Component = f.component;
-          return { path: f.path, element: <Component /> };
+          const element = <Component />;
+          return {
+            path: f.path,
+            element: protectedKeys.has(f.key) ? <AuthGate>{element}</AuthGate> : element,
+          };
         }),
     ],
   },

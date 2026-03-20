@@ -6,20 +6,34 @@ import { useScreenShare } from "../hooks/useScreenShare";
 
 const VideoMeet = () => {
   const { id = "" } = useParams(); // session ID
-  const participantId = localStorage.getItem("participant_id") || "anon"; // или берём реальный id
+  const getOrCreateParticipant = () => {
+    const existingId = sessionStorage.getItem("participant_id") || localStorage.getItem("participant_id");
+    if (existingId) return existingId;
+
+    const uuid =
+      globalThis.crypto?.randomUUID?.() ||
+      `p_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+    sessionStorage.setItem("participant_id", uuid);
+
+    if (!sessionStorage.getItem("participant_name") && !localStorage.getItem("participant_name")) {
+      sessionStorage.setItem("participant_name", "You");
+    }
+
+    return uuid;
+  };
+
+  const [participantId] = useState<string>(getOrCreateParticipant);
+  const participantName =
+    sessionStorage.getItem("participant_name") || localStorage.getItem("participant_name") || "You";
 
   const { videoRef, captureFrame, toggleMic, toggleCam, micEnabled, camEnabled } =
     useMediaStream();
 
   const { startShare } = useScreenShare();
-  const { send } = useSessionWS(id, participantId); // передаём participantId
-
   type Emotion = "Happy" | "Neutral" | "Engaged" | "Focused" | "Surprised" | "Thoughtful";
   type Participant = {
     id: string;
     name: string;
-    isMuted: boolean;
-    isVideoOff: boolean;
     emotion: Emotion;
     emotionConfidence: number;
   };
@@ -29,12 +43,66 @@ const VideoMeet = () => {
     []
   );
 
-  const [participants, setParticipants] = useState<Participant[]>([
-    { id: "you", name: "You", isMuted: false, isVideoOff: false, emotion: "Neutral", emotionConfidence: 80 },
-    { id: "p2", name: "Sarah Chen", isMuted: false, isVideoOff: false, emotion: "Engaged", emotionConfidence: 75 },
-    { id: "p3", name: "Michael Rodriguez", isMuted: true, isVideoOff: false, emotion: "Focused", emotionConfidence: 72 },
-    { id: "p4", name: "Emily Johnson", isMuted: false, isVideoOff: false, emotion: "Thoughtful", emotionConfidence: 78 },
-  ]);
+  const [participants, setParticipants] = useState<Record<string, Participant>>({
+    [participantId]: {
+      id: participantId,
+      name: participantName,
+      emotion: "Neutral",
+      emotionConfidence: 80,
+    },
+  });
+
+  const { send } = useSessionWS(id, participantId, (msg) => {
+    if (typeof msg !== "object" || msg === null) return;
+
+    const m = msg as {
+      type?: unknown;
+      participant_id?: unknown;
+      payload?: unknown;
+    };
+
+    const type = typeof m.type === "string" ? m.type : undefined;
+    const pid = typeof m.participant_id === "string" ? m.participant_id : undefined;
+
+    if (!type || !pid) return;
+
+    if (type === "join") {
+      let name = `Participant ${pid}`;
+      const payload = m.payload;
+      if (payload && typeof payload === "object") {
+        const maybeName = (payload as Record<string, unknown>)["name"];
+        if (typeof maybeName === "string") name = maybeName;
+      }
+      setParticipants((prev) => {
+        if (prev[pid]) {
+          return {
+            ...prev,
+            [pid]: { ...prev[pid], name },
+          };
+        }
+
+        return {
+          ...prev,
+          [pid]: {
+            id: pid,
+            name,
+            emotion: "Neutral",
+            emotionConfidence: 80,
+          },
+        };
+      });
+    }
+
+    if (type === "leave") {
+      if (pid === participantId) return;
+      setParticipants((prev) => {
+        if (!prev[pid]) return prev;
+        const next = { ...prev };
+        delete next[pid];
+        return next;
+      });
+    }
+  });
 
   // Отправка кадра каждые 2 секунды
   useEffect(() => {
@@ -51,13 +119,15 @@ const VideoMeet = () => {
   // Симуляция эмоций (пока AI-детектор не подключён)
   useEffect(() => {
     const interval = setInterval(() => {
-      setParticipants((prev) =>
-        prev.map((p) => {
+      setParticipants((prev) => {
+        const next: Record<string, Participant> = {};
+        for (const [key, p] of Object.entries(prev)) {
           const nextEmotion = emotions[Math.floor(Math.random() * emotions.length)];
           const confidence = Math.floor(Math.random() * 31) + 60; // 60..90
-          return { ...p, emotion: nextEmotion, emotionConfidence: confidence };
-        })
-      );
+          next[key] = { ...p, emotion: nextEmotion, emotionConfidence: confidence };
+        }
+        return next;
+      });
     }, 3000);
 
     return () => clearInterval(interval);
@@ -84,14 +154,15 @@ const VideoMeet = () => {
   return (
     <div className="video-container">
       <div className="video-grid">
-        {participants.map((p) => {
-          const isMuted = p.id === "you" ? !micEnabled : p.isMuted;
-          const isVideoOff = p.id === "you" ? !camEnabled : p.isVideoOff;
+        {Object.values(participants).map((p) => {
+          const isSelf = p.id === participantId;
+          const showMicOff = isSelf && !micEnabled;
+          const showCamOff = isSelf && !camEnabled;
           return (
           <div key={p.id} className="video-tile">
             <div className="tile-media">
-              {p.id === "you" ? (
-                isVideoOff ? (
+              {isSelf ? (
+                showCamOff ? (
                   <div className="video-placeholder" />
                 ) : (
                   <video ref={videoRef} autoPlay playsInline />
@@ -110,8 +181,8 @@ const VideoMeet = () => {
 
             <div className="participant-name">
               {p.name}
-              {p.id === "you" && isMuted ? " • Mic off" : ""}
-              {p.id === "you" && isVideoOff ? " • Cam off" : ""}
+              {showMicOff ? " • Mic off" : ""}
+              {showCamOff ? " • Cam off" : ""}
             </div>
           </div>
           );

@@ -65,7 +65,24 @@ func (h *Handler) WS(c *gin.Context) {
 
 	// регистрируем в хабе
 	h.hub.Add(sessionID, conn)
-	defer h.hub.Remove(sessionID, conn)
+	participantID := ""
+	participantName := ""
+	defer func() {
+		if participantID != "" {
+			// Broadcast leave so that clients can remove the participant tile.
+			leaveMsg := WSMessage{
+				Type:        "leave",
+				SessionID:   sessionID,
+				Participant: participantID,
+				Payload: map[string]any{
+					"name": participantName,
+				},
+				Timestamp: time.Now(),
+			}
+			h.hub.Broadcast(sessionID, leaveMsg)
+		}
+		h.hub.Remove(sessionID, conn)
+	}()
 
 	// ping loop
 	go func() {
@@ -91,10 +108,17 @@ func (h *Handler) WS(c *gin.Context) {
 			break
 		}
 
-		log.Printf(
-			"[WS] RECEIVED type=%s session=%d participant=%s",
-			msg.Type, msg.SessionID, msg.Participant,
-		)
+		// Track last known participant to emit `leave` on disconnect.
+		if msg.Participant != "" {
+			participantID = msg.Participant
+		}
+		if msg.Type == "join" && msg.Payload != nil {
+			if m, ok := msg.Payload.(map[string]any); ok {
+				if name, ok := m["name"].(string); ok {
+					participantName = name
+				}
+			}
+		}
 
 		h.dispatchWSMessage(sessionID, msg)
 	}

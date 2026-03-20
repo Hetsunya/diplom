@@ -32,6 +32,7 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
+	// TODO: set HttpOnly cookie / session token for real auth.
 	c.JSON(http.StatusOK, user)
 }
 

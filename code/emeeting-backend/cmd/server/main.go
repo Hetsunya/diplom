@@ -38,7 +38,7 @@ func main() {
 	}))
 
 	modules := []server.RouteModule{
-		auth.NewModule(),
+		auth.NewModule(database),
 		session.NewModule(database),
 		reports.NewModule(),
 		ws.NewModule(),
