@@ -1,14 +1,14 @@
 import asyncio
 import json
 import websockets
-from typing import Callable
+from typing import Awaitable, Callable, Any
 
 
 class SessionWSClient:
     def __init__(
         self,
         url: str,
-        on_message: Callable[[dict], None],
+        on_message: Callable[[dict, websockets.WebSocketClientProtocol], Awaitable[None]],
     ):
         self.url = url
         self.on_message = on_message
@@ -24,4 +24,4 @@ class SessionWSClient:
                     print("[WS] invalid json:", raw)
                     continue
 
-                await self.on_message(msg)
+                await self.on_message(msg, ws)

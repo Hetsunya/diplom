@@ -9,7 +9,7 @@ class Plugin(Protocol):
 
     def can_handle(self, msg: dict[str, Any]) -> bool: ...
 
-    async def process(self, msg: dict[str, Any]) -> None: ...
+    async def process(self, msg: dict[str, Any], ws: Any) -> None: ...
 
 
 def _load_plugins() -> list[Plugin]:
@@ -43,10 +43,10 @@ def _get_plugins() -> list[Plugin]:
     return _PLUGINS
 
 
-async def handle_message(msg: dict[str, Any]):
+async def handle_message(msg: dict[str, Any], ws: Any):
     for plugin in _get_plugins():
         if plugin.can_handle(msg):
-            await plugin.process(msg)
+            await plugin.process(msg, ws)
             return
 
     # Fallback for messages without matching plugin.

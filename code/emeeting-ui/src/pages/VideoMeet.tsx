@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useMediaStream } from "../hooks/useMediaStream";
 import { useSessionWS } from "../hooks/useSessionWS";
@@ -30,7 +30,7 @@ const VideoMeet = () => {
     useMediaStream();
 
   const { startShare } = useScreenShare();
-  type Emotion = "Happy" | "Neutral" | "Engaged" | "Focused" | "Surprised" | "Thoughtful";
+  type Emotion = "Analyzing" | "Happy" | "Neutral" | "Engaged" | "Focused" | "Surprised" | "Thoughtful";
   type Participant = {
     id: string;
     name: string;
@@ -38,17 +38,12 @@ const VideoMeet = () => {
     emotionConfidence: number;
   };
 
-  const emotions: Emotion[] = useMemo(
-    () => ["Happy", "Neutral", "Engaged", "Focused", "Surprised", "Thoughtful"],
-    []
-  );
-
   const [participants, setParticipants] = useState<Record<string, Participant>>({
     [participantId]: {
       id: participantId,
       name: participantName,
-      emotion: "Neutral",
-      emotionConfidence: 80,
+      emotion: "Analyzing",
+      emotionConfidence: 0,
     },
   });
 
@@ -102,6 +97,82 @@ const VideoMeet = () => {
         return next;
       });
     }
+
+    if (type === "emotion") {
+      const payload = m.payload;
+      let emotion: Emotion | undefined;
+      let confidence = 0;
+
+      // Flexible parsing: different AI implementations may send different payload shapes.
+      if (payload && typeof payload === "object") {
+        const p = payload as Record<string, unknown>;
+        const maybeEmotion = p["emotion"];
+        if (typeof maybeEmotion === "string") {
+          const normalized = maybeEmotion.toLowerCase();
+          // Map arbitrary AI emotion labels to our UI set.
+          if (normalized.includes("happy")) emotion = "Happy";
+          else if (normalized.includes("surpris")) emotion = "Surprised";
+          else if (normalized.includes("neutral")) emotion = "Neutral";
+          else if (normalized.includes("fear") || normalized.includes("disgust")) emotion = "Engaged";
+          else if (normalized.includes("sad")) emotion = "Focused";
+          else if (normalized.includes("angry")) emotion = "Thoughtful";
+        }
+
+        const maybeConfidence = p["confidence"];
+        if (typeof maybeConfidence === "number") {
+          // assume either 0..1 or 0..100
+          confidence = maybeConfidence > 1 ? maybeConfidence : maybeConfidence * 100;
+        }
+
+        const probs = p["probs"] ?? p["probabilities"];
+        if ((!emotion || emotion === "Analyzing") && probs && typeof probs === "object") {
+          const pr = probs as Record<string, unknown>;
+          // pick max prob from probs
+          let bestKey: string | null = null;
+          let bestVal = -1;
+          for (const [k, v] of Object.entries(pr)) {
+            if (typeof v !== "number") continue;
+            if (v > bestVal) {
+              bestVal = v;
+              bestKey = k;
+            }
+          }
+          if (bestKey) {
+            const normalized = bestKey.toLowerCase();
+            if (normalized.includes("happy")) emotion = "Happy";
+            else if (normalized.includes("surpris")) emotion = "Surprised";
+            else if (normalized.includes("neutral")) emotion = "Neutral";
+            else if (normalized.includes("fear") || normalized.includes("disgust")) emotion = "Engaged";
+            else if (normalized.includes("sad")) emotion = "Focused";
+            else if (normalized.includes("angry")) emotion = "Thoughtful";
+            confidence = bestVal > 1 ? bestVal : bestVal * 100;
+          }
+        }
+      }
+
+      setParticipants((prev) => {
+        const current = prev[pid];
+        if (!current) {
+          return {
+            ...prev,
+            [pid]: {
+              id: pid,
+              name: `Participant ${pid}`,
+              emotion: emotion ?? "Neutral",
+              emotionConfidence: Math.round(confidence),
+            },
+          };
+        }
+        return {
+          ...prev,
+          [pid]: {
+            ...current,
+            emotion: emotion ?? current.emotion,
+            emotionConfidence: emotion ? Math.round(confidence) : current.emotionConfidence,
+          },
+        };
+      });
+    }
   });
 
   // Отправка кадра каждые 2 секунды
@@ -116,25 +187,10 @@ const VideoMeet = () => {
     return () => clearInterval(timer);
   }, [captureFrame, send]);
 
-  // Симуляция эмоций (пока AI-детектор не подключён)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setParticipants((prev) => {
-        const next: Record<string, Participant> = {};
-        for (const [key, p] of Object.entries(prev)) {
-          const nextEmotion = emotions[Math.floor(Math.random() * emotions.length)];
-          const confidence = Math.floor(Math.random() * 31) + 60; // 60..90
-          next[key] = { ...p, emotion: nextEmotion, emotionConfidence: confidence };
-        }
-        return next;
-      });
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [emotions]);
-
   const emotionToClass = (emotion: Emotion) => {
     switch (emotion) {
+      case "Analyzing":
+        return "neutral";
       case "Happy":
         return "happy";
       case "Engaged":
@@ -182,7 +238,7 @@ const VideoMeet = () => {
             </div>
 
             <div className={`emotion-indicator ${emotionToClass(p.emotion)}`}>
-              {p.emotion} {p.emotionConfidence}%
+              {p.emotion === "Analyzing" ? "AI analyzing..." : `${p.emotion} ${p.emotionConfidence}%`}
             </div>
 
             <div className="participant-name">
