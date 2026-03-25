@@ -6,8 +6,6 @@ services:
       POSTGRES_DB: emeeting
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: 1040
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./code/emeeting-backend/migrations/up:/docker-entrypoint-initdb.d:ro
