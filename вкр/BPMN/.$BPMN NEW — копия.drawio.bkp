@@ -5,7 +5,7 @@
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
         <mxCell id="vJj1VVXhEZX1OBIbCPYw-71" value="Отбор" style="swimlane;html=1;startSize=20;fontStyle=0;collapsible=0;horizontal=0;swimlaneLine=1;swimlaneFillColor=#ffffff;strokeWidth=2;whiteSpace=wrap;fontSize=18;" parent="1" vertex="1">
-          <mxGeometry x="2400" y="510" width="1160" height="180" as="geometry" />
+          <mxGeometry x="2400" y="560" width="1160" height="210" as="geometry" />
         </mxCell>
         <mxCell id="vJj1VVXhEZX1OBIbCPYw-86" value="Проведение сессии" style="points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;whiteSpace=wrap;rectStyle=rounded;size=10;html=1;container=1;expand=0;collapsible=0;taskMarker=abstract;isLoopStandard=1;" parent="vJj1VVXhEZX1OBIbCPYw-71" vertex="1">
           <mxGeometry x="55" y="52.5" width="120" height="80" as="geometry" />
@@ -20,7 +20,7 @@
           <mxGeometry x="1017.5" y="67.5" width="115" height="65" as="geometry" />
         </mxCell>
         <mxCell id="vJj1VVXhEZX1OBIbCPYw-60" value="Анализ" style="swimlane;html=1;startSize=20;fontStyle=0;collapsible=0;horizontal=0;swimlaneLine=1;swimlaneFillColor=#ffffff;strokeWidth=2;whiteSpace=wrap;fontSize=18;" parent="1" vertex="1">
-          <mxGeometry x="2400" y="700" width="1160" height="187.5" as="geometry" />
+          <mxGeometry x="2400" y="780" width="1160" height="217.5" as="geometry" />
         </mxCell>
         <mxCell id="vJj1VVXhEZX1OBIbCPYw-62" value="Анализ с помощью нейросети" style="points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];shape=mxgraph.bpmn.task2;whiteSpace=wrap;rectStyle=rounded;size=10;html=1;container=1;expand=0;collapsible=0;taskMarker=abstract;strokeColor=default;strokeWidth=1;shadow=0;fontSize=15;fontStyle=0;labelBackgroundColor=none;" parent="vJj1VVXhEZX1OBIbCPYw-60" vertex="1">
           <mxGeometry x="683" y="77.5" width="120" height="80" as="geometry" />
@@ -44,11 +44,11 @@
         </mxCell>
         <mxCell id="vJj1VVXhEZX1OBIbCPYw-105" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="vJj1VVXhEZX1OBIbCPYw-63" target="vJj1VVXhEZX1OBIbCPYw-106" edge="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="3800.000000000001" y="640" as="targetPoint" />
+            <mxPoint x="3800.000000000001" y="690" as="targetPoint" />
           </mxGeometry>
         </mxCell>
         <mxCell id="vJj1VVXhEZX1OBIbCPYw-72" value="Hr" style="swimlane;html=1;startSize=20;fontStyle=0;collapsible=0;horizontal=0;swimlaneLine=1;swimlaneFillColor=#ffffff;strokeWidth=2;whiteSpace=wrap;fontSize=18;" parent="1" vertex="1">
-          <mxGeometry x="2400" y="200" width="1160" height="300" as="geometry" />
+          <mxGeometry x="2400" y="200" width="1160" height="350" as="geometry" />
         </mxCell>
         <mxCell id="vJj1VVXhEZX1OBIbCPYw-75" value="Задача" style="points=[[0.145,0.145,0],[0.5,0,0],[0.855,0.145,0],[1,0.5,0],[0.855,0.855,0],[0.5,1,0],[0.145,0.855,0],[0,0.5,0]];shape=mxgraph.bpmn.event;html=1;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;align=center;perimeter=ellipsePerimeter;outlineConnect=0;aspect=fixed;outline=standard;symbol=message;" parent="vJj1VVXhEZX1OBIbCPYw-72" vertex="1">
           <mxGeometry x="30" y="120" width="50" height="50" as="geometry" />
@@ -124,7 +124,7 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="vJj1VVXhEZX1OBIbCPYw-88" value="" style="shape=datastore;html=1;labelPosition=center;verticalLabelPosition=bottom;align=center;verticalAlign=top;labelBackgroundColor=none;" parent="1" vertex="1">
-          <mxGeometry x="2790" y="910" width="100" height="100" as="geometry" />
+          <mxGeometry x="2790" y="1020" width="100" height="100" as="geometry" />
         </mxCell>
         <mxCell id="vJj1VVXhEZX1OBIbCPYw-89" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="vJj1VVXhEZX1OBIbCPYw-88" target="vJj1VVXhEZX1OBIbCPYw-78" edge="1">
           <mxGeometry relative="1" as="geometry" />
@@ -134,7 +134,7 @@
             <mxPoint x="3407" y="573" as="sourcePoint" />
             <mxPoint x="3405" y="827" as="targetPoint" />
             <Array as="points">
-              <mxPoint x="3291" y="603" />
+              <mxPoint x="3290" y="652" />
             </Array>
           </mxGeometry>
         </mxCell>
@@ -142,7 +142,7 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="vJj1VVXhEZX1OBIbCPYw-101" value="" style="shape=datastore;html=1;labelPosition=center;verticalLabelPosition=bottom;align=center;verticalAlign=top;labelBackgroundColor=none;" parent="1" vertex="1">
-          <mxGeometry x="3425" y="910" width="100" height="100" as="geometry" />
+          <mxGeometry x="3425" y="1020" width="100" height="100" as="geometry" />
         </mxCell>
         <mxCell id="vJj1VVXhEZX1OBIbCPYw-113" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;" parent="1" source="vJj1VVXhEZX1OBIbCPYw-114" edge="1">
           <mxGeometry relative="1" as="geometry">
@@ -157,19 +157,19 @@
           </mxGeometry>
         </mxCell>
         <mxCell id="vJj1VVXhEZX1OBIbCPYw-66" value="&lt;div&gt;Нейросеть&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;strokeColor=default;strokeWidth=1;shadow=0;fontSize=15;fontStyle=0;labelBackgroundColor=none;" parent="1" vertex="1">
-          <mxGeometry x="3083" y="930" width="120" height="60" as="geometry" />
+          <mxGeometry x="3083" y="1040" width="120" height="60" as="geometry" />
         </mxCell>
         <mxCell id="vJj1VVXhEZX1OBIbCPYw-67" value="&lt;div&gt;Данные для анализа&lt;/div&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;dashed=1;exitX=0;exitY=0.75;exitDx=0;exitDy=0;exitPerimeter=0;labelBorderColor=none;labelBackgroundColor=none;strokeColor=default;strokeWidth=1;shadow=0;fontSize=15;fontStyle=0;" parent="1" source="vJj1VVXhEZX1OBIbCPYw-62" target="vJj1VVXhEZX1OBIbCPYw-66" edge="1">
           <mxGeometry x="0.1861" relative="1" as="geometry">
             <mxPoint as="offset" />
-            <mxPoint x="2583" y="793.04" as="sourcePoint" />
-            <mxPoint x="2583.96" y="1070" as="targetPoint" />
+            <mxPoint x="2583" y="903.04" as="sourcePoint" />
+            <mxPoint x="2583.96" y="1180" as="targetPoint" />
           </mxGeometry>
         </mxCell>
         <mxCell id="vJj1VVXhEZX1OBIbCPYw-68" value="&lt;div&gt;Результаты анализа&lt;/div&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.75;entryDx=0;entryDy=0;entryPerimeter=0;labelBorderColor=none;labelBackgroundColor=none;strokeColor=default;strokeWidth=1;shadow=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;fontSize=15;fontStyle=0;elbow=vertical;" parent="1" source="vJj1VVXhEZX1OBIbCPYw-66" target="vJj1VVXhEZX1OBIbCPYw-62" edge="1">
           <mxGeometry x="-0.1818" y="-10" relative="1" as="geometry">
             <mxPoint as="offset" />
-            <mxPoint x="2423" y="680" as="targetPoint" />
+            <mxPoint x="2423" y="790" as="targetPoint" />
           </mxGeometry>
         </mxCell>
       </root>
