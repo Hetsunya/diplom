@@ -105,3 +105,128 @@ KPI, чтобы видеть прогресс
 Время поднятия проекта “с нуля” ≤ 15 минут по README.
 Добавление новой WS-команды/AI-инструмента ≤ 1 файл + регистрация (без правки центральных switch-цепочек).
 Если хочешь, следующим шагом разложу это в формат GitHub Issues (title, description, acceptance criteria, labels, estimate) — готовыми карточками.
+
+---
+
+Новый backlog (по `@instructions.md`, meeting/auth)
+
+P0 — Meeting Service (MVP real-time, блокеры продукта)
+BL-014 [ ]: State machine митинга + аудит событий в БД
+
+Цель: формализовать жизненный цикл и историю изменений.
+Файлы: code/emeeting-backend/internal/meeting/**, code/emeeting-backend/migrations/up/*, migrations/down/*
+Результат:
+- статусы: created|active|paused|ended|cancelled
+- сервис-методы переходов: StartMeeting(), EndMeeting() (+ валидация)
+- таблица audit: meeting_events (append-only)
+Оценка: 1–2 дн
+DoD: unit-тесты на переходы (`TestMeeting_Transitions`) + миграция поднимается с нуля.
+
+BL-015 [ ]: Участники и роли (host/co-host/participant/guest)
+
+Цель: управляемые join/leave и права на действия.
+Файлы: code/emeeting-backend/internal/meeting/**, code/emeeting-backend/migrations/*
+Результат:
+- модель participants с ролями и флагом активности (soft leave: is_active=false)
+- проверки доступа: user_id из токена ↔ participant.user_id
+Оценка: 1–2 дн
+DoD: тесты сервис-слоя на join/leave и проверки ролей.
+
+BL-016 [ ]: WS события join/leave/start/end + broadcast hub
+
+Цель: синхронизация состояния в реальном времени.
+Файлы: code/emeeting-backend/internal/ws/**, code/emeeting-backend/internal/meeting/**, code/emeeting-ui/src/features/meeting/**
+Результат:
+- WSEvent (type/payload/ts)
+- события: user_joined, user_left, host_started, meeting_ended (+ user_removed опционально)
+- broadcast всем активным соединениям сессии
+Оценка: 1–2 дн
+DoD: интеграционный тест потока (`TestE2E_MeetingFlow`) + UI обновляет список участников.
+
+BL-017 [ ]: Реконнект: восстановление участника по session_id + token
+
+Цель: устойчивость к обрывам сети.
+Файлы: code/emeeting-backend/internal/ws/**, code/emeeting-backend/internal/meeting/**, code/emeeting-ui/src/features/meeting/**
+Результат:
+- server-side: rejoin без дубликатов participant, корректная повторная подписка
+- client-side: авто-reconnect с backoff, resync состояния (fetch + cache update)
+Оценка: 1–2 дн
+DoD: тест на реконнект (backend) + unit-тесты обработчика событий (frontend).
+
+BL-018 [ ]: Обработка onClose (user_left) + правило “host ушёл”
+
+Цель: консистентная очистка participants и корректное завершение митинга.
+Файлы: code/emeeting-backend/internal/ws/handler.go, code/emeeting-backend/internal/meeting/service.go, code/emeeting-ui/src/features/meeting/**
+Результат:
+- onClose: is_active=false + broadcast user_left {user_id,left_at}
+- если ушёл host и нет co-host: meeting → ended (+ meeting_ended)
+Оценка: 6–12 ч
+DoD: `TestMeeting_UserDisconnect_WithCoHost`, `TestMeeting_UserDisconnect_HostOnly` + UI корректно реагирует.
+
+P1 — Frontend Meeting UX (чтобы митинг ощущался “живым”)
+BL-019 [ ]: Meeting feature-store (React Query + Zustand) + WS hook
+
+Цель: разделить server-state и UI-state и стандартизировать WS подписку.
+Файлы: code/emeeting-ui/src/features/meeting/**, (опц.) src/lib/ws
+Результат:
+- `useMeetingStore` (UI флаги/модалки)
+- `useMeetingWebSocket`/`useWebSocket` с `onEvent(handleMeetingEvent)`
+Оценка: 6–12 ч
+DoD: тесты на обработку событий (Vitest) + отсутствие “ручных” setState по всему UI.
+
+BL-020 [ ]: UI реакции на WS события (participants cache + toasts + redirect)
+
+Цель: завершить пользовательский цикл “вошёл/вышел/кикнули”.
+Файлы: code/emeeting-ui/src/features/meeting/** (participants list, toast, routing)
+Результат:
+- user_left/user_joined обновляют кэш React Query
+- если текущего кикнули: redirect на /meetings + сообщение
+Оценка: 4–8 ч
+DoD: RTL тесты на редирект/тост и корректное обновление списка.
+
+P0 — Auth System (безопасный базовый контур)
+BL-021 [ ]: bcrypt для password_hash + миграция/переезд
+
+Цель: убрать SHA-256 и подготовиться к прод-уровню.
+Файлы: code/emeeting-backend/internal/auth/**, code/emeeting-backend/migrations/*
+Результат:
+- хранение bcrypt hash
+- сценарий миграции: на логине “rehash” (или массовое обновление для демо-юзеров)
+Оценка: 1 дн
+DoD: `TestAuth_LoginFlow` покрывает корректные/некорректные пароли.
+
+BL-022 [ ]: Access/Refresh tokens + rotation + хранение refresh в БД
+
+Цель: короткий access + безопасный refresh с одноразовостью.
+Файлы: code/emeeting-backend/internal/auth/**, code/emeeting-backend/migrations/*
+Результат:
+- refresh_tokens (token_hash, user_id, expires_at, revoked) + индексы
+- refresh rotation: при использовании выдаём новый, старый revoke
+Оценка: 1–2 дн
+DoD: `TestAuth_TokenRefresh_Invalidated` (старый refresh не работает).
+
+BL-023 [ ]: HttpOnly cookie с session token + фронтенд без localStorage
+
+Цель: минимизировать XSS-риски и убрать хранение токенов на клиенте.
+Файлы: code/emeeting-backend/internal/auth/**, code/emeeting-ui/src/features/auth/**, UI http client
+Результат:
+- backend выставляет cookie `session_token` (Secure только prod)
+- frontend: AuthContext, retry при 401, auto refresh
+Оценка: 1–2 дн
+DoD: ручной сценарий “обновил страницу — остаюсь залогинен” (если предусмотрено) + автоповтор запроса после refresh.
+
+BL-024 [ ]: Middleware: RequireAuth / RequireRole / RateLimit + audit auth_events
+
+Цель: централизованная защита эндпоинтов и защита от brute-force.
+Файлы: code/emeeting-backend/middleware/**, code/emeeting-backend/internal/auth/**, migrations/*
+Результат:
+- порядок middleware: Recover → Logger → CORS → RateLimit → Auth → Handler
+- rate-limit логина: 5/мин IP + lock после 10 попыток (locked_until)
+- аудит: auth_events (login_attempt, token_refresh, logout)
+Оценка: 1–2 дн
+DoD: `TestMiddleware_RequireRole` + тест на блокировку brute-force.
+
+Рекомендуемый порядок внедрения (следующие спринты)
+Спринт 4 (meeting MVP): BL-014 → BL-015 → BL-016 → BL-018 → BL-020
+Спринт 5 (meeting resilience): BL-017 → BL-019
+Спринт 6 (auth secure): BL-021 → BL-022 → BL-023 → BL-024

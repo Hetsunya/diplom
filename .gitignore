@@ -19,4 +19,3 @@ __pycache__/
 # Игнорируем файлы, генерируемые IDE (например, VS Code, PyCharm)
 .vscode/
 .idea/
-
