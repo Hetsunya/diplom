@@ -44,7 +44,10 @@ func (h *Handler) Login(c *gin.Context) {
 	}
 
 	setTokenCookies(c, pair)
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusOK, gin.H{
+		"user":   user,
+		"tokens": pair,
+	})
 }
 
 func (h *Handler) Refresh(c *gin.Context) {
