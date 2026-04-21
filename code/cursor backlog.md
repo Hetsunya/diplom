@@ -111,10 +111,10 @@ KPI, чтобы видеть прогресс
 Новый backlog (по `@instructions.md`, meeting/auth)
 
 P0 — Meeting Service (MVP real-time, блокеры продукта)
-BL-014 [ ]: State machine митинга + аудит событий в БД
+BL-014 [x]: State machine митинга + аудит событий в БД
 
 Цель: формализовать жизненный цикл и историю изменений.
-Файлы: code/emeeting-backend/internal/meeting/**, code/emeeting-backend/migrations/up/*, migrations/down/*
+Файлы: emeeting-backend/internal/meeting/**, emeeting-backend/migrations/up/*, emeeting-backend/migrations/down/*
 Результат:
 - статусы: created|active|paused|ended|cancelled
 - сервис-методы переходов: StartMeeting(), EndMeeting() (+ валидация)

@@ -1,9 +1,10 @@
 ---
 description: Meeting Service development rules
 globs:
-  - code/emeeting-backend/internal/meeting/**
-  - code/emeeting-backend/internal/ws/**
-  - code/emeeting-ui/src/features/meeting/**
+  - emeeting-backend/internal/meeting/**
+  - emeeting-backend/internal/ws/**
+  - emeeting-backend/internal/session/**
+  - emeeting-ui/src/features/meeting/**
 alwaysApply: false
 ---
 
