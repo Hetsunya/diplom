@@ -18,13 +18,6 @@ func RequireAuth() gin.HandlerFunc {
 
 		token, err := c.Cookie("access_token")
 		if err != nil || strings.TrimSpace(token) == "" {
-			// Fallback to Authorization: Bearer <token> for environments where cookies are blocked cross-site.
-			authHeader := strings.TrimSpace(c.GetHeader("Authorization"))
-			if strings.HasPrefix(strings.ToLower(authHeader), "bearer ") {
-				token = strings.TrimSpace(authHeader[len("Bearer "):])
-			}
-		}
-		if strings.TrimSpace(token) == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}

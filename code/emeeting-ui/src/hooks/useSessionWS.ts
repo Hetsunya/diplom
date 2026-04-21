@@ -40,12 +40,16 @@ export const useSessionWS = (
         sessionStorage.getItem("participant_name") ||
         localStorage.getItem("participant_name") ||
         "You";
+      const role =
+        sessionStorage.getItem("participant_role") ||
+        localStorage.getItem("participant_role") ||
+        "participant";
       ws.current?.send(
         JSON.stringify({
           type: "join",
           session_id: Number(sessionId),
           participant_id: participantId,
-          payload: { name },
+          payload: { name, role },
           timestamp: new Date().toISOString(),
         })
       );
@@ -103,5 +107,7 @@ export const useSessionWS = (
     );
   };
 
-  return { send };
+  const close = () => ws.current?.close();
+
+  return { send, close };
 };

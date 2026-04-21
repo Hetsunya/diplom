@@ -27,6 +27,8 @@ const VideoMeet = () => {
   const [participantId] = useState<string>(getOrCreateParticipant);
   const participantName =
     sessionStorage.getItem("participant_name") || localStorage.getItem("participant_name") || "You";
+  const participantRole =
+    sessionStorage.getItem("participant_role") || localStorage.getItem("participant_role") || "participant";
 
   const { videoRef, captureFrame, toggleMic, toggleCam, micEnabled, camEnabled } =
     useMediaStream();
@@ -121,7 +123,7 @@ const VideoMeet = () => {
     });
   };
 
-  const { send } = useMeetingWebSocket(
+  const { send, close } = useMeetingWebSocket(
     id,
     participantId,
     onEmotionMessage,
@@ -179,6 +181,25 @@ const VideoMeet = () => {
       default:
         return "neutral";
     }
+  };
+
+  const leaveMeeting = () => {
+    send("leave", { name: participantName, role: participantRole });
+    close();
+    sessionStorage.setItem("meeting_notice", "Вы вышли из встречи.");
+    navigate("/sessions");
+  };
+
+  const endMeeting = () => {
+    // If not host, behave like leave.
+    if (participantRole !== "host") {
+      leaveMeeting();
+      return;
+    }
+    send("end_meeting", { role: "host" });
+    close();
+    sessionStorage.setItem("meeting_notice", "Вы завершили встречу.");
+    navigate("/sessions");
   };
 
   return (
@@ -265,7 +286,11 @@ const VideoMeet = () => {
           🖥️ Поделиться экраном
         </button>
 
-        <button className="control-btn end-btn" type="button">
+        <button className="control-btn" onClick={leaveMeeting} type="button">
+          Выйти
+        </button>
+
+        <button className="control-btn end-btn" onClick={endMeeting} type="button">
           Завершить
         </button>
       </div>

@@ -76,11 +76,37 @@ func (h *Handler) registerDefaultWSHandlers() {
 			Timestamp: time.Now().UTC(),
 		})
 	}
+	endMeetingHandler := func(sessionID int, msg WSMessage) {
+		// Only host should be allowed to end meeting. We accept role passed in payload
+		// (server also tracks roles per connection for disconnect rules).
+		role := ""
+		if msg.Payload != nil {
+			if m, ok := msg.Payload.(map[string]any); ok {
+				if v, ok := m["role"].(string); ok {
+					role = v
+				}
+			}
+		}
+		if role != "host" {
+			return
+		}
+		now := time.Now().UTC()
+		endPayload, _ := json.Marshal(map[string]any{
+			"ended_at": now,
+			"reason":   "host_ended",
+		})
+		h.hub.Broadcast(sessionID, WSEvent{
+			Type:      "meeting_ended",
+			Payload:   endPayload,
+			Timestamp: now,
+		})
+	}
 	h.RegisterWSHandler("broadcast", broadcastHandler)
 	h.RegisterWSHandler("frame", broadcastHandler)
 	h.RegisterWSHandler("analytics", broadcastHandler)
 	h.RegisterWSHandler("join", joinHandler)
 	h.RegisterWSHandler("leave", leaveHandler)
+	h.RegisterWSHandler("end_meeting", endMeetingHandler)
 }
 
 func (h *Handler) dispatchWSMessage(sessionID int, msg WSMessage) {

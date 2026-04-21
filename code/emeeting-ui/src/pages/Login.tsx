@@ -29,11 +29,11 @@ const Login = () => {
       <form>
         <div className="form-group">
           <label>Email</label>
-          <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
         <div className="form-group">
           <label>Пароль</label>
-          <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </div>
         <button className="primary-btn" type="button" onClick={submit}>Войти</button>
       </form>
