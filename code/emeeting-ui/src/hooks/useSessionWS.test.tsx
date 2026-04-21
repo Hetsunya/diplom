@@ -5,6 +5,7 @@ import { useSessionWS } from "./useSessionWS";
 class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
 
+  url: string;
   readyState = 0;
   sent: string[] = [];
 
@@ -12,7 +13,8 @@ class FakeWebSocket {
   onmessage: ((ev: MessageEvent) => void) | null = null;
   onclose: (() => void) | null = null;
 
-  constructor(public url: string) {
+  constructor(url: string) {
+    this.url = url;
     FakeWebSocket.instances.push(this);
   }
 
