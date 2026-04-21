@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -18,6 +19,12 @@ func RequireAuth() gin.HandlerFunc {
 
 		token, err := c.Cookie("access_token")
 		if err != nil || strings.TrimSpace(token) == "" {
+			log.Printf("[AUTH] missing access_token cookie path=%s origin=%q host=%q cookie_hdr_present=%t",
+				path,
+				c.GetHeader("Origin"),
+				c.Request.Host,
+				strings.TrimSpace(c.GetHeader("Cookie")) != "",
+			)
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}

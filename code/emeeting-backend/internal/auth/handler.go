@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -77,7 +78,13 @@ func (h *Handler) Logout(c *gin.Context) {
 func setTokenCookies(c *gin.Context, pair *TokenPair) {
 	secure := c.Request.TLS != nil
 	httpOnly := true
-	sameSite := http.SameSiteLaxMode
+	sameSite := cookieSameSite(c)
+
+	// Important: SameSite=None requires Secure in modern browsers; if we're on plain HTTP,
+	// fall back to Lax so cookies are still accepted (proxy makes requests same-site).
+	if !secure && sameSite == http.SameSiteNoneMode {
+		sameSite = http.SameSiteLaxMode
+	}
 
 	c.SetSameSite(sameSite)
 	c.SetCookie("access_token", pair.AccessToken, pair.ExpiresInSec, "/", "", secure, httpOnly)
@@ -96,7 +103,10 @@ func setTokenCookies(c *gin.Context, pair *TokenPair) {
 func clearTokenCookies(c *gin.Context) {
 	secure := c.Request.TLS != nil
 	httpOnly := true
-	sameSite := http.SameSiteLaxMode
+	sameSite := cookieSameSite(c)
+	if !secure && sameSite == http.SameSiteNoneMode {
+		sameSite = http.SameSiteLaxMode
+	}
 	c.SetSameSite(sameSite)
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "access_token",
@@ -116,4 +126,22 @@ func clearTokenCookies(c *gin.Context) {
 		SameSite: sameSite,
 		MaxAge:   -1,
 	})
+}
+
+func cookieSameSite(c *gin.Context) http.SameSite {
+	// If UI and API are on different sites (common in docker dev: 172.18.x.x -> localhost),
+	// Lax cookies won't be sent on fetch() POSTs. In that case, use SameSite=None.
+	origin := c.GetHeader("Origin")
+	if origin == "" {
+		return http.SameSiteLaxMode
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return http.SameSiteLaxMode
+	}
+	host := u.Hostname()
+	if host == "localhost" || host == "127.0.0.1" {
+		return http.SameSiteLaxMode
+	}
+	return http.SameSiteNoneMode
 }

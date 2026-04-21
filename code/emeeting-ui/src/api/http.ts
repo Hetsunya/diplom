@@ -1,6 +1,6 @@
 // src/api/http.ts
-const DEFAULT_API_URL = 'http://localhost:8080';
-export const API_URL = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
+// In docker we proxy API through the UI origin (nginx), so default is relative.
+export const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const res = await fetch(API_URL + path, {
@@ -16,6 +16,7 @@ export async function apiFetch(path: string, options: RequestInit = {}): Promise
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
+      body: "{}",
     });
     if (!refresh.ok) return res;
     return await fetch(API_URL + path, {
