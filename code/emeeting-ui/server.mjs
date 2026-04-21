@@ -35,7 +35,6 @@ app.use(express.static(distDir));
 app.get(/.*/, (_req, res) => res.sendFile(path.join(distDir, "index.html")));
 
 app.listen(port, "0.0.0.0", () => {
-  // eslint-disable-next-line no-console
   console.log(`[ui] listening on :${port}, proxy -> ${backend}`);
 });
 

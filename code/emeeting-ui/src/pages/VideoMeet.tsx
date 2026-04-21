@@ -30,10 +30,10 @@ const VideoMeet = () => {
   const participantRole =
     sessionStorage.getItem("participant_role") || localStorage.getItem("participant_role") || "participant";
 
-  const { videoRef, captureFrame, toggleMic, toggleCam, micEnabled, camEnabled } =
+  const { videoRef, captureFrame, toggleMic, toggleCam, micEnabled, camEnabled, error: mediaError } =
     useMediaStream();
 
-  const { startShare } = useScreenShare();
+  const { startShare, error: shareError } = useScreenShare();
   type Emotion = "Analyzing" | "Happy" | "Neutral" | "Engaged" | "Focused" | "Surprised" | "Thoughtful";
   type Participant = {
     id: string;
@@ -204,6 +204,20 @@ const VideoMeet = () => {
 
   return (
     <div className="video-container">
+      {(mediaError || shareError) && (
+        <div
+          style={{
+            background: "#3b2a1f",
+            color: "white",
+            padding: "10px 12px",
+            borderRadius: 10,
+            marginBottom: 12,
+          }}
+          role="status"
+        >
+          {mediaError || shareError}
+        </div>
+      )}
       {toasts.length > 0 && (
         <div style={{ position: "fixed", top: 12, right: 12, zIndex: 10 }}>
           {toasts.map((t, idx) => (

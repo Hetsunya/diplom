@@ -6,17 +6,34 @@ export const useMediaStream = () => {
 
   const canvasRef = useRef<HTMLCanvasElement>(document.createElement("canvas"));
 
-  const [micEnabled, setMicEnabled] = useState(true);
-  const [camEnabled, setCamEnabled] = useState(true);
+  const canUseMedia = !!globalThis.navigator?.mediaDevices?.getUserMedia;
+  const [micEnabled, setMicEnabled] = useState(() => canUseMedia);
+  const [camEnabled, setCamEnabled] = useState(() => canUseMedia);
+  const [error, setError] = useState<string | null>(() => {
+    const md = globalThis.navigator?.mediaDevices;
+    if (!md?.getUserMedia) {
+      return "Камера/микрофон недоступны в этом контексте. Откройте приложение через http://localhost:5173 или используйте HTTPS.";
+    }
+    return null;
+  });
 
   useEffect(() => {
-    navigator.mediaDevices
-      .getUserMedia({ video: true, audio: true })
+    const md = globalThis.navigator?.mediaDevices;
+    if (!md?.getUserMedia) {
+      return;
+    }
+
+    md.getUserMedia({ video: true, audio: true })
       .then((stream) => {
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : "Не удалось получить доступ к камере/микрофону");
+        setMicEnabled(false);
+        setCamEnabled(false);
       });
 
     return () => {
@@ -60,5 +77,6 @@ export const useMediaStream = () => {
     toggleCam,
     micEnabled,
     camEnabled,
+    error,
   };
 };
