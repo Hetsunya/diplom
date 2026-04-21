@@ -7,6 +7,8 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type LoginResponse struct {
@@ -40,11 +42,20 @@ func (s *service) Authenticate(email, password string) (*LoginResponse, error) {
 		return nil, errors.New("invalid credentials")
 	}
 
-	sum := sha256.Sum256([]byte(password))
-	calculatedHash := hex.EncodeToString(sum[:])
-
-	if subtle.ConstantTimeCompare([]byte(calculatedHash), []byte(user.PasswordHash)) != 1 {
-		return nil, errors.New("invalid credentials")
+	// Support legacy SHA-256 hex hashes, but upgrade to bcrypt on successful login.
+	if strings.HasPrefix(user.PasswordHash, "$2") {
+		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+			return nil, errors.New("invalid credentials")
+		}
+	} else {
+		sum := sha256.Sum256([]byte(password))
+		calculatedHash := hex.EncodeToString(sum[:])
+		if subtle.ConstantTimeCompare([]byte(calculatedHash), []byte(user.PasswordHash)) != 1 {
+			return nil, errors.New("invalid credentials")
+		}
+		if newHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost); err == nil {
+			_ = s.repo.UpdatePasswordHash(user.AuthUserID, string(newHash))
+		}
 	}
 
 	now := time.Now().UTC()

@@ -10,6 +10,7 @@ import (
 type Repository interface {
 	GetByEmail(email string) (*models.AuthUser, error)
 	UpdateLastLogin(authUserID int, at time.Time) error
+	UpdatePasswordHash(authUserID int, passwordHash string) error
 }
 
 type repo struct {
@@ -64,6 +65,15 @@ func (r *repo) UpdateLastLogin(authUserID int, at time.Time) error {
 		SET last_login = $1
 		WHERE auth_user_id = $2
 	`, at, authUserID)
+	return err
+}
+
+func (r *repo) UpdatePasswordHash(authUserID int, passwordHash string) error {
+	_, err := r.db.Exec(`
+		UPDATE auth_user
+		SET password_hash = $1
+		WHERE auth_user_id = $2
+	`, passwordHash, authUserID)
 	return err
 }
 

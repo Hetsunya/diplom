@@ -1,6 +1,7 @@
 package session
 
 import (
+	"encoding/json"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -62,6 +63,71 @@ func TestWSSessionConnectionSmoke(t *testing.T) {
 	}
 }
 
+func TestE2E_MeetingFlow(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub())
+	r := gin.New()
+	r.GET("/ws/sessions/:id", handler.WS)
+
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/sessions/1"
+
+	connA, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("failed to connect websocket A: %v", err)
+	}
+	defer connA.Close()
+
+	connB, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("failed to connect websocket B: %v", err)
+	}
+	defer connB.Close()
+
+	join := WSMessage{
+		Type:        "join",
+		SessionID:   1,
+		Participant: "pA",
+		Payload:     map[string]any{"name": "Alice"},
+		Timestamp:   time.Now().UTC(),
+	}
+	if err := connA.WriteJSON(join); err != nil {
+		t.Fatalf("failed to write join: %v", err)
+	}
+
+	// B should receive a server event user_joined.
+	_ = connB.SetReadDeadline(time.Now().Add(2 * time.Second))
+	for {
+		var got map[string]any
+		if err := connB.ReadJSON(&got); err != nil {
+			t.Fatalf("failed to read message: %v", err)
+		}
+		typ, _ := got["type"].(string)
+		if typ != "user_joined" {
+			// ignore other messages (e.g. echoed join, ping)
+			continue
+		}
+		var payload map[string]any
+		switch v := got["payload"].(type) {
+		case map[string]interface{}:
+			payload = map[string]any(v)
+		case string:
+			if err := json.Unmarshal([]byte(v), &payload); err != nil {
+				t.Fatalf("failed to unmarshal payload: %v", err)
+			}
+		default:
+			t.Fatalf("unexpected payload type: %#v", got["payload"])
+		}
+		if payload["participant_id"] != "pA" {
+			t.Fatalf("expected participant_id pA, got %#v", payload["participant_id"])
+		}
+		return
+	}
+}
+
 func TestWSDispatchUsesRegisteredHandler(t *testing.T) {
 	spy := &busSpy{}
 	handler := NewHandler(NewService(newFakeRepo()), spy)
@@ -77,6 +143,117 @@ func TestWSDispatchUsesRegisteredHandler(t *testing.T) {
 	}
 	if spy.lastMessage.Type != "custom_processed" {
 		t.Fatalf("expected transformed type, got %q", spy.lastMessage.Type)
+	}
+}
+
+func TestMeeting_UserDisconnect_HostOnly(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub())
+	r := gin.New()
+	r.GET("/ws/sessions/:id", handler.WS)
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/sessions/1"
+
+	connA, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("failed to connect websocket A: %v", err)
+	}
+	defer connA.Close()
+
+	connB, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("failed to connect websocket B: %v", err)
+	}
+	defer connB.Close()
+
+	joinHost := WSMessage{
+		Type:        "join",
+		SessionID:   1,
+		Participant: "host1",
+		Payload:     map[string]any{"name": "Host", "role": "host"},
+		Timestamp:   time.Now().UTC(),
+	}
+	if err := connA.WriteJSON(joinHost); err != nil {
+		t.Fatalf("failed to write join: %v", err)
+	}
+
+	// Close host -> B should observe meeting_ended (no co-host).
+	_ = connB.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_ = connA.Close()
+
+	for {
+		var got map[string]any
+		if err := connB.ReadJSON(&got); err != nil {
+			t.Fatalf("failed to read: %v", err)
+		}
+		typ, _ := got["type"].(string)
+		if typ != "meeting_ended" {
+			continue
+		}
+		return
+	}
+}
+
+func TestMeeting_UserDisconnect_WithCoHost(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub())
+	r := gin.New()
+	r.GET("/ws/sessions/:id", handler.WS)
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/sessions/1"
+
+	connHost, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("failed to connect websocket host: %v", err)
+	}
+	defer connHost.Close()
+
+	connCo, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("failed to connect websocket cohost: %v", err)
+	}
+	defer connCo.Close()
+
+	joinCo := WSMessage{
+		Type:        "join",
+		SessionID:   1,
+		Participant: "co1",
+		Payload:     map[string]any{"name": "CoHost", "role": "co-host"},
+		Timestamp:   time.Now().UTC(),
+	}
+	if err := connCo.WriteJSON(joinCo); err != nil {
+		t.Fatalf("failed to write join co-host: %v", err)
+	}
+	joinHost := WSMessage{
+		Type:        "join",
+		SessionID:   1,
+		Participant: "host1",
+		Payload:     map[string]any{"name": "Host", "role": "host"},
+		Timestamp:   time.Now().UTC(),
+	}
+	if err := connHost.WriteJSON(joinHost); err != nil {
+		t.Fatalf("failed to write join host: %v", err)
+	}
+
+	_ = connCo.SetReadDeadline(time.Now().Add(1 * time.Second))
+	_ = connHost.Close()
+
+	for {
+		var got map[string]any
+		if err := connCo.ReadJSON(&got); err != nil {
+			// deadline reached without meeting_ended: success
+			return
+		}
+		typ, _ := got["type"].(string)
+		if typ == "meeting_ended" {
+			t.Fatalf("did not expect meeting_ended when co-host present")
+		}
 	}
 }
 

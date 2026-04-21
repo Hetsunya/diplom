@@ -1,6 +1,7 @@
 package session
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"strconv"
@@ -27,9 +28,59 @@ func (h *Handler) registerDefaultWSHandlers() {
 	broadcastHandler := func(sessionID int, msg WSMessage) {
 		h.hub.Broadcast(sessionID, msg)
 	}
+	joinHandler := func(sessionID int, msg WSMessage) {
+		// Keep backwards compatibility: still broadcast "join" WSMessage.
+		h.hub.Broadcast(sessionID, msg)
+
+		var name string
+		if msg.Payload != nil {
+			if m, ok := msg.Payload.(map[string]any); ok {
+				if v, ok := m["name"].(string); ok {
+					name = v
+				}
+			}
+		}
+
+		payload, _ := json.Marshal(map[string]any{
+			"participant_id": msg.Participant,
+			"name":           name,
+			"joined_at":      msg.Timestamp.UTC(),
+		})
+		h.hub.Broadcast(sessionID, WSEvent{
+			Type:      "user_joined",
+			Payload:   payload,
+			Timestamp: time.Now().UTC(),
+		})
+	}
+	leaveHandler := func(sessionID int, msg WSMessage) {
+		// Keep backwards compatibility: still broadcast "leave" WSMessage.
+		h.hub.Broadcast(sessionID, msg)
+
+		var name string
+		if msg.Payload != nil {
+			if m, ok := msg.Payload.(map[string]any); ok {
+				if v, ok := m["name"].(string); ok {
+					name = v
+				}
+			}
+		}
+
+		payload, _ := json.Marshal(map[string]any{
+			"participant_id": msg.Participant,
+			"name":           name,
+			"left_at":        msg.Timestamp.UTC(),
+		})
+		h.hub.Broadcast(sessionID, WSEvent{
+			Type:      "user_left",
+			Payload:   payload,
+			Timestamp: time.Now().UTC(),
+		})
+	}
 	h.RegisterWSHandler("broadcast", broadcastHandler)
 	h.RegisterWSHandler("frame", broadcastHandler)
 	h.RegisterWSHandler("analytics", broadcastHandler)
+	h.RegisterWSHandler("join", joinHandler)
+	h.RegisterWSHandler("leave", leaveHandler)
 }
 
 func (h *Handler) dispatchWSMessage(sessionID int, msg WSMessage) {
@@ -67,7 +118,31 @@ func (h *Handler) WS(c *gin.Context) {
 	h.hub.Add(sessionID, conn)
 	participantID := ""
 	participantName := ""
+	participantRole := ""
+
+	h.roleMu.Lock()
+	if _, ok := h.connRoles[sessionID]; !ok {
+		h.connRoles[sessionID] = make(map[*websocket.Conn]string)
+	}
+	h.connRoles[sessionID][conn] = participantRole
+	h.roleMu.Unlock()
+
 	defer func() {
+		leaveAt := time.Now().UTC()
+		endAt := leaveAt
+		h.roleMu.Lock()
+		delete(h.connRoles[sessionID], conn)
+		remainingRoles := make([]string, 0, len(h.connRoles[sessionID]))
+		for _, r := range h.connRoles[sessionID] {
+			if r != "" {
+				remainingRoles = append(remainingRoles, r)
+			}
+		}
+		if len(h.connRoles[sessionID]) == 0 {
+			delete(h.connRoles, sessionID)
+		}
+		h.roleMu.Unlock()
+
 		if participantID != "" {
 			// Broadcast leave so that clients can remove the participant tile.
 			leaveMsg := WSMessage{
@@ -76,10 +151,46 @@ func (h *Handler) WS(c *gin.Context) {
 				Participant: participantID,
 				Payload: map[string]any{
 					"name": participantName,
+					"role": participantRole,
 				},
-				Timestamp: time.Now(),
+				Timestamp: leaveAt,
 			}
 			h.hub.Broadcast(sessionID, leaveMsg)
+
+			// Also emit server event envelope.
+			payload, _ := json.Marshal(map[string]any{
+				"participant_id": participantID,
+				"name":           participantName,
+				"role":           participantRole,
+				"left_at":        leaveAt,
+			})
+			h.hub.Broadcast(sessionID, WSEvent{
+				Type:      "user_left",
+				Payload:   payload,
+				Timestamp: leaveAt,
+			})
+
+			// If host left and there is no co-host, end the meeting.
+			if participantRole == "host" {
+				hasCoHost := false
+				for _, r := range remainingRoles {
+					if r == "co-host" {
+						hasCoHost = true
+						break
+					}
+				}
+				if !hasCoHost {
+					endPayload, _ := json.Marshal(map[string]any{
+						"ended_at": endAt,
+						"reason":   "host_left",
+					})
+					h.hub.Broadcast(sessionID, WSEvent{
+						Type:      "meeting_ended",
+						Payload:   endPayload,
+						Timestamp: endAt,
+					})
+				}
+			}
 		}
 		h.hub.Remove(sessionID, conn)
 	}()
@@ -93,7 +204,7 @@ func (h *Handler) WS(c *gin.Context) {
 			msg := WSMessage{
 				Type:      "ping",
 				SessionID: sessionID,
-				Timestamp: time.Now(),
+				Timestamp: time.Now().UTC(),
 			}
 			h.hub.Broadcast(sessionID, msg)
 			log.Printf("[WS] ping sent session=%d", sessionID)
@@ -117,7 +228,21 @@ func (h *Handler) WS(c *gin.Context) {
 				if name, ok := m["name"].(string); ok {
 					participantName = name
 				}
+				if role, ok := m["role"].(string); ok {
+					participantRole = role
+					h.roleMu.Lock()
+					if _, ok := h.connRoles[sessionID]; !ok {
+						h.connRoles[sessionID] = make(map[*websocket.Conn]string)
+					}
+					h.connRoles[sessionID][conn] = participantRole
+					h.roleMu.Unlock()
+				}
 			}
+		}
+		if msg.Type == "leave" {
+			// Explicit leave: avoid duplicate leave on deferred disconnect.
+			participantID = ""
+			participantName = ""
 		}
 
 		h.dispatchWSMessage(sessionID, msg)

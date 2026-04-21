@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useMediaStream } from "../hooks/useMediaStream";
-import { useSessionWS } from "../hooks/useSessionWS";
+import { useMeetingWebSocket } from "../features/meeting/useMeetingWebSocket";
+import { useMeetingStore } from "../features/meeting/useMeetingStore";
 import { useScreenShare } from "../hooks/useScreenShare";
 
 const VideoMeet = () => {
   const { id = "" } = useParams(); // session ID
+  const navigate = useNavigate();
   const getOrCreateParticipant = () => {
     const existingId = sessionStorage.getItem("participant_id") || localStorage.getItem("participant_id");
     if (existingId) return existingId;
@@ -38,142 +40,114 @@ const VideoMeet = () => {
     emotionConfidence: number;
   };
 
-  const [participants, setParticipants] = useState<Record<string, Participant>>({
-    [participantId]: {
+  const meetingParticipants = useMeetingStore((s) => s.participants);
+  const toasts = useMeetingStore((s) => s.toasts);
+  const popToast = useMeetingStore((s) => s.popToast);
+  const upsert = useMeetingStore((s) => s.upsertParticipant);
+
+  // Ensure "self" exists in store immediately.
+  useEffect(() => {
+    upsert({
       id: participantId,
       name: participantName,
       emotion: "Analyzing",
       emotionConfidence: 0,
-    },
-  });
+    });
+  }, [participantId, participantName, upsert]);
 
-  const { send } = useSessionWS(id, participantId, (msg) => {
+  const onEmotionMessage = (msg: unknown) => {
     if (typeof msg !== "object" || msg === null) return;
-
-    const m = msg as {
-      type?: unknown;
-      participant_id?: unknown;
-      payload?: unknown;
-    };
-
+    const m = msg as { type?: unknown; participant_id?: unknown; payload?: unknown };
     const type = typeof m.type === "string" ? m.type : undefined;
     const pid = typeof m.participant_id === "string" ? m.participant_id : undefined;
+    if (type !== "emotion" || !pid) return;
 
-    if (!type || !pid) return;
+    const payload = m.payload;
+    let emotion: Emotion | undefined;
+    let confidence = 0;
 
-    if (type === "join") {
-      let name = `Participant ${pid}`;
-      const payload = m.payload;
-      if (payload && typeof payload === "object") {
-        const maybeName = (payload as Record<string, unknown>)["name"];
-        if (typeof maybeName === "string") name = maybeName;
+    // Flexible parsing: different AI implementations may send different payload shapes.
+    if (payload && typeof payload === "object") {
+      const p = payload as Record<string, unknown>;
+      const maybeEmotion = p["emotion"];
+      if (typeof maybeEmotion === "string") {
+        const normalized = maybeEmotion.toLowerCase();
+        // Map arbitrary AI emotion labels to our UI set.
+        if (normalized.includes("happy")) emotion = "Happy";
+        else if (normalized.includes("surpris")) emotion = "Surprised";
+        else if (normalized.includes("neutral")) emotion = "Neutral";
+        else if (normalized.includes("fear") || normalized.includes("disgust")) emotion = "Engaged";
+        else if (normalized.includes("sad")) emotion = "Focused";
+        else if (normalized.includes("angry")) emotion = "Thoughtful";
       }
-      setParticipants((prev) => {
-        if (prev[pid]) {
-          return {
-            ...prev,
-            [pid]: { ...prev[pid], name },
-          };
+
+      const maybeConfidence = p["confidence"];
+      if (typeof maybeConfidence === "number") {
+        // assume either 0..1 or 0..100
+        confidence = maybeConfidence > 1 ? maybeConfidence : maybeConfidence * 100;
+      }
+
+      const probs = p["probs"] ?? p["probabilities"];
+      if ((!emotion || emotion === "Analyzing") && probs && typeof probs === "object") {
+        const pr = probs as Record<string, unknown>;
+        // pick max prob from probs
+        let bestKey: string | null = null;
+        let bestVal = -1;
+        for (const [k, v] of Object.entries(pr)) {
+          if (typeof v !== "number") continue;
+          if (v > bestVal) {
+            bestVal = v;
+            bestKey = k;
+          }
         }
-
-        return {
-          ...prev,
-          [pid]: {
-            id: pid,
-            name,
-            emotion: "Neutral",
-            emotionConfidence: 80,
-          },
-        };
-      });
-    }
-
-    if (type === "leave") {
-      if (pid === participantId) return;
-      setParticipants((prev) => {
-        if (!prev[pid]) return prev;
-        const next = { ...prev };
-        delete next[pid];
-        return next;
-      });
-    }
-
-    if (type === "emotion") {
-      const payload = m.payload;
-      let emotion: Emotion | undefined;
-      let confidence = 0;
-
-      // Flexible parsing: different AI implementations may send different payload shapes.
-      if (payload && typeof payload === "object") {
-        const p = payload as Record<string, unknown>;
-        const maybeEmotion = p["emotion"];
-        if (typeof maybeEmotion === "string") {
-          const normalized = maybeEmotion.toLowerCase();
-          // Map arbitrary AI emotion labels to our UI set.
+        if (bestKey) {
+          const normalized = bestKey.toLowerCase();
           if (normalized.includes("happy")) emotion = "Happy";
           else if (normalized.includes("surpris")) emotion = "Surprised";
           else if (normalized.includes("neutral")) emotion = "Neutral";
           else if (normalized.includes("fear") || normalized.includes("disgust")) emotion = "Engaged";
           else if (normalized.includes("sad")) emotion = "Focused";
           else if (normalized.includes("angry")) emotion = "Thoughtful";
-        }
-
-        const maybeConfidence = p["confidence"];
-        if (typeof maybeConfidence === "number") {
-          // assume either 0..1 or 0..100
-          confidence = maybeConfidence > 1 ? maybeConfidence : maybeConfidence * 100;
-        }
-
-        const probs = p["probs"] ?? p["probabilities"];
-        if ((!emotion || emotion === "Analyzing") && probs && typeof probs === "object") {
-          const pr = probs as Record<string, unknown>;
-          // pick max prob from probs
-          let bestKey: string | null = null;
-          let bestVal = -1;
-          for (const [k, v] of Object.entries(pr)) {
-            if (typeof v !== "number") continue;
-            if (v > bestVal) {
-              bestVal = v;
-              bestKey = k;
-            }
-          }
-          if (bestKey) {
-            const normalized = bestKey.toLowerCase();
-            if (normalized.includes("happy")) emotion = "Happy";
-            else if (normalized.includes("surpris")) emotion = "Surprised";
-            else if (normalized.includes("neutral")) emotion = "Neutral";
-            else if (normalized.includes("fear") || normalized.includes("disgust")) emotion = "Engaged";
-            else if (normalized.includes("sad")) emotion = "Focused";
-            else if (normalized.includes("angry")) emotion = "Thoughtful";
-            confidence = bestVal > 1 ? bestVal : bestVal * 100;
-          }
+          confidence = bestVal > 1 ? bestVal : bestVal * 100;
         }
       }
-
-      setParticipants((prev) => {
-        const current = prev[pid];
-        if (!current) {
-          return {
-            ...prev,
-            [pid]: {
-              id: pid,
-              name: `Participant ${pid}`,
-              emotion: emotion ?? "Neutral",
-              emotionConfidence: Math.round(confidence),
-            },
-          };
-        }
-        return {
-          ...prev,
-          [pid]: {
-            ...current,
-            emotion: emotion ?? current.emotion,
-            emotionConfidence: emotion ? Math.round(confidence) : current.emotionConfidence,
-          },
-        };
-      });
     }
-  });
+
+    upsert({
+      id: pid,
+      name: meetingParticipants[pid]?.name ?? `Participant ${pid}`,
+      emotion: emotion ?? meetingParticipants[pid]?.emotion ?? "Neutral",
+      emotionConfidence: emotion ? Math.round(confidence) : meetingParticipants[pid]?.emotionConfidence ?? 0,
+    });
+  };
+
+  const { send } = useMeetingWebSocket(
+    id,
+    participantId,
+    onEmotionMessage,
+    () => {
+      sessionStorage.setItem("meeting_notice", "Митинг завершён (хост вышел).");
+      navigate("/sessions");
+    }
+  );
+
+  useEffect(() => {
+    if (toasts.length === 0) return;
+    const t = window.setTimeout(() => popToast(), 2500);
+    return () => window.clearTimeout(t);
+  }, [toasts.length, popToast]);
+
+  const participants: Record<string, Participant> = Object.fromEntries(
+    Object.entries(meetingParticipants).map(([k, v]) => [
+      k,
+      {
+        id: v.id,
+        name: v.name,
+        emotion: (v.emotion as Emotion) ?? "Neutral",
+        emotionConfidence: v.emotionConfidence ?? 0,
+      },
+    ])
+  );
 
   // Отправка кадра каждые 2 секунды
   useEffect(() => {
@@ -209,6 +183,25 @@ const VideoMeet = () => {
 
   return (
     <div className="video-container">
+      {toasts.length > 0 && (
+        <div style={{ position: "fixed", top: 12, right: 12, zIndex: 10 }}>
+          {toasts.map((t, idx) => (
+            <div
+              key={`${idx}-${t}`}
+              style={{
+                background: "rgba(0,0,0,0.75)",
+                color: "white",
+                padding: "10px 12px",
+                borderRadius: 10,
+                marginBottom: 8,
+                maxWidth: 320,
+              }}
+            >
+              {t}
+            </div>
+          ))}
+        </div>
+      )}
       <div className="video-grid">
         {Object.values(participants).map((p) => {
           const isSelf = p.id === participantId;

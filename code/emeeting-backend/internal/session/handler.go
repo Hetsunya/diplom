@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 
 	"emeeting/internal/models"
 )
@@ -17,6 +18,9 @@ type Handler struct {
 	hub     Bus
 	wsMu    sync.RWMutex
 	wsMap   map[string]WSMessageHandler
+
+	roleMu    sync.RWMutex
+	connRoles map[int]map[*websocket.Conn]string
 }
 
 func NewHandler(service Service, hub Bus) *Handler {
@@ -24,6 +28,7 @@ func NewHandler(service Service, hub Bus) *Handler {
 		service: service,
 		hub:     hub,
 		wsMap:   make(map[string]WSMessageHandler),
+		connRoles: make(map[int]map[*websocket.Conn]string),
 	}
 	h.registerDefaultWSHandlers()
 	return h

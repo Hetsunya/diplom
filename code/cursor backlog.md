@@ -122,20 +122,20 @@ BL-014 [x]: State machine митинга + аудит событий в БД
 Оценка: 1–2 дн
 DoD: unit-тесты на переходы (`TestMeeting_Transitions`) + миграция поднимается с нуля.
 
-BL-015 [ ]: Участники и роли (host/co-host/participant/guest)
+BL-015 [x]: Участники и роли (host/co-host/participant/guest)
 
 Цель: управляемые join/leave и права на действия.
-Файлы: code/emeeting-backend/internal/meeting/**, code/emeeting-backend/migrations/*
+Файлы: emeeting-backend/internal/meeting/**, emeeting-backend/migrations/*
 Результат:
 - модель participants с ролями и флагом активности (soft leave: is_active=false)
 - проверки доступа: user_id из токена ↔ participant.user_id
 Оценка: 1–2 дн
 DoD: тесты сервис-слоя на join/leave и проверки ролей.
 
-BL-016 [ ]: WS события join/leave/start/end + broadcast hub
+BL-016 [x]: WS события join/leave/start/end + broadcast hub
 
 Цель: синхронизация состояния в реальном времени.
-Файлы: code/emeeting-backend/internal/ws/**, code/emeeting-backend/internal/meeting/**, code/emeeting-ui/src/features/meeting/**
+Файлы: emeeting-backend/internal/session/**, emeeting-backend/internal/meeting/**, emeeting-ui/src/**
 Результат:
 - WSEvent (type/payload/ts)
 - события: user_joined, user_left, host_started, meeting_ended (+ user_removed опционально)
@@ -143,7 +143,7 @@ BL-016 [ ]: WS события join/leave/start/end + broadcast hub
 Оценка: 1–2 дн
 DoD: интеграционный тест потока (`TestE2E_MeetingFlow`) + UI обновляет список участников.
 
-BL-017 [ ]: Реконнект: восстановление участника по session_id + token
+BL-017 [x]: Реконнект: восстановление участника по session_id + token
 
 Цель: устойчивость к обрывам сети.
 Файлы: code/emeeting-backend/internal/ws/**, code/emeeting-backend/internal/meeting/**, code/emeeting-ui/src/features/meeting/**
@@ -153,7 +153,7 @@ BL-017 [ ]: Реконнект: восстановление участника 
 Оценка: 1–2 дн
 DoD: тест на реконнект (backend) + unit-тесты обработчика событий (frontend).
 
-BL-018 [ ]: Обработка onClose (user_left) + правило “host ушёл”
+BL-018 [x]: Обработка onClose (user_left) + правило “host ушёл”
 
 Цель: консистентная очистка participants и корректное завершение митинга.
 Файлы: code/emeeting-backend/internal/ws/handler.go, code/emeeting-backend/internal/meeting/service.go, code/emeeting-ui/src/features/meeting/**
@@ -164,7 +164,7 @@ BL-018 [ ]: Обработка onClose (user_left) + правило “host уш
 DoD: `TestMeeting_UserDisconnect_WithCoHost`, `TestMeeting_UserDisconnect_HostOnly` + UI корректно реагирует.
 
 P1 — Frontend Meeting UX (чтобы митинг ощущался “живым”)
-BL-019 [ ]: Meeting feature-store (React Query + Zustand) + WS hook
+BL-019 [x]: Meeting feature-store (React Query + Zustand) + WS hook
 
 Цель: разделить server-state и UI-state и стандартизировать WS подписку.
 Файлы: code/emeeting-ui/src/features/meeting/**, (опц.) src/lib/ws
@@ -174,7 +174,7 @@ BL-019 [ ]: Meeting feature-store (React Query + Zustand) + WS hook
 Оценка: 6–12 ч
 DoD: тесты на обработку событий (Vitest) + отсутствие “ручных” setState по всему UI.
 
-BL-020 [ ]: UI реакции на WS события (participants cache + toasts + redirect)
+BL-020 [x]: UI реакции на WS события (participants cache + toasts + redirect)
 
 Цель: завершить пользовательский цикл “вошёл/вышел/кикнули”.
 Файлы: code/emeeting-ui/src/features/meeting/** (participants list, toast, routing)
@@ -185,7 +185,7 @@ BL-020 [ ]: UI реакции на WS события (participants cache + toast
 DoD: RTL тесты на редирект/тост и корректное обновление списка.
 
 P0 — Auth System (безопасный базовый контур)
-BL-021 [ ]: bcrypt для password_hash + миграция/переезд
+BL-021 [x]: bcrypt для password_hash + миграция/переезд
 
 Цель: убрать SHA-256 и подготовиться к прод-уровню.
 Файлы: code/emeeting-backend/internal/auth/**, code/emeeting-backend/migrations/*

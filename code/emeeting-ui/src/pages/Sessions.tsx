@@ -7,6 +7,12 @@ const Sessions = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [dateFilter, setDateFilter] = useState<string>("");
   const navigate = useNavigate();
+  const [notice] = useState<string>(() => {
+    const n = sessionStorage.getItem("meeting_notice");
+    if (!n) return "";
+    sessionStorage.removeItem("meeting_notice");
+    return n;
+  });
 
   useEffect(() => {
     getSessions()
@@ -34,6 +40,21 @@ const Sessions = () => {
   return (
     <div>
       <h2>Сессии</h2>
+
+      {notice && (
+        <div
+          style={{
+            background: "#1f2a3a",
+            color: "white",
+            padding: "10px 12px",
+            borderRadius: 10,
+            marginBottom: 12,
+          }}
+          role="status"
+        >
+          {notice}
+        </div>
+      )}
 
       <div className="date-filter">
         <input
