@@ -195,7 +195,7 @@ BL-021 [x]: bcrypt для password_hash + миграция/переезд
 Оценка: 1 дн
 DoD: `TestAuth_LoginFlow` покрывает корректные/некорректные пароли.
 
-BL-022 [ ]: Access/Refresh tokens + rotation + хранение refresh в БД
+BL-022 [x]: Access/Refresh tokens + rotation + хранение refresh в БД
 
 Цель: короткий access + безопасный refresh с одноразовостью.
 Файлы: code/emeeting-backend/internal/auth/**, code/emeeting-backend/migrations/*
@@ -205,7 +205,7 @@ BL-022 [ ]: Access/Refresh tokens + rotation + хранение refresh в БД
 Оценка: 1–2 дн
 DoD: `TestAuth_TokenRefresh_Invalidated` (старый refresh не работает).
 
-BL-023 [ ]: HttpOnly cookie с session token + фронтенд без localStorage
+BL-023 [x]: HttpOnly cookie с session token + фронтенд без localStorage
 
 Цель: минимизировать XSS-риски и убрать хранение токенов на клиенте.
 Файлы: code/emeeting-backend/internal/auth/**, code/emeeting-ui/src/features/auth/**, UI http client
@@ -215,7 +215,7 @@ BL-023 [ ]: HttpOnly cookie с session token + фронтенд без localStor
 Оценка: 1–2 дн
 DoD: ручной сценарий “обновил страницу — остаюсь залогинен” (если предусмотрено) + автоповтор запроса после refresh.
 
-BL-024 [ ]: Middleware: RequireAuth / RequireRole / RateLimit + audit auth_events
+BL-024 [x]: Middleware: RequireAuth / RequireRole / RateLimit + audit auth_events
 
 Цель: централизованная защита эндпоинтов и защита от brute-force.
 Файлы: code/emeeting-backend/middleware/**, code/emeeting-backend/internal/auth/**, migrations/*

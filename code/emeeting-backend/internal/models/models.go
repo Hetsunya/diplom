@@ -29,6 +29,8 @@ type AuthUser struct {
 	IsActive     bool       `json:"isActive"`
 	CreatedAt    time.Time  `json:"createdAt"`
 	LastLogin    *time.Time `json:"lastLogin,omitempty"`
+	FailedLoginAttempts int        `json:"failedLoginAttempts"`
+	LockedUntil         *time.Time `json:"lockedUntil,omitempty"`
 }
 
 type AuthRole struct {

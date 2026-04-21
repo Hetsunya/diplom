@@ -35,6 +35,25 @@ func (r *repoFake) UpdatePasswordHash(authUserID int, passwordHash string) error
 	return nil
 }
 
+func (r *repoFake) IncrementFailedLogin(authUserID int) (int, error) { return 0, nil }
+func (r *repoFake) ResetFailedLogin(authUserID int) error           { return nil }
+func (r *repoFake) SetLockedUntil(authUserID int, until *time.Time) error {
+	return nil
+}
+
+func (r *repoFake) CreateRefreshToken(userID int, tokenHash string, expiresAt time.Time) error {
+	return nil
+}
+func (r *repoFake) GetRefreshToken(tokenHash string) (*RefreshToken, error) {
+	return nil, errors.New("not implemented")
+}
+func (r *repoFake) RevokeRefreshToken(tokenHash string, revokedAt time.Time, replacedByTokenHash *string) error {
+	return nil
+}
+func (r *repoFake) AppendAuthEvent(authUserID *int, eventType string, ip *string, payloadJSON []byte) error {
+	return nil
+}
+
 func TestAuth_LoginFlow(t *testing.T) {
 	t.Run("bcrypt hash authenticates", func(t *testing.T) {
 		t.Parallel()

@@ -13,6 +13,7 @@ import (
 	"emeeting/internal/server"
 	"emeeting/internal/session"
 	"emeeting/internal/ws"
+	"emeeting/middleware"
 )
 
 func main() {
@@ -36,6 +37,10 @@ func main() {
 		AllowCredentials: true,
 		MaxAge:           12 * 60 * 60,
 	}))
+
+	// Middleware order: Recover/Logger (gin.Default) → CORS → RateLimit → Auth → Handler
+	r.Use(middleware.RateLimitLogin())
+	r.Use(middleware.RequireAuth())
 
 	modules := []server.RouteModule{
 		auth.NewModule(database),
