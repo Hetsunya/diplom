@@ -284,3 +284,7 @@ BL-029 [ ]: Observability для релиза (логирование/health/м�
 - health endpoints и понятные статусы
 Оценка: 6–12 ч
 DoD: по логам видно origin/cookies/auth path и причины отказа.
+
+Статус (частично):
+- Реализовано: `X-Request-ID` middleware + access log с rid/origin/host/xfp/uid.
+- Реализовано: `GET /health` и `GET /ready` (ready проверяет Ping к Postgres).

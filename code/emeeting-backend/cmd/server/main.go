@@ -12,6 +12,7 @@ import (
 
 	"emeeting/internal/auth"
 	"emeeting/internal/db"
+	"emeeting/internal/health"
 	"emeeting/internal/reports"
 	"emeeting/internal/server"
 	"emeeting/internal/session"
@@ -31,8 +32,10 @@ func main() {
 	}
 
 	// gin
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
 	r.Use(middleware.RequestID())
+	r.Use(middleware.AccessLog())
 
 	allowedOrigins := splitCSV(corsOrigin)
 	r.Use(cors.New(cors.Config{
@@ -49,6 +52,7 @@ func main() {
 	r.Use(middleware.RequireAuth())
 
 	modules := []server.RouteModule{
+		health.NewModule(database),
 		auth.NewModule(database),
 		session.NewModule(database),
 		reports.NewModule(),
