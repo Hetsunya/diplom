@@ -12,18 +12,30 @@ import (
 func RequireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
-		if path == "/auth/login" || path == "/auth/refresh" || path == "/ws/health" || path == "/health" {
+		if path == "/auth/login" || path == "/auth/refresh" || path == "/auth/token" || path == "/ws/health" || path == "/health" {
 			c.Next()
 			return
 		}
 
-		token, err := c.Cookie("access_token")
-		if err != nil || strings.TrimSpace(token) == "" {
-			log.Printf("[AUTH] missing access_token cookie path=%s origin=%q host=%q cookie_hdr_present=%t",
+		token := ""
+		if cookieToken, err := c.Cookie("access_token"); err == nil {
+			token = strings.TrimSpace(cookieToken)
+		}
+		if token == "" {
+			// Support non-browser clients (ai-gateway) with Authorization: Bearer <token>
+			authz := strings.TrimSpace(c.GetHeader("Authorization"))
+			if strings.HasPrefix(strings.ToLower(authz), "bearer ") {
+				token = strings.TrimSpace(authz[len("bearer "):])
+			}
+		}
+
+		if token == "" {
+			log.Printf("[AUTH] missing token path=%s origin=%q host=%q cookie_hdr_present=%t authz_present=%t",
 				path,
 				c.GetHeader("Origin"),
 				c.Request.Host,
 				strings.TrimSpace(c.GetHeader("Cookie")) != "",
+				strings.TrimSpace(c.GetHeader("Authorization")) != "",
 			)
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return

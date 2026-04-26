@@ -32,13 +32,14 @@ func main() {
 
 	// gin
 	r := gin.Default()
+	r.Use(middleware.RequestID())
 
 	allowedOrigins := splitCSV(corsOrigin)
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     allowedOrigins,
 		AllowOriginFunc:  isAllowedDevOrigin(allowedOrigins),
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"},
 		AllowCredentials: true,
 		MaxAge:           12 * 60 * 60,
 	}))

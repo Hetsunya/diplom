@@ -25,6 +25,11 @@ type refreshRequest struct {
 	RefreshToken string `json:"refreshToken"`
 }
 
+type tokenRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 func (h *Handler) Login(c *gin.Context) {
 	var input loginRequest
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -46,6 +51,26 @@ func (h *Handler) Login(c *gin.Context) {
 
 	setTokenCookies(c, pair)
 	c.JSON(http.StatusOK, user)
+}
+
+// Token returns access/refresh pair as JSON for non-browser clients (service-to-service).
+func (h *Handler) Token(c *gin.Context) {
+	var input tokenRequest
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid token payload"})
+		return
+	}
+	user, err := h.service.Authenticate(input.Email, input.Password)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	pair, err := h.service.IssueTokens(user.AuthUserID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to issue tokens"})
+		return
+	}
+	c.JSON(http.StatusOK, pair)
 }
 
 func (h *Handler) Refresh(c *gin.Context) {

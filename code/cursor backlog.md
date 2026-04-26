@@ -263,7 +263,7 @@ BL-027 [ ]: Auth hardening для prod (cookie Secure + SameSite + rotation)
 Оценка: 4–8 ч
 DoD: логин сохраняется после F5, `/sessions` не ловит 401 без причины.
 
-BL-028 [ ]: ai-gateway: сервис‑аккаунт/токен для WS или отдельный internal-канал
+BL-028 [x]: ai-gateway: сервис‑аккаунт/токен для WS или отдельный internal-канал
 
 Цель: gateway не получает 401 на WS.
 Результат (варианты):
@@ -271,6 +271,10 @@ BL-028 [ ]: ai-gateway: сервис‑аккаунт/токен для WS ил�
 - B) отдельный endpoint для internal клиентов в одной сети (с ограничениями)
 Оценка: 1–2 дн
 DoD: ai-gateway стабильно подключается и не падает.
+
+Статус:
+- Реализовано: `/auth/token` (выдаёт TokenPair JSON для сервисов), поддержка `Authorization: Bearer <JWT>` в `RequireAuth`, настройки env для ai-gateway.
+- Проверено: gateway подключается к `/ws/sessions/:id` без 401 в docker-compose.
 
 BL-029 [ ]: Observability для релиза (логирование/health/метрики)
 
