@@ -230,3 +230,53 @@ DoD: `TestMiddleware_RequireRole` + тест на блокировку brute-for
 Спринт 4 (meeting MVP): BL-014 → BL-015 → BL-016 → BL-018 → BL-020
 Спринт 5 (meeting resilience): BL-017 → BL-019
 Спринт 6 (auth secure): BL-021 → BL-022 → BL-023 → BL-024
+
+---
+
+P0 — Release/VDS (единое решение для Linux/Windows + прод)
+BL-025 [ ]: Продовый reverse-proxy + HTTPS (чтобы работал getUserMedia везде)
+
+Цель: камера/микрофон работают не только на localhost, без “secure context” проблем.
+Результат:
+- домен + TLS (например Caddy или Nginx+certbot)
+- единый origin: `https://<domain>` проксирует `/api` и `/ws` на backend
+Оценка: 1 дн
+DoD: `navigator.mediaDevices.getUserMedia` доступен на VDS, UI/WS/API работают через один домен.
+
+BL-026 [ ]: Prod docker-compose (secrets/env/volumes) + .env.prod.example
+
+Цель: воспроизводимый деплой на VDS без ручных правок.
+Результат:
+- `docker-compose.prod.yml`
+- env: `POSTGRES_DSN`, `JWT_SECRET`, `CORS_ALLOW_ORIGIN`, etc
+- persist volumes для Postgres, бэкапы
+Оценка: 6–12 ч
+DoD: поднятие на чистой VDS одной командой, после рестарта данные на месте.
+
+BL-027 [ ]: Auth hardening для prod (cookie Secure + SameSite + rotation)
+
+Цель: убрать “иногда надо перезапуск” и сделать поведение токенов предсказуемым.
+Результат:
+- cookie `Secure=true` на HTTPS
+- чёткая политика SameSite (обычно Lax при одном origin)
+- refresh flow стабилен
+Оценка: 4–8 ч
+DoD: логин сохраняется после F5, `/sessions` не ловит 401 без причины.
+
+BL-028 [ ]: ai-gateway: сервис‑аккаунт/токен для WS или отдельный internal-канал
+
+Цель: gateway не получает 401 на WS.
+Результат (варианты):
+- A) gateway получает сервисный access token и подключается с ним
+- B) отдельный endpoint для internal клиентов в одной сети (с ограничениями)
+Оценка: 1–2 дн
+DoD: ai-gateway стабильно подключается и не падает.
+
+BL-029 [ ]: Observability для релиза (логирование/health/метрики)
+
+Цель: быстро понимать “почему не работает” без дебага в браузере.
+Результат:
+- структурные логи, request-id
+- health endpoints и понятные статусы
+Оценка: 6–12 ч
+DoD: по логам видно origin/cookies/auth path и причины отказа.

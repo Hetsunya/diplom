@@ -14,14 +14,22 @@ class SessionWSClient:
         self.on_message = on_message
 
     async def connect(self):
-        async with websockets.connect(self.url) as ws:
-            print(f"[WS] connected to {self.url}")
+        backoff = 1
+        while True:
+            try:
+                async with websockets.connect(self.url) as ws:
+                    print(f"[WS] connected to {self.url}")
+                    backoff = 1
 
-            async for raw in ws:
-                try:
-                    msg = json.loads(raw)
-                except json.JSONDecodeError:
-                    print("[WS] invalid json:", raw)
-                    continue
+                    async for raw in ws:
+                        try:
+                            msg = json.loads(raw)
+                        except json.JSONDecodeError:
+                            print("[WS] invalid json:", raw)
+                            continue
 
-                await self.on_message(msg, ws)
+                        await self.on_message(msg, ws)
+            except Exception as e:
+                print(f"[WS] connect failed: {e} (retry in {backoff}s)")
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 30)
