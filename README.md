@@ -123,3 +123,37 @@ python main.py
 В UI поля логина/пароля по умолчанию заполнены для пользователя `demo1`.
 
 TODO: будет cookie-based auth (HttpOnly cookie / session token) вместо хранения только `isAuthenticated` в frontend state.
+
+---
+
+## Production (VDS) deploy
+
+### Requirements
+- A VDS with Docker Engine + Docker Compose plugin
+- A domain name pointing to your VDS IP (A/AAAA records)
+- Open ports **80** and **443** in firewall/security group
+
+### Files
+- `docker-compose.prod.yml` – production stack (db + backend + ui + caddy)
+- `Caddyfile` – HTTPS + reverse proxy
+- `.env.prod.example` – example environment file
+
+### Deploy steps
+
+1) Copy `.env.prod.example` to `.env.prod` and fill values:
+- `DOMAIN` (your domain)
+- `JWT_SECRET` (generate a long random string)
+- `POSTGRES_PASSWORD`
+
+2) Start the stack:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+```
+
+3) Open the app:
+- `https://<DOMAIN>/`
+
+### Notes
+- **Camera/mic**: `getUserMedia` works on `https://<DOMAIN>` and on `http://localhost` (browser secure-context rules).
+- **Caddy TLS**: certificates are stored in `caddy_data` volume.

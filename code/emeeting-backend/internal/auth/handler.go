@@ -76,7 +76,7 @@ func (h *Handler) Logout(c *gin.Context) {
 }
 
 func setTokenCookies(c *gin.Context, pair *TokenPair) {
-	secure := c.Request.TLS != nil
+	secure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
 	httpOnly := true
 	sameSite := cookieSameSite(c)
 
@@ -101,7 +101,7 @@ func setTokenCookies(c *gin.Context, pair *TokenPair) {
 }
 
 func clearTokenCookies(c *gin.Context) {
-	secure := c.Request.TLS != nil
+	secure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
 	httpOnly := true
 	sameSite := cookieSameSite(c)
 	if !secure && sameSite == http.SameSiteNoneMode {
