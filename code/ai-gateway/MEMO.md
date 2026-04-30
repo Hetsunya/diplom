@@ -57,6 +57,11 @@ Loader: [`gateway_config.py`](gateway_config.py). Snapshot for reports: `config_
 3. Apply DB migration `007_analysis` on Postgres.
 4. `python main.py`
 5. Optional: `python smoke_ws_emotion_test.py` → expects both `face_analysis` and legacy `emotion`.
+6. Optional backend read-path check:
+   - `python e2e_analysis_readpath_check.py`
+   - sends synthetic `face_analysis` + `analysis_report_partial`, then verifies:
+     - `GET /sessions/:id/analysis/events`
+     - `GET /sessions/:id/analysis/report`
 
 ## How To Add a New Plugin
 
