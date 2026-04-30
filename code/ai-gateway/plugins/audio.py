@@ -2,7 +2,7 @@ import json
 from typing import Any, Literal, cast
 
 from adapters.speech_service import transcribe_audio_chunk
-from contracts import analysis_envelope, build_trace_id
+from contracts import analysis_envelope, build_trace_id, has_required_envelope_fields
 from feature_store import get_feature_store
 from gateway_config import get_gateway_config
 from observability import incr, log_event
@@ -52,6 +52,9 @@ class AudioPlugin:
                 },
                 "timestamp": ts,
             }
+            if not has_required_envelope_fields(audio_out["payload"]):
+                incr("audio_contract_invalid")
+                return
             await ws.send(json.dumps(audio_out))
             get_feature_store().push(
                 int(session_id),
@@ -71,6 +74,8 @@ class AudioPlugin:
             return
 
         timeout_sec = float(text_mod.params.get("timeout_sec", 15))
+        retries = int(text_mod.params.get("retries", 2))
+        backoff_sec = float(text_mod.params.get("backoff_sec", 0.5))
         text_ver = text_mod.model or "stub-v1"
 
         result = transcribe_audio_chunk(
@@ -80,6 +85,8 @@ class AudioPlugin:
             trace_id=trace_id,
             audio_payload=payload,
             timeout_sec=timeout_sec,
+            retries=retries,
+            backoff_sec=backoff_sec,
         )
         if not isinstance(result, dict):
             incr("text_analysis_errors")
@@ -116,6 +123,9 @@ class AudioPlugin:
             },
             "timestamp": ts,
         }
+        if not has_required_envelope_fields(text_out["payload"]):
+            incr("text_contract_invalid")
+            return
         await ws.send(json.dumps(text_out))
         get_feature_store().push(
             int(session_id),

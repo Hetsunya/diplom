@@ -30,3 +30,13 @@ def analysis_envelope(
     if extra:
         out.update(extra)
     return out
+
+
+def has_required_envelope_fields(payload: dict[str, Any]) -> bool:
+    """Validate required v1 analysis envelope fields inside payload."""
+    required = ("module", "version", "stage", "trace_id")
+    for key in required:
+        value = payload.get(key)
+        if not isinstance(value, str) or not value:
+            return False
+    return True

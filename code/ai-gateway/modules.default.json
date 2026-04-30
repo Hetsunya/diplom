@@ -1,12 +1,14 @@
 {
   "modules": {
     "text": {
-      "enabled": false,
+      "enabled": true,
       "provider": "http",
       "model": "stub-v1",
       "params": {
         "speech_service_url": "http://127.0.0.1:8090",
-        "timeout_sec": 15
+        "timeout_sec": 15,
+        "retries": 2,
+        "backoff_sec": 0.5
       }
     },
     "audio": {

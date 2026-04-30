@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 from deepface import DeepFace
 
-from contracts import analysis_envelope, build_trace_id
+from contracts import analysis_envelope, build_trace_id, has_required_envelope_fields
 from feature_store import get_feature_store
 from gateway_config import get_gateway_config
 from observability import incr, log_event
@@ -106,6 +106,9 @@ class FramePlugin:
                 },
                 "timestamp": ts,
             }
+            if not has_required_envelope_fields(face_out["payload"]):
+                incr("face_contract_invalid")
+                return
             await ws.send(json.dumps(face_out))
             incr("face_analysis_sent")
 

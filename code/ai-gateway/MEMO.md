@@ -12,6 +12,10 @@ Current source entrypoint: `main.py`.
 - Override path: env `AI_GATEWAY_MODULES_CONFIG` → path to JSON with the same `modules` shape.
 - Keys: `text`, `audio`, `face`, `report` — each has `enabled`, `provider`, `model`, `params`.
 - Text/ASR: set `modules.text.enabled=true` and `modules.text.params.speech_service_url` to a running [`speech-service`](../speech-service/) (or your ASR HTTP API compatible with `adapters/speech_service.py`).
+- Text/ASR retry controls:
+  - `modules.text.params.timeout_sec`
+  - `modules.text.params.retries`
+  - `modules.text.params.backoff_sec`
 - Report: `modules.report.params.interval_sec` (min 5s enforced in code), `own_nn_url` optional (`POST {url}/v1/report`).
 
 Loader: [`gateway_config.py`](gateway_config.py). Snapshot for reports: `config_snapshot()`.
@@ -23,6 +27,7 @@ Loader: [`gateway_config.py`](gateway_config.py). Snapshot for reports: `config_
 3. If `report` module enabled: background `report_loop` sends periodic `analysis_report_partial` on the same socket.
 4. `handle_message` (`handlers.py`): runs **all** plugins whose `can_handle` matches, sorted by `priority` (lower runs first).
 5. Plugins send results with `ws.send(...)`; see v1 contracts in [`../docs/ANALYSIS_WS_CONTRACTS.md`](../docs/ANALYSIS_WS_CONTRACTS.md) and [`CONTRACTS.md`](CONTRACTS.md).
+6. Before sending `face_analysis` / `audio_analysis` / `text_analysis`, gateway validates required v1 envelope fields: `module`, `version`, `stage`, `trace_id`.
 
 ## Implemented Plugins
 

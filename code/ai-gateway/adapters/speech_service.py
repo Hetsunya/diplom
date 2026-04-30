@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 import urllib.error
 import urllib.request
 from typing import Any
@@ -16,6 +17,8 @@ def transcribe_audio_chunk(
     trace_id: str,
     audio_payload: dict[str, Any],
     timeout_sec: float = 15.0,
+    retries: int = 2,
+    backoff_sec: float = 0.5,
 ) -> dict[str, Any] | None:
     """
     POST {base_url}/v1/transcribe
@@ -39,15 +42,22 @@ def transcribe_audio_chunk(
         "audio": audio_payload,
     }
     data = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
-            raw = resp.read().decode("utf-8")
-            return json.loads(raw)
-    except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as e:
-        return {"_error": str(e)}
+    attempt = 0
+    while attempt <= retries:
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
+                raw = resp.read().decode("utf-8")
+                return json.loads(raw)
+        except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as e:
+            if attempt >= retries:
+                return {"_error": str(e), "_attempts": attempt + 1}
+            sleep_for = backoff_sec * (2**attempt)
+            time.sleep(sleep_for)
+            attempt += 1
+    return {"_error": "unexpected asr adapter state"}
