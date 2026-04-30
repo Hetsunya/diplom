@@ -46,6 +46,7 @@ async def main():
 
     # Test client.
     emotion_msg = None
+    face_msg = None
 
     async with websockets.connect(gateway_url) as test_ws:
         # join (not required for emotion inference, but keeps state consistent)
@@ -80,15 +81,18 @@ async def main():
             )
         )
 
-        # Wait for an emotion message that came from ai-gateway.
+        # Wait for face/emotion messages that came from ai-gateway.
         for _ in range(50):
             raw = await asyncio.wait_for(test_ws.recv(), timeout=2.0)
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
                 continue
+            if msg.get("type") == "face_analysis":
+                face_msg = msg
             if msg.get("type") == "emotion":
                 emotion_msg = msg
+            if face_msg and emotion_msg:
                 break
 
     # Stop server (and gateway task best-effort).
@@ -102,9 +106,21 @@ async def main():
 
     if not emotion_msg:
         raise RuntimeError("No emotion message received from ai-gateway.")
+    if not face_msg:
+        raise RuntimeError("No face_analysis message received from ai-gateway.")
+
+    fp = face_msg.get("payload") or {}
+    for k in ("module", "version", "stage", "trace_id", "face_features"):
+        if k not in fp:
+            raise RuntimeError(f"face_analysis missing payload key: {k}")
 
     payload = emotion_msg.get("payload") or {}
-    print("OK: received emotion:", emotion_msg.get("participant_id"), payload.get("emotion"), payload.get("confidence"))
+    print(
+        "OK: received emotion+face_analysis:",
+        emotion_msg.get("participant_id"),
+        payload.get("emotion"),
+        payload.get("confidence"),
+    )
 
 
 if __name__ == "__main__":

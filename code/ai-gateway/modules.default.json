@@ -21,7 +21,10 @@
       "enabled": true,
       "provider": "deepface",
       "model": "emotion-v1",
-      "params": {}
+      "params": {
+        "min_interval_sec": 0.2,
+        "min_confidence": 5.0
+      }
     },
     "report": {
       "enabled": true,

@@ -1,5 +1,6 @@
 import base64
 import json
+import time
 from typing import Any
 
 import cv2
@@ -16,6 +17,9 @@ class FramePlugin:
     name = "frame"
     priority = 100
 
+    def __init__(self) -> None:
+        self._last_inference_ts: dict[str, float] = {}
+
     def can_handle(self, msg: dict[str, Any]) -> bool:
         return msg.get("type") == "frame"
 
@@ -24,6 +28,7 @@ class FramePlugin:
         mod = cfg.module("face")
         if not mod or not mod.enabled:
             return
+        params = mod.params or {}
 
         payload = msg.get("payload") or {}
         frame_data_url = None
@@ -37,6 +42,16 @@ class FramePlugin:
         participant_id = msg.get("participant_id")
         if session_id is None or participant_id is None:
             return
+
+        # Throttle inference frequency per participant to reduce CPU/GPU load.
+        min_interval_sec = float(params.get("min_interval_sec", 0.0))
+        key = f"{session_id}:{participant_id}"
+        now = time.monotonic()
+        last_ts = self._last_inference_ts.get(key, 0.0)
+        if min_interval_sec > 0 and (now - last_ts) < min_interval_sec:
+            incr("face_throttled")
+            return
+        self._last_inference_ts[key] = now
 
         trace_id = build_trace_id()
         model_ver = mod.model or "emotion-v1"
@@ -74,6 +89,17 @@ class FramePlugin:
             confidence_val = probs.get(dominant, 0)
             if not isinstance(confidence_val, (int, float)):
                 confidence_val = 0
+
+            min_confidence = float(params.get("min_confidence", 0.0))
+            if confidence_val < min_confidence:
+                incr("face_low_confidence_skipped")
+                log_event(
+                    "face_low_confidence",
+                    trace_id=trace_id,
+                    module="face",
+                    extra={"confidence": round(float(confidence_val), 4)},
+                )
+                return
 
             face_features = {
                 "dominant_emotion": dominant,

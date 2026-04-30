@@ -17,6 +17,9 @@ Current source entrypoint: `main.py`.
   - `modules.text.params.retries`
   - `modules.text.params.backoff_sec`
 - Report: `modules.report.params.interval_sec` (min 5s enforced in code), `own_nn_url` optional (`POST {url}/v1/report`).
+- Face quality/performance controls:
+  - `modules.face.params.min_interval_sec` (throttling per participant)
+  - `modules.face.params.min_confidence` (skip low-confidence inference results)
 
 Loader: [`gateway_config.py`](gateway_config.py). Snapshot for reports: `config_snapshot()`.
 
@@ -53,7 +56,7 @@ Loader: [`gateway_config.py`](gateway_config.py). Snapshot for reports: `config_
 2. `pip install -r requirements.txt`
 3. Apply DB migration `007_analysis` on Postgres.
 4. `python main.py`
-5. Optional: `python smoke_ws_emotion_test.py` → expects legacy `emotion` (still emitted).
+5. Optional: `python smoke_ws_emotion_test.py` → expects both `face_analysis` and legacy `emotion`.
 
 ## How To Add a New Plugin
 
