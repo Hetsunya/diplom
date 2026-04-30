@@ -4,6 +4,8 @@ import (
 	"database/sql"
 
 	"github.com/gin-gonic/gin"
+
+	"emeeting/internal/analysis"
 )
 
 type Module struct {
@@ -14,8 +16,9 @@ func NewModule(database *sql.DB) *Module {
 	repo := NewRepository(database)
 	service := NewService(repo)
 	hub := NewSessionHub()
+	analysisSvc := analysis.NewService(database)
 	return &Module{
-		handler: NewHandler(service, hub),
+		handler: NewHandler(service, hub, analysisSvc),
 	}
 }
 

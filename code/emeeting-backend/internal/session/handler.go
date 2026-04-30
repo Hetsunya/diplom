@@ -10,24 +10,27 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 
+	"emeeting/internal/analysis"
 	"emeeting/internal/models"
 )
 
 type Handler struct {
-	service Service
-	hub     Bus
-	wsMu    sync.RWMutex
-	wsMap   map[string]WSMessageHandler
+	service     Service
+	hub         Bus
+	analysisSvc *analysis.Service
+	wsMu        sync.RWMutex
+	wsMap       map[string]WSMessageHandler
 
 	roleMu    sync.RWMutex
 	connRoles map[int]map[*websocket.Conn]string
 }
 
-func NewHandler(service Service, hub Bus) *Handler {
+func NewHandler(service Service, hub Bus, analysisSvc *analysis.Service) *Handler {
 	h := &Handler{
-		service: service,
-		hub:     hub,
-		wsMap:   make(map[string]WSMessageHandler),
+		service:     service,
+		hub:         hub,
+		analysisSvc: analysisSvc,
+		wsMap:       make(map[string]WSMessageHandler),
 		connRoles: make(map[int]map[*websocket.Conn]string),
 	}
 	h.registerDefaultWSHandlers()

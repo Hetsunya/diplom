@@ -28,7 +28,7 @@ func (b *busSpy) Broadcast(sessionID int, message any) {
 func TestWSSessionConnectionSmoke(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub())
+	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil)
 	r := gin.New()
 	r.GET("/ws/sessions/:id", handler.WS)
 
@@ -66,7 +66,7 @@ func TestWSSessionConnectionSmoke(t *testing.T) {
 func TestE2E_MeetingFlow(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub())
+	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil)
 	r := gin.New()
 	r.GET("/ws/sessions/:id", handler.WS)
 
@@ -130,7 +130,7 @@ func TestE2E_MeetingFlow(t *testing.T) {
 
 func TestWSDispatchUsesRegisteredHandler(t *testing.T) {
 	spy := &busSpy{}
-	handler := NewHandler(NewService(newFakeRepo()), spy)
+	handler := NewHandler(NewService(newFakeRepo()), spy, nil)
 
 	handler.RegisterWSHandler("custom", func(sessionID int, msg WSMessage) {
 		msg.Type = "custom_processed"
@@ -149,7 +149,7 @@ func TestWSDispatchUsesRegisteredHandler(t *testing.T) {
 func TestMeeting_UserDisconnect_HostOnly(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub())
+	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil)
 	r := gin.New()
 	r.GET("/ws/sessions/:id", handler.WS)
 	server := httptest.NewServer(r)
@@ -200,7 +200,7 @@ func TestMeeting_UserDisconnect_HostOnly(t *testing.T) {
 func TestMeeting_UserDisconnect_WithCoHost(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub())
+	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil)
 	r := gin.New()
 	r.GET("/ws/sessions/:id", handler.WS)
 	server := httptest.NewServer(r)

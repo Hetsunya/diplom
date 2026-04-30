@@ -1,11 +1,14 @@
 package session
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
+
+	"emeeting/internal/analysis"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -26,6 +29,19 @@ func (h *Handler) RegisterWSHandler(messageType string, handler WSMessageHandler
 func (h *Handler) registerDefaultWSHandlers() {
 	// Default behavior for known command types is broadcast.
 	broadcastHandler := func(sessionID int, msg WSMessage) {
+		h.hub.Broadcast(sessionID, msg)
+	}
+
+	persistBroadcast := func(sessionID int, msg WSMessage) {
+		if h.analysisSvc != nil {
+			_ = h.analysisSvc.RecordInbound(context.Background(), analysis.InboundWSMessage{
+				Type:        msg.Type,
+				SessionID: sessionID,
+				Participant: msg.Participant,
+				Payload:     msg.Payload,
+				Timestamp:   msg.Timestamp,
+			})
+		}
 		h.hub.Broadcast(sessionID, msg)
 	}
 	joinHandler := func(sessionID int, msg WSMessage) {
@@ -104,6 +120,13 @@ func (h *Handler) registerDefaultWSHandlers() {
 	h.RegisterWSHandler("broadcast", broadcastHandler)
 	h.RegisterWSHandler("frame", broadcastHandler)
 	h.RegisterWSHandler("analytics", broadcastHandler)
+	// AI analytics inbound (from ai-gateway or future clients): persist + broadcast.
+	h.RegisterWSHandler(analysis.TypeTextAnalysis, persistBroadcast)
+	h.RegisterWSHandler(analysis.TypeAudioAnalysis, persistBroadcast)
+	h.RegisterWSHandler(analysis.TypeFaceAnalysis, persistBroadcast)
+	h.RegisterWSHandler(analysis.TypeAnalysisReport, persistBroadcast)
+	h.RegisterWSHandler(analysis.TypeAnalysisReportPartial, persistBroadcast)
+	h.RegisterWSHandler(analysis.TypeEmotionLegacy, persistBroadcast)
 	h.RegisterWSHandler("join", joinHandler)
 	h.RegisterWSHandler("leave", leaveHandler)
 	h.RegisterWSHandler("end_meeting", endMeetingHandler)

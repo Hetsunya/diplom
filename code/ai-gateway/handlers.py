@@ -43,11 +43,12 @@ def _get_plugins() -> list[Plugin]:
     return _PLUGINS
 
 
-async def handle_message(msg: dict[str, Any], ws: Any):
-    for plugin in _get_plugins():
+def _plugin_sort_key(p: Plugin) -> int:
+    return int(getattr(p, "priority", 500))
+
+
+async def handle_message(msg: dict[str, Any], ws: Any) -> None:
+    """Dispatch to all plugins that can handle the message (sorted by priority)."""
+    for plugin in sorted(_get_plugins(), key=_plugin_sort_key):
         if plugin.can_handle(msg):
             await plugin.process(msg, ws)
-            return
-
-    # Fallback for messages without matching plugin.
-    print("[WS] message:", msg)

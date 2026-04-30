@@ -1,0 +1,34 @@
+{
+  "modules": {
+    "text": {
+      "enabled": false,
+      "provider": "http",
+      "model": "stub-v1",
+      "params": {
+        "speech_service_url": "http://127.0.0.1:8090",
+        "timeout_sec": 15
+      }
+    },
+    "audio": {
+      "enabled": true,
+      "provider": "baseline",
+      "model": "audio-features-v1",
+      "params": {}
+    },
+    "face": {
+      "enabled": true,
+      "provider": "deepface",
+      "model": "emotion-v1",
+      "params": {}
+    },
+    "report": {
+      "enabled": true,
+      "provider": "stub-nn",
+      "model": "report-v1",
+      "params": {
+        "interval_sec": 30,
+        "own_nn_url": ""
+      }
+    }
+  }
+}

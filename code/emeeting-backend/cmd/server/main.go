@@ -10,6 +10,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
+	"emeeting/internal/analysis"
 	"emeeting/internal/auth"
 	"emeeting/internal/db"
 	"emeeting/internal/health"
@@ -55,6 +56,7 @@ func main() {
 		health.NewModule(database),
 		auth.NewModule(database),
 		session.NewModule(database),
+		analysis.NewModule(database),
 		reports.NewModule(),
 		ws.NewModule(),
 	}

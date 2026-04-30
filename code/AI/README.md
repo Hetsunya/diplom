@@ -31,10 +31,13 @@ pip install -r requirements.txt
 Для Docker:
 - Dockerfile для `ai-gateway` устанавливает зависимости из `requirements.txt`, поэтому для контейнера также нужен `pip install -r requirements.txt`.
 
-### Аудио (следующий шаг)
-В этом MVP аудио ещё не отправляется в `ai-gateway` и не анализируется.
-Дальше можно подключить:
-- ASR: `Whisper` (speech-to-text)
-- эмоции голоса: `openSMILE` или `SpeechBrain`
-- фьюжн: простая агрегация по времени (moving average / majority vote) до перехода к более сложным моделям.
+### Аудио и модульная аналитика (обновление)
 
+См. также:
+
+- Контракты v1: [`../docs/ANALYSIS_WS_CONTRACTS.md`](../docs/ANALYSIS_WS_CONTRACTS.md)
+- Наблюдаемость / SLO: [`../docs/ANALYSIS_OBSERVABILITY.md`](../docs/ANALYSIS_OBSERVABILITY.md)
+- Конфиг модулей: `ai-gateway/modules.default.json`, памятка `ai-gateway/MEMO.md`
+- Отдельный ASR: каталог `speech-service/` (HTTP stub + контракт для `ai-gateway/adapters/speech_service.py`)
+
+Поведение `frame`: помимо legacy `emotion` шлюз шлёт `face_analysis` с полями `module`, `stage`, `trace_id`, `version` в `payload`.

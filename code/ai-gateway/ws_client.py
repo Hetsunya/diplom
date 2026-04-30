@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import os
@@ -12,9 +14,13 @@ class SessionWSClient:
         self,
         url: str,
         on_message: Callable[[dict, websockets.WebSocketClientProtocol], Awaitable[None]],
+        session_id: int = 0,
+        enable_report_loop: bool = True,
     ):
         self.url = url
         self.on_message = on_message
+        self.session_id = session_id
+        self.enable_report_loop = enable_report_loop
         self.access_token: str | None = None
 
     def _http_base(self) -> str:
@@ -60,14 +66,32 @@ class SessionWSClient:
                     print(f"[WS] connected to {self.url}")
                     backoff = 1
 
-                    async for raw in ws:
-                        try:
-                            msg = json.loads(raw)
-                        except json.JSONDecodeError:
-                            print("[WS] invalid json:", raw)
-                            continue
+                    bg_tasks: list[asyncio.Task[Any]] = []
+                    if self.enable_report_loop and self.session_id > 0:
+                        from report_loop import report_loop
 
-                        await self.on_message(msg, ws)
+                        holder: list[Any] = [ws]
+                        bg_tasks.append(
+                            asyncio.create_task(
+                                report_loop(holder, self.session_id),
+                                name="report_loop",
+                            )
+                        )
+
+                    try:
+                        async for raw in ws:
+                            try:
+                                msg = json.loads(raw)
+                            except json.JSONDecodeError:
+                                print("[WS] invalid json:", raw)
+                                continue
+
+                            await self.on_message(msg, ws)
+                    finally:
+                        for t in bg_tasks:
+                            t.cancel()
+                        if bg_tasks:
+                            await asyncio.gather(*bg_tasks, return_exceptions=True)
             except Exception as e:
                 print(f"[WS] connect failed: {e} (retry in {backoff}s)")
                 self.access_token = None

@@ -4,8 +4,8 @@ Versioned migrations are stored in:
 - `migrations/up` - forward migrations
 - `migrations/down` - rollback migrations
 
-Current version:
-- `002_auth_users`
+Current version (see `migrations/up`):
+- through `007_analysis` (`analysis_event`, `analysis_report` tables for WS analytics persistence)
 
 ## Auto-apply on fresh DB
 

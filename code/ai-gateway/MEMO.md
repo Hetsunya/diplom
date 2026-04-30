@@ -6,113 +6,52 @@
 
 Current source entrypoint: `main.py`.
 
+## Configuration (modular)
+
+- Default module toggles and providers: [`modules.default.json`](modules.default.json).
+- Override path: env `AI_GATEWAY_MODULES_CONFIG` → path to JSON with the same `modules` shape.
+- Keys: `text`, `audio`, `face`, `report` — each has `enabled`, `provider`, `model`, `params`.
+- Text/ASR: set `modules.text.enabled=true` and `modules.text.params.speech_service_url` to a running [`speech-service`](../speech-service/) (or your ASR HTTP API compatible with `adapters/speech_service.py`).
+- Report: `modules.report.params.interval_sec` (min 5s enforced in code), `own_nn_url` optional (`POST {url}/v1/report`).
+
+Loader: [`gateway_config.py`](gateway_config.py). Snapshot for reports: `config_snapshot()`.
+
 ## Current Runtime Flow
 
-1. `main.py` builds WS URL:
-   - `BACKEND_WS_BASE_URL` (default `ws://localhost:8080`)
-   - `SESSION_ID` (default `2`)
-   - final URL: `/ws/sessions/{SESSION_ID}`
-2. `SessionWSClient` (`ws_client.py`):
-   - requests access token via `POST /auth/token`
-   - uses `Authorization: Bearer <token>` for WS connect
-   - reconnects with exponential backoff (`1s -> ... -> 30s`)
-3. Every incoming WS message is passed into `handle_message` (`handlers.py`).
-4. `handlers.py` auto-discovers `plugins/*` and routes message to the first plugin where `can_handle(msg) == true`.
-5. Plugin can send analysis result back to backend through the same socket (`ws.send(...)`).
+1. `main.py` loads config (`load_gateway_config` / `set_gateway_config`), builds WS URL from `BACKEND_WS_BASE_URL` + `SESSION_ID`.
+2. `SessionWSClient` (`ws_client.py`): token via `POST /auth/token`, `Authorization` on WS, reconnect backoff.
+3. If `report` module enabled: background `report_loop` sends periodic `analysis_report_partial` on the same socket.
+4. `handle_message` (`handlers.py`): runs **all** plugins whose `can_handle` matches, sorted by `priority` (lower runs first).
+5. Plugins send results with `ws.send(...)`; see v1 contracts in [`../docs/ANALYSIS_WS_CONTRACTS.md`](../docs/ANALYSIS_WS_CONTRACTS.md) and [`CONTRACTS.md`](CONTRACTS.md).
 
 ## Implemented Plugins
 
-- `plugins/frame.py`
-  - Handles `type == "frame"`.
-  - Expects payload with image Data URL: `payload.frame = "data:image/jpeg;base64,..."`.
-  - Runs DeepFace emotion inference.
-  - Sends event back:
-    - `type: "emotion"`
-    - `session_id`, `participant_id`, `timestamp`
-    - `payload: { emotion, confidence, probs }`
+| Plugin | Priority | Behavior |
+|--------|----------|----------|
+| `ping.py` | 50 | Metrics + log for backend heartbeats |
+| `frame.py` | 100 | DeepFace → `face_analysis` (v1 envelope) + legacy `emotion` |
+| `audio.py` | 150 | Optional `audio_analysis` stub; optional speech HTTP → `text_analysis` |
 
-- `plugins/audio.py`
-  - Handles `type == "audio"`.
-  - Stub only; no analysis yet.
+## Observability
 
-- `plugins/ping.py`
-  - Handles `type == "ping"`.
-  - Logs heartbeat only.
+- [`observability.py`](observability.py): counters (`incr`), structured `log_event`, `snapshot_metrics()`.
+- Use `trace_id` from v1 payloads for correlation (see contracts).
 
-## Message Contract (in practice)
+## Backend Integration
 
-Incoming frame message:
-
-```json
-{
-  "type": "frame",
-  "session_id": 1,
-  "participant_id": "p1",
-  "payload": {
-    "frame": "data:image/jpeg;base64,..."
-  },
-  "timestamp": "2026-01-01T00:00:00Z"
-}
-```
-
-Outgoing emotion message:
-
-```json
-{
-  "type": "emotion",
-  "session_id": 1,
-  "participant_id": "p1",
-  "payload": {
-    "emotion": "neutral",
-    "confidence": 75.2,
-    "probs": {
-      "neutral": 75.2
-    }
-  },
-  "timestamp": "2026-01-01T00:00:00Z"
-}
-```
-
-## Backend Integration Notes
-
-- Backend WS endpoint: `GET /ws/sessions/:id`.
-- Backend broadcasts most message types by default, including:
-  - `frame`
-  - unknown custom types (fallback broadcast path)
-- This means new analysis modules can publish their own event types without backend code changes, as long as frontend can consume them.
-- WS endpoint is auth-protected; gateway authenticates with `/auth/token`.
+- WS: `GET /ws/sessions/:id` (auth). Analytics inbound types are registered for **persist + broadcast**: `text_analysis`, `audio_analysis`, `face_analysis`, `analysis_report`, `analysis_report_partial`, `emotion` (legacy).
+- REST (after migration `007_analysis`): `GET /sessions/:id/analysis/report`, `GET /sessions/:id/analysis/events?limit=`.
 
 ## Local Run Checklist
 
-1. Configure env variables (example in `.env.example`):
-   - `BACKEND_WS_BASE_URL`
-   - `SESSION_ID`
-   - plus credentials expected by `ws_client.py`:
-     - `AI_GATEWAY_EMAIL`
-     - `AI_GATEWAY_PASSWORD`
-2. Install dependencies from `requirements.txt`.
-3. Start gateway:
-   - `python main.py`
-4. Optional smoke test:
-   - `python smoke_ws_emotion_test.py`
-   - should print `OK: received emotion: ...`
+1. Env (see `.env.example`): `BACKEND_WS_BASE_URL`, `SESSION_ID`, `AI_GATEWAY_EMAIL`, `AI_GATEWAY_PASSWORD`, optional `AI_GATEWAY_MODULES_CONFIG`.
+2. `pip install -r requirements.txt`
+3. Apply DB migration `007_analysis` on Postgres.
+4. `python main.py`
+5. Optional: `python smoke_ws_emotion_test.py` → expects legacy `emotion` (still emitted).
 
-## Notes from Current Verification
+## How To Add a New Plugin
 
-- In this environment, runtime execution is blocked because Python package manager and runtime deps are not available (`websockets` missing, no `pip` installed).
-- Code-level verification confirms:
-  - reconnect/auth logic is wired
-  - plugin auto-discovery works
-  - `frame -> emotion` path is implemented end-to-end in code
-
-## How To Add New Analysis Module
-
-1. Create `plugins/<module_name>.py`.
-2. Implement plugin object with:
-   - `can_handle(msg) -> bool`
-   - `async process(msg, ws) -> None`
-3. Export instance as module-level `plugin = <PluginClass>()`.
-4. Pick a unique outgoing `type` (example: `speech_sentiment`, `attention_score`, `summary_chunk`).
-5. Keep processing exception-safe (do not crash gateway loop).
-6. Keep payload schema stable and document it for frontend.
-
+1. Add `plugins/<name>.py` exporting `plugin = ...` with `name`, `priority`, `can_handle`, `async process`.
+2. Follow v1 envelope in outbound `payload` (`module`, `stage`, `trace_id`, `version`) — document in `docs/ANALYSIS_WS_CONTRACTS.md`.
+3. Register new `type` on backend in `internal/session/ws_handler.go` + `internal/analysis` if it should be persisted.

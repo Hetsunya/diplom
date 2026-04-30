@@ -288,3 +288,100 @@ DoD: по логам видно origin/cookies/auth path и причины от�
 Статус (частично):
 - Реализовано: `X-Request-ID` middleware + access log с rid/origin/host/xfp/uid.
 - Реализовано: `GET /health` и `GET /ready` (ready проверяет Ping к Postgres).
+
+---
+
+P0 — AI modules implementation (единая папка модулей)
+BL-030 [ ]: Единый layout для AI-модулей в одной папке
+
+Цель: стандартизовать структуру и убрать размазывание логики по разным местам.
+Файлы: `ai-gateway/modules/**` (новые), `ai-gateway/handlers.py`, `ai-gateway/gateway_config.py`, `ai-gateway/MEMO.md`
+Результат:
+- единая папка: `ai-gateway/modules/`
+- подпапки: `text/`, `audio/`, `face/`, `report/`, `shared/`
+- общий интерфейс модуля (`can_handle/process` + metadata: module/provider/model/version)
+Оценка: 1 дн
+DoD: все активные анализаторы грузятся из `ai-gateway/modules/**`, старые `plugins/*` либо проксируют, либо удалены без потери функционала.
+
+BL-031 [ ]: Text module v1 (ASR + NLP поверх транскрибации)
+
+Цель: получить стабильный поток `text_analysis` partial/final из отдельного speech-service.
+Файлы: `ai-gateway/modules/text/**`, `ai-gateway/adapters/speech_service.py`, `speech-service/**`, `docs/ANALYSIS_WS_CONTRACTS.md`
+Результат:
+- адаптер к speech-service с timeout/retry/circuit-breaker
+- нормализация ответа ASR в контракт `text_analysis`
+- базовые `text_features` (sentiment/topics/keyphrases/confidence) как отдельный шаг
+Оценка: 1–2 дн
+DoD: в live-сессии приходят `text_analysis` события с `trace_id`, `stage`, `version`; при ошибке speech-service gateway не падает.
+
+BL-032 [ ]: Audio module v1 (voice/signal features)
+
+Цель: заменить текущий stub на реальный анализ аудио-сигнала.
+Файлы: `ai-gateway/modules/audio/**`, `docs/ANALYSIS_WS_CONTRACTS.md`, `docs/ANALYSIS_OBSERVABILITY.md`
+Результат:
+- извлечение признаков: energy, pause_ratio, tempo, (опц.) jitter/shimmer
+- публикация `audio_analysis` partial событий
+- конфигурируемые пороги/окна (`modules.audio.params`)
+Оценка: 1–2 дн
+DoD: `audio_analysis` стабильно публикуется, latency в целевом диапазоне p95, есть fallback при невалидном чанке.
+
+BL-033 [ ]: Face module v2 (emotion alias + quality guards)
+
+Цель: стабилизировать модуль лица и подготовить к прод-режиму.
+Файлы: `ai-gateway/modules/face/**`, `ai-gateway/contracts.py`, `emeeting-backend/internal/analysis/**`
+Результат:
+- основной тип `face_analysis`, legacy `emotion` как alias
+- quality guards: face_detected=false, confidence thresholds, skip noisy frames
+- вынесенные настройки провайдера/модели (`modules.face.*`)
+Оценка: 1 дн
+DoD: UI совместим с legacy `emotion`, а новый канал `face_analysis` используется для агрегаторов/отчетов.
+
+BL-034 [ ]: Report orchestrator v1 (fusion text+audio+face -> own NN)
+
+Цель: собрать 3 канала в единый отчетный пайплайн.
+Файлы: `ai-gateway/modules/report/**`, `ai-gateway/feature_store.py`, `ai-gateway/own_nn_client.py`, `docs/ANALYSIS_WS_CONTRACTS.md`
+Результат:
+- windowing/join по `trace_id` + `participant_id` + time bucket
+- `analysis_report_partial` (инкрементально) и `analysis_report` (финал)
+- вызов собственной нейронки (`own_nn_url`) + fallback stub
+Оценка: 2–3 дн
+DoD: по завершении сессии есть финальный `analysis_report`, структура совпадает с контрактом, конфиг-снимок сохранен.
+
+BL-035 [ ]: Backend RBAC + API фильтры для аналитики
+
+Цель: безопасный доступ к аналитике и удобная выборка.
+Файлы: `emeeting-backend/internal/analysis/http_handlers.go`, `emeeting-backend/internal/analysis/repository.go`, `middleware/auth.go`
+Результат:
+- role-aware доступ к `/sessions/:id/analysis/*`
+- фильтры для events: `module`, `participant_id`, `from`, `to`, `limit`
+- audit лог доступа к participant-level данным
+Оценка: 1–2 дн
+DoD: host/co-host видят полный отчет, participant — только разрешенный уровень детализации.
+
+BL-036 [ ]: E2E тест-контур AI pipeline (hybrid)
+
+Цель: поймать регрессии на сквозном потоке до релиза.
+Файлы: `ai-gateway/smoke_ws_emotion_test.py` (расширить), новые `ai-gateway/tests/*`, `emeeting-backend/internal/session/ws_handler_test.go`
+Результат:
+- smoke: frame -> face_analysis/emotion
+- smoke: audio -> text_analysis + audio_analysis
+- smoke: partial report -> final report
+Оценка: 1–2 дн
+DoD: один сценарий запуска проверяет полный hybrid pipeline и валидирует обязательные поля контракта.
+
+BL-037 [ ]: Prod readiness AI (ресурсы, деградация, алерты)
+
+Цель: контролируемое поведение под нагрузкой и при деградации внешних сервисов.
+Файлы: `ai-gateway/observability.py`, `docs/ANALYSIS_OBSERVABILITY.md`, `docker-compose.prod.yml` (или эквивалент)
+Результат:
+- лимиты/очереди на тяжелые модули
+- graceful degradation (отключение модуля через конфиг без перезапуска backend)
+- метрики и алерты: error-rate, module latency, report generation lag
+Оценка: 1–2 дн
+DoD: при падении speech-service или face-провайдера остальные модули продолжают работу, отчет формируется с пометкой неполных данных.
+
+Рекомендуемый порядок внедрения (AI спринты)
+Спринт 7 (структура + контракты): BL-030 → BL-031
+Спринт 8 (мультимодальность): BL-032 → BL-033
+Спринт 9 (агрегация/отчеты): BL-034 → BL-035
+Спринт 10 (стабилизация): BL-036 → BL-037
