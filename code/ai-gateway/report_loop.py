@@ -181,6 +181,27 @@ def sanitize_report_shape(raw: Any, *, session_id: int) -> dict[str, Any]:
     }
 
 
+def _is_report_substantial(report: dict[str, Any]) -> bool:
+    summary = report.get("summary")
+    if isinstance(summary, str) and summary.strip() and summary.strip().lower() != "report generated":
+        return True
+
+    fc = report.get("feature_counts")
+    if isinstance(fc, dict) and any(isinstance(v, int) and v > 0 for v in fc.values()):
+        return True
+
+    participants = report.get("participants")
+    if isinstance(participants, list) and len(participants) > 0:
+        for p in participants:
+            if not isinstance(p, dict):
+                continue
+            if isinstance(p.get("audio_chunks"), int) and p.get("audio_chunks", 0) > 0:
+                return True
+            if isinstance(p.get("last_transcript"), str) and p.get("last_transcript", "").strip():
+                return True
+    return False
+
+
 async def report_loop(ws_holder: list[Any], session_id: int) -> None:
     """ws_holder[0] is the active websocket client protocol (mutated by SessionWSClient)."""
     cfg = get_gateway_config()
@@ -209,7 +230,13 @@ async def report_loop(ws_holder: list[Any], session_id: int) -> None:
             stage="partial",
         )
         if isinstance(remote, dict) and remote.get("report"):
-            report_body = sanitize_report_shape(remote.get("report"), session_id=session_id)
+            sanitized = sanitize_report_shape(remote.get("report"), session_id=session_id)
+            if _is_report_substantial(sanitized):
+                report_body = sanitized
+            else:
+                # Remote returned a structurally valid but effectively empty report.
+                report_body = _stub_report(session_id, feats)
+                incr("report_remote_empty_fallback")
             incr("report_shape_validated")
         else:
             report_body = _stub_report(session_id, feats)
