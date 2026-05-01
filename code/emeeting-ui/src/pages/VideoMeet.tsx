@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMediaStream } from "../hooks/useMediaStream";
 import { useMeetingWebSocket } from "../features/meeting/useMeetingWebSocket";
@@ -265,10 +265,7 @@ const VideoMeet = () => {
     }
   );
 
-  const sendRef = useRef(send);
-  sendRef.current = send;
-
-  useMeetingAudioChunks(streamRef, sendRef, {
+  useMeetingAudioChunks(streamRef, send, {
     enabled: micEnabled,
     mediaReady,
     timesliceMs: 3500,

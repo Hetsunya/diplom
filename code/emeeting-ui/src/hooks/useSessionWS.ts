@@ -96,15 +96,21 @@ export const useSessionWS = (
   }, [sessionId, participantId, options.reconnect, options.maxReconnectDelayMs]);
 
   const send = (type: string, payload?: unknown) => {
-    ws.current?.send(
-      JSON.stringify({
-        type,
-        session_id: Number(sessionId),
-        participant_id: participantId,
-        payload,
-        timestamp: new Date().toISOString(),
-      })
-    );
+    const sock = ws.current;
+    if (!sock || sock.readyState !== WebSocket.OPEN) return;
+    try {
+      sock.send(
+        JSON.stringify({
+          type,
+          session_id: Number(sessionId),
+          participant_id: participantId,
+          payload,
+          timestamp: new Date().toISOString(),
+        })
+      );
+    } catch {
+      // Ignore transient close races during reconnect.
+    }
   };
 
   const close = () => ws.current?.close();

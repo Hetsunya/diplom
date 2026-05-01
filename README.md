@@ -74,6 +74,7 @@ npm run dev
 ```
 
 Default UI URL: `http://localhost:5173`
+In dev mode Vite proxies `/api` and `/ws` to `http://localhost:8080`, so `VITE_API_URL=/api` and `VITE_WS_URL=/ws` work locally without extra env.
 
 ### AI gateway
 

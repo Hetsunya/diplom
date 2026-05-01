@@ -24,7 +24,7 @@ function pickRecorderMime(): string {
  */
 export function useMeetingAudioChunks(
   streamRef: React.RefObject<MediaStream | null>,
-  sendRef: React.MutableRefObject<(type: string, payload?: unknown) => void>,
+  send: (type: string, payload?: unknown) => void,
   opts: { enabled: boolean; mediaReady: boolean; timesliceMs?: number }
 ) {
   const { enabled, mediaReady, timesliceMs = 3500 } = opts;
@@ -52,7 +52,7 @@ export function useMeetingAudioChunks(
       try {
         const buf = await ev.data.arrayBuffer();
         const chunk_base64 = bytesToBase64(new Uint8Array(buf));
-        sendRef.current("audio", {
+        send("audio", {
           chunk_base64,
           mime,
           encoding: "base64",
@@ -79,5 +79,5 @@ export function useMeetingAudioChunks(
         /* noop */
       }
     };
-  }, [enabled, mediaReady, streamRef, sendRef, timesliceMs]);
+  }, [enabled, mediaReady, streamRef, send, timesliceMs]);
 }
