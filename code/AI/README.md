@@ -36,6 +36,7 @@ pip install -r requirements.txt
 См. также:
 
 - Контракты v1: [`../docs/ANALYSIS_WS_CONTRACTS.md`](../docs/ANALYSIS_WS_CONTRACTS.md)
+- **План: что оставить / переписать / удалить:** [`../docs/AI_MODULES_ACTION_PLAN.md`](../docs/AI_MODULES_ACTION_PLAN.md)
 - Наблюдаемость / SLO: [`../docs/ANALYSIS_OBSERVABILITY.md`](../docs/ANALYSIS_OBSERVABILITY.md)
 - Конфиг модулей: `ai-gateway/modules.default.json`, памятка `ai-gateway/MEMO.md`
 - Отдельный ASR: каталог `speech-service/` (HTTP stub + контракт для `ai-gateway/adapters/speech_service.py`)
