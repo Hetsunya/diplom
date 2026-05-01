@@ -144,6 +144,7 @@ uvicorn main:app --host 0.0.0.0 --port 8090
 - UI config in compose:
   - `VITE_API_URL`
   - `VITE_WS_URL`
+    - path prefix mode (`/ws`) or absolute ws base (`ws://host:port`)
 - AI gateway config in compose:
   - `BACKEND_WS_BASE_URL`
   - `SESSION_ID` (или `AI_GATEWAY_SESSION_ID` в корневом `docker-compose.yml`)

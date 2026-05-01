@@ -163,6 +163,7 @@ func (h *Handler) WS(c *gin.Context) {
 	defer conn.Close()
 
 	log.Printf("[WS] CONNECTED session=%d remote=%s", sessionID, conn.RemoteAddr())
+	done := make(chan struct{})
 
 	// регистрируем в хабе
 	h.hub.Add(sessionID, conn)
@@ -178,6 +179,7 @@ func (h *Handler) WS(c *gin.Context) {
 	h.roleMu.Unlock()
 
 	defer func() {
+		close(done)
 		leaveAt := time.Now().UTC()
 		endAt := leaveAt
 		h.roleMu.Lock()
@@ -250,14 +252,19 @@ func (h *Handler) WS(c *gin.Context) {
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 
-		for range ticker.C {
-			msg := WSMessage{
-				Type:      "ping",
-				SessionID: sessionID,
-				Timestamp: time.Now().UTC(),
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				msg := WSMessage{
+					Type:      "ping",
+					SessionID: sessionID,
+					Timestamp: time.Now().UTC(),
+				}
+				h.hub.Broadcast(sessionID, msg)
+				log.Printf("[WS] ping sent session=%d", sessionID)
 			}
-			h.hub.Broadcast(sessionID, msg)
-			log.Printf("[WS] ping sent session=%d", sessionID)
 		}
 	}()
 

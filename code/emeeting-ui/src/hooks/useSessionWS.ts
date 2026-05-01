@@ -14,6 +14,22 @@ export const useSessionWS = (
   onMessage?: (msg: unknown) => void,
   options: UseSessionWSOptions = {}
 ) => {
+  const buildSocketUrl = (sid: string) => {
+    const raw = (WS_URL || "").trim().replace(/\/+$/, "");
+    if (raw.startsWith("ws://") || raw.startsWith("wss://")) {
+      return `${raw}/ws/sessions/${sid}`;
+    }
+    if (raw.startsWith("http://") || raw.startsWith("https://")) {
+      const wsBase = raw.replace(/^http/i, "ws");
+      return `${wsBase}/ws/sessions/${sid}`;
+    }
+    if (raw.startsWith("/")) {
+      // Reverse-proxy mode: VITE_WS_URL is path prefix (usually "/ws").
+      return `${raw}/sessions/${sid}`;
+    }
+    return `${DEFAULT_WS_URL}/ws/sessions/${sid}`;
+  };
+
   const ws = useRef<WebSocket | null>(null);
   const onMessageRef = useRef(onMessage);
   const reconnectAttempt = useRef(0);
@@ -57,7 +73,7 @@ export const useSessionWS = (
 
     const connect = () => {
       clearReconnectTimer();
-      ws.current = new WebSocket(`${WS_URL}/ws/sessions/${sessionId}`);
+      ws.current = new WebSocket(buildSocketUrl(sessionId));
 
       ws.current.onopen = () => {
         reconnectAttempt.current = 0;
