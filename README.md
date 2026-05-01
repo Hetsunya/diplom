@@ -113,6 +113,7 @@ uvicorn main:app --host 0.0.0.0 --port 8090
 - Backend tests pass locally: `go test ./...`.
 - UI quality checks pass locally: `npm run lint && npm run build`.
 - Для AI-пайплайна (профиль `ai`) в live-сессии появляются WS события `text_analysis` и `audio_analysis`.
+- `analysis_report_partial` в gateway нормализуется по стабильной структуре перед отправкой в UI.
 
 ## Debug guide
 

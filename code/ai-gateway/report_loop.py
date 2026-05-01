@@ -15,6 +15,9 @@ from observability import incr, log_event, monotonic_ms
 from own_nn_client import generate_report
 
 
+_PIPELINE_STAGES = {"idle", "listening", "transcribing", "visual_only"}
+
+
 def _mean(vals: list[float]) -> float | None:
     if not vals:
         return None
@@ -107,6 +110,77 @@ def _stub_report(session_id: int, features: list[dict[str, Any]]) -> dict[str, A
     }
 
 
+def _to_non_empty_str(v: Any, default: str) -> str:
+    if isinstance(v, str) and v.strip():
+        return v.strip()
+    return default
+
+
+def _to_float(v: Any, default: float, *, lo: float | None = None, hi: float | None = None) -> float:
+    if isinstance(v, (int, float)):
+        out = float(v)
+        if lo is not None and out < lo:
+            out = lo
+        if hi is not None and out > hi:
+            out = hi
+        return round(out, 3)
+    return default
+
+
+def _sanitize_feature_counts(v: Any) -> dict[str, int]:
+    if not isinstance(v, dict):
+        return {}
+    out: dict[str, int] = {}
+    for k, val in v.items():
+        if not isinstance(k, str):
+            continue
+        if isinstance(val, (int, float)):
+            out[k] = max(0, int(val))
+    return out
+
+
+def _sanitize_participants(v: Any) -> list[dict[str, Any]]:
+    if not isinstance(v, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for raw in v:
+        if not isinstance(raw, dict):
+            continue
+        pid = _to_non_empty_str(raw.get("participant_id"), "unknown")
+        item = {
+            "participant_id": pid,
+            "audio_chunks": int(_to_float(raw.get("audio_chunks"), 0.0, lo=0)),
+            "avg_speech_activity_proxy": _to_float(raw.get("avg_speech_activity_proxy"), 0.0, lo=0.0, hi=1.0),
+            "avg_bitrate_kbps": _to_float(raw.get("avg_bitrate_kbps"), 0.0, lo=0.0),
+            "last_emotion": _to_non_empty_str(raw.get("last_emotion"), ""),
+            "last_transcript": _to_non_empty_str(raw.get("last_transcript"), "")[:180],
+        }
+        out.append(item)
+    return out
+
+
+def sanitize_report_shape(raw: Any, *, session_id: int) -> dict[str, Any]:
+    """
+    Keep report JSON shape stable for UI regardless of remote model output.
+    Unknown fields are dropped in this baseline implementation.
+    """
+    if not isinstance(raw, dict):
+        return _stub_report(session_id, [])
+
+    stage = _to_non_empty_str(raw.get("pipeline_stage"), "idle")
+    if stage not in _PIPELINE_STAGES:
+        stage = "idle"
+
+    return {
+        "session_id": int(_to_float(raw.get("session_id"), float(session_id), lo=0)),
+        "summary": _to_non_empty_str(raw.get("summary"), "report generated"),
+        "pipeline_stage": stage,
+        "speech_ratio": _to_float(raw.get("speech_ratio"), 0.0, lo=0.0, hi=1.0),
+        "feature_counts": _sanitize_feature_counts(raw.get("feature_counts")),
+        "participants": _sanitize_participants(raw.get("participants")),
+    }
+
+
 async def report_loop(ws_holder: list[Any], session_id: int) -> None:
     """ws_holder[0] is the active websocket client protocol (mutated by SessionWSClient)."""
     cfg = get_gateway_config()
@@ -135,7 +209,8 @@ async def report_loop(ws_holder: list[Any], session_id: int) -> None:
             stage="partial",
         )
         if isinstance(remote, dict) and remote.get("report"):
-            report_body = remote["report"]
+            report_body = sanitize_report_shape(remote.get("report"), session_id=session_id)
+            incr("report_shape_validated")
         else:
             report_body = _stub_report(session_id, feats)
 

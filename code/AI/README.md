@@ -42,5 +42,6 @@ pip install -r requirements.txt
 - Отдельный ASR: каталог `speech-service/` (режимы **stub** и **whisper**/faster-whisper; см. `speech-service/README.md` и адаптер `ai-gateway/adapters/speech_service.py`). UI шлёт фрагменты микрофона как WS `type: "audio"`.
 - `audio_analysis` больше не константный stub: gateway считает proxy-фичи по чанкам (`chunk_size_bytes`, `bitrate_kbps_est`, `speech_activity_proxy`) для промежуточной аналитики до внедрения полного SER/DSP.
 - `analysis_report_partial` (stub report v2) теперь агрегирует не только счётчики, но и `pipeline_stage`, `speech_ratio`, а также per-participant поля (`audio_chunks`, `avg_speech_activity_proxy`, `last_emotion`, `last_transcript`).
+- Перед отправкой `analysis_report_partial` применяется sanitization shape (стабильные поля `summary/pipeline_stage/speech_ratio/feature_counts/participants`) — это защищает UI от «ломаного» ответа внешней NN.
 
 Поведение `frame`: помимо legacy `emotion` шлюз шлёт `face_analysis` с полями `module`, `stage`, `trace_id`, `version` в `payload`.
