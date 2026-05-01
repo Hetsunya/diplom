@@ -27,15 +27,30 @@ export function MeetingTranscriptRail({
   onToggleVerdict,
 }: MeetingTranscriptRailProps) {
   const linesShown = useMemo(() => [...lines].reverse(), [lines]);
+  const sourceClass =
+    verdictSource === "remote" || verdictSource === "local_fallback" || verdictSource === "local_stub"
+      ? verdictSource
+      : "local_stub";
+  const sourceLabel =
+    verdictSource === "remote"
+      ? "NN"
+      : verdictSource === "local_fallback"
+        ? "fallback"
+        : verdictSource === "local_stub"
+          ? "stub"
+          : null;
 
   return (
     <aside className="meeting-transcript-rail" aria-label="Транскрипт и вердикт AI">
       <div className="meeting-transcript-rail__section meeting-transcript-rail__verdict">
         <div className="meeting-transcript-rail__section-title-row">
           <div className="meeting-transcript-rail__section-title">Вердикт AI</div>
-          {verdictSource && (
-            <span className={`meeting-transcript-rail__source-badge meeting-transcript-rail__source-badge--${verdictSource}`}>
-              {verdictSource}
+          {sourceLabel && (
+            <span
+              className={`meeting-transcript-rail__source-badge meeting-transcript-rail__source-badge--${sourceClass}`}
+              title={`source: ${verdictSource}`}
+            >
+              {sourceLabel}
             </span>
           )}
         </div>
