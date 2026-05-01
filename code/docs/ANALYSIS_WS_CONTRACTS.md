@@ -60,6 +60,7 @@ Aggregated report from the report orchestrator / own NN.
 - `model_version` (string)
 - `generated_at` (RFC3339)
 - `config_snapshot` (object, optional): effective `modules.*` config at generation time
+- `report_source` (`remote` | `local_fallback` | `local_stub`): origin of report body
 
 Current stub orchestrator may include inside `report` (optional):
 

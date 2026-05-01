@@ -222,6 +222,7 @@ async def report_loop(ws_holder: list[Any], session_id: int) -> None:
         trace = build_trace_id()
         snap = config_snapshot()
         report_body: dict[str, Any]
+        report_source = "local_stub"
         remote = generate_report(
             own_url,
             session_id=session_id,
@@ -233,13 +234,16 @@ async def report_loop(ws_holder: list[Any], session_id: int) -> None:
             sanitized = sanitize_report_shape(remote.get("report"), session_id=session_id)
             if _is_report_substantial(sanitized):
                 report_body = sanitized
+                report_source = "remote"
             else:
                 # Remote returned a structurally valid but effectively empty report.
                 report_body = _stub_report(session_id, feats)
+                report_source = "local_fallback"
                 incr("report_remote_empty_fallback")
             incr("report_shape_validated")
         else:
             report_body = _stub_report(session_id, feats)
+            report_source = "local_stub"
 
         now = datetime.now(timezone.utc).isoformat()
         out = {
@@ -254,6 +258,7 @@ async def report_loop(ws_holder: list[Any], session_id: int) -> None:
                     trace_id=trace,
                 ),
                 "report": report_body,
+                "report_source": report_source,
                 "model_version": model_ver,
                 "generated_at": now,
                 "config_snapshot": snap,
