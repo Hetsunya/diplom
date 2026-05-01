@@ -288,10 +288,25 @@ DoD: по логам видно origin/cookies/auth path и причины от�
 Статус (частично):
 - Реализовано: `X-Request-ID` middleware + access log с rid/origin/host/xfp/uid.
 - Реализовано: `GET /health` и `GET /ready` (ready проверяет Ping к Postgres).
+- Не закрыто по DoD BL-029: метрики/алерты/SLO для прод-наблюдаемости (отдельный трек).
 
 ---
 
 P0 — AI modules implementation (единая папка модулей)
+
+**Синхронизация статусов BL-030…BL-037 (2026-05):** часть работы уже в коде, но DoD карточек ниже формулировался шире — не удаляем карточки, фиксируем фактический прогресс.
+
+| ID | Фактический статус | Куда смотреть в репо |
+|----|--------------------|----------------------|
+| BL-030 | не сделано | Плагины всё ещё в `ai-gateway/plugins/`, папки `ai-gateway/modules/` нет |
+| BL-031 | **частично** | `ai-gateway/adapters/speech_service.py` (retry), `plugins/audio.py` → `text_analysis`; полный вынос в `modules/text` + circuit-breaker — впереди |
+| BL-032 | не сделано | `audio_analysis` пока baseline stub в `plugins/audio.py` |
+| BL-033 | **частично** | `plugins/frame.py`: `face_analysis` + legacy `emotion`, throttling `min_interval_sec`, порог `min_confidence`; вынос в `modules/face` — впереди |
+| BL-034 | **частично** | `ai-gateway/report_loop.py` + `feature_store.py`; полноценный fusion/windowing — впереди |
+| BL-035 | не сделано | REST есть, RBAC/фильтры `from/to/module` — нет |
+| BL-036 | **частично** | `smoke_ws_emotion_test.py` (face+emotion), `e2e_analysis_readpath_check.py`; полный hybrid smoke — впереди |
+| BL-037 | не сделано | prod readiness AI |
+
 BL-030 [ ]: Единый layout для AI-модулей в одной папке
 
 Цель: стандартизовать структуру и убрать размазывание логики по разным местам.
@@ -385,3 +400,37 @@ DoD: при падении speech-service или face-провайдера ос�
 Спринт 8 (мультимодальность): BL-032 → BL-033
 Спринт 9 (агрегация/отчеты): BL-034 → BL-035
 Спринт 10 (стабилизация): BL-036 → BL-037
+
+---
+
+P1 — UI: транскрипт, чат, вердикт AI (план в `docs/UI_AI_ANALYSIS_PLAN.md`)
+
+BL-038 [ ]: Правый рейл «Live транскрипт» (не чат)
+
+Цель: отображать поток `text_analysis` (partial/final) по спикерам, без смешивания с пользовательским чатом.
+Файлы: `emeeting-ui/src/pages/VideoMeet.tsx`, новый компонент `emeeting-ui/src/features/meeting/TranscriptRail.tsx` (или аналог)
+Оценка: 1–2 дн
+DoD: при live-сессии видны строки транскрипта; состояния не «вечный analyzing».
+
+BL-039 [ ]: Отдельная панель «Чат»
+
+Цель: явное UI-разделение чата и транскрипта (макет + роутинг/состояние при необходимости).
+Файлы: `emeeting-ui/src/pages/VideoMeet.tsx`, layout/meeting shell
+Оценка: 1 дн
+DoD: пользователь не путает ASR-текст с сообщениями чата.
+
+BL-040 [ ]: Плашка / блок «Вердикт» по `analysis_report_partial`
+
+Цель: краткий вывод нейросети + раскрытие деталей (drawer/modal).
+Файлы: `emeeting-ui/src/pages/VideoMeet.tsx`, `emeeting-ui/src/api/sessions.ts` (опц. REST fallback)
+Оценка: 1 дн
+DoD: клик открывает подробности; пустое состояние без вводящего в заблуждение текста.
+
+BL-041 [ ]: Убрать или переработать «AI analyzing…»
+
+Цель: заменить на состояния пайплайна (listening / transcribing / verdict) или убрать дублирование с индикаторами рейла.
+Файлы: `emeeting-ui/src/pages/VideoMeet.tsx`
+Оценка: 0.5–1 дн
+DoD: нет «вечного» analyzing при отсутствии событий; согласовано с BL-038.
+
+Опционально позже (фаза D в плане): bubble под активным спикером — отдельная карточка после diarization/VAD в данных.
