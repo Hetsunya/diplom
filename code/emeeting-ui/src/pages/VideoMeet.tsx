@@ -148,6 +148,7 @@ const VideoMeet = () => {
 
   const [transcriptLines, setTranscriptLines] = useState<TranscriptLine[]>([]);
   const [lastTextAt, setLastTextAt] = useState<number | null>(null);
+  const [asrAgeSec, setAsrAgeSec] = useState(0);
   const [verdictSummary, setVerdictSummary] = useState<string | null>(null);
   const [verdictDetail, setVerdictDetail] = useState<unknown | null>(null);
   const [verdictSource, setVerdictSource] = useState<string | null>(null);
@@ -278,6 +279,18 @@ const VideoMeet = () => {
     const t = window.setTimeout(() => popToast(), 2500);
     return () => window.clearTimeout(t);
   }, [toasts.length, popToast]);
+
+  useEffect(() => {
+    if (!lastTextAt) {
+      setAsrAgeSec(0);
+      return;
+    }
+    setAsrAgeSec(Math.max(0, Math.round((Date.now() - lastTextAt) / 1000)));
+    const timer = window.setInterval(() => {
+      setAsrAgeSec(Math.max(0, Math.round((Date.now() - lastTextAt) / 1000)));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [lastTextAt]);
 
   const participants: Record<string, Participant> = Object.fromEntries(
     Object.entries(meetingParticipants).map(([k, v]) => [
@@ -464,11 +477,7 @@ const VideoMeet = () => {
 
         <MeetingTranscriptRail
           lines={transcriptLines}
-          asrStatus={
-            lastTextAt
-              ? `recv ${Math.max(0, Math.round((Date.now() - lastTextAt) / 1000))}s ago`
-              : "waiting…"
-          }
+          asrStatus={lastTextAt ? `recv ${asrAgeSec}s ago` : "waiting…"}
           verdictSummary={verdictSummary}
           verdictDetail={verdictDetail}
           verdictSource={verdictSource}
