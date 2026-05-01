@@ -40,5 +40,6 @@ pip install -r requirements.txt
 - Наблюдаемость / SLO: [`../docs/ANALYSIS_OBSERVABILITY.md`](../docs/ANALYSIS_OBSERVABILITY.md)
 - Конфиг модулей: `ai-gateway/modules.default.json`, памятка `ai-gateway/MEMO.md`
 - Отдельный ASR: каталог `speech-service/` (режимы **stub** и **whisper**/faster-whisper; см. `speech-service/README.md` и адаптер `ai-gateway/adapters/speech_service.py`). UI шлёт фрагменты микрофона как WS `type: "audio"`.
+- `audio_analysis` больше не константный stub: gateway считает proxy-фичи по чанкам (`chunk_size_bytes`, `bitrate_kbps_est`, `speech_activity_proxy`) для промежуточной аналитики до внедрения полного SER/DSP.
 
 Поведение `frame`: помимо legacy `emotion` шлюз шлёт `face_analysis` с полями `module`, `stage`, `trace_id`, `version` в `payload`.

@@ -39,6 +39,7 @@ export function useMeetingAudioChunks(
 
     let cancelled = false;
     let mr: MediaRecorder;
+    let chunkSeq = 0;
 
     try {
       mr = new MediaRecorder(streamRef.current, { mimeType: mime });
@@ -55,6 +56,9 @@ export function useMeetingAudioChunks(
           chunk_base64,
           mime,
           encoding: "base64",
+          timeslice_ms: timesliceMs,
+          sent_at_ms: Date.now(),
+          chunk_seq: ++chunkSeq,
         });
       } catch {
         /* ignore chunk upload errors */

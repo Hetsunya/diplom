@@ -112,6 +112,7 @@ uvicorn main:app --host 0.0.0.0 --port 8090
 - UI opens and can call backend endpoints (`/sessions`, `/auth/login`, `/reports/:id`).
 - Backend tests pass locally: `go test ./...`.
 - UI quality checks pass locally: `npm run lint && npm run build`.
+- Для AI-пайплайна (профиль `ai`) в live-сессии появляются WS события `text_analysis` и `audio_analysis`.
 
 ## Debug guide
 
@@ -124,6 +125,10 @@ uvicorn main:app --host 0.0.0.0 --port 8090
 - **WS closes immediately**
   - Confirm `GET /ws/sessions/:id` is reachable.
   - Check backend logs for upgrade errors.
+- **AI profile is up, but no transcript**
+  - Verify `docker compose --profile ai ps` shows healthy `speech-service`.
+  - Ensure meeting URL session id matches `AI_GATEWAY_SESSION_ID`.
+  - Temporarily set `SPEECH_ASR_ENGINE=stub` to isolate ASR performance/model issues.
 - **DB schema missing**
   - Reset volumes (`docker compose down -v`) and start again.
   - Verify scripts exist in `migrations/up`.
