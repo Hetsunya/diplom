@@ -345,6 +345,13 @@ footer {
     background: #f4ecf7;
 }
 
+.meeting-transcript-rail__asr-status {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #7f8c8d;
+    white-space: nowrap;
+}
+
 .meeting-transcript-rail__muted {
     margin: 0;
     font-size: 0.85rem;

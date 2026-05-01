@@ -147,6 +147,7 @@ const VideoMeet = () => {
   const upsert = useMeetingStore((s) => s.upsertParticipant);
 
   const [transcriptLines, setTranscriptLines] = useState<TranscriptLine[]>([]);
+  const [lastTextAt, setLastTextAt] = useState<number | null>(null);
   const [verdictSummary, setVerdictSummary] = useState<string | null>(null);
   const [verdictDetail, setVerdictDetail] = useState<unknown | null>(null);
   const [verdictSource, setVerdictSource] = useState<string | null>(null);
@@ -232,6 +233,7 @@ const VideoMeet = () => {
           }
           return [...prev, line].slice(-80);
         });
+        setLastTextAt(Date.now());
         return;
       }
 
@@ -462,6 +464,11 @@ const VideoMeet = () => {
 
         <MeetingTranscriptRail
           lines={transcriptLines}
+          asrStatus={
+            lastTextAt
+              ? `recv ${Math.max(0, Math.round((Date.now() - lastTextAt) / 1000))}s ago`
+              : "waiting…"
+          }
           verdictSummary={verdictSummary}
           verdictDetail={verdictDetail}
           verdictSource={verdictSource}

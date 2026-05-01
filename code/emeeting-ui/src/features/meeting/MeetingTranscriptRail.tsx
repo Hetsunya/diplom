@@ -11,6 +11,7 @@ export type TranscriptLine = {
 
 type MeetingTranscriptRailProps = {
   lines: TranscriptLine[];
+  asrStatus: string;
   verdictSummary: string | null;
   verdictDetail: unknown | null;
   verdictSource: string | null;
@@ -20,6 +21,7 @@ type MeetingTranscriptRailProps = {
 
 export function MeetingTranscriptRail({
   lines,
+  asrStatus,
   verdictSummary,
   verdictDetail,
   verdictSource,
@@ -72,7 +74,12 @@ export function MeetingTranscriptRail({
       </div>
 
       <div className="meeting-transcript-rail__section">
-        <div className="meeting-transcript-rail__section-title">Транскрипт (ASR)</div>
+        <div className="meeting-transcript-rail__section-title-row">
+          <div className="meeting-transcript-rail__section-title">Транскрипт (ASR)</div>
+          <span className="meeting-transcript-rail__asr-status" title="Состояние live-транскрипции">
+            {asrStatus}
+          </span>
+        </div>
         <div className="meeting-transcript-rail__scroll" role="log" aria-live="polite">
           {linesShown.length === 0 ? (
             <p className="meeting-transcript-rail__muted">Сюда попадают события text_analysis, когда включён speech-service.</p>
