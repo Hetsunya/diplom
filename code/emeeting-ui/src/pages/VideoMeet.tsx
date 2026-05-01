@@ -1,9 +1,105 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMediaStream } from "../hooks/useMediaStream";
 import { useMeetingWebSocket } from "../features/meeting/useMeetingWebSocket";
 import { useMeetingStore } from "../features/meeting/useMeetingStore";
 import { useScreenShare } from "../hooks/useScreenShare";
+import {
+  MeetingTranscriptRail,
+  type TranscriptLine,
+} from "../features/meeting/MeetingTranscriptRail";
+
+export type Emotion = "Happy" | "Neutral" | "Engaged" | "Focused" | "Surprised" | "Thoughtful";
+
+type Participant = {
+  id: string;
+  name: string;
+  emotion: Emotion;
+  emotionConfidence: number;
+  faceSignalReceived: boolean;
+};
+
+function mapEmotionLabel(normalized: string): Emotion | undefined {
+  if (normalized.includes("happy")) return "Happy";
+  if (normalized.includes("surpris")) return "Surprised";
+  if (normalized.includes("neutral")) return "Neutral";
+  if (normalized.includes("fear") || normalized.includes("disgust")) return "Engaged";
+  if (normalized.includes("sad")) return "Focused";
+  if (normalized.includes("angry")) return "Thoughtful";
+  return undefined;
+}
+
+function parseEmotionFromLegacyPayload(p: Record<string, unknown>): { emotion: Emotion; confidence: number } | null {
+  let emotion: Emotion | undefined;
+  let confidence = 0;
+
+  const maybeEmotion = p["emotion"];
+  if (typeof maybeEmotion === "string") {
+    emotion = mapEmotionLabel(maybeEmotion.toLowerCase());
+  }
+
+  const maybeConfidence = p["confidence"];
+  if (typeof maybeConfidence === "number") {
+    confidence = maybeConfidence > 1 ? maybeConfidence : maybeConfidence * 100;
+  }
+
+  const probs = p["probs"] ?? p["probabilities"];
+  if (!emotion && probs && typeof probs === "object") {
+    const pr = probs as Record<string, unknown>;
+    let bestKey: string | null = null;
+    let bestVal = -1;
+    for (const [k, v] of Object.entries(pr)) {
+      if (typeof v !== "number") continue;
+      if (v > bestVal) {
+        bestVal = v;
+        bestKey = k;
+      }
+    }
+    if (bestKey) {
+      emotion = mapEmotionLabel(bestKey.toLowerCase());
+      confidence = bestVal > 1 ? bestVal : bestVal * 100;
+    }
+  }
+
+  if (!emotion) return null;
+  return { emotion, confidence: Math.round(confidence) };
+}
+
+function parseFaceAnalysisPayload(p: Record<string, unknown>): { emotion: Emotion; confidence: number } | null {
+  const ff = p["face_features"];
+  if (!ff || typeof ff !== "object") return null;
+  const f = ff as Record<string, unknown>;
+  let emotion: Emotion | undefined;
+  let confidence = 0;
+  const dom = f["dominant_emotion"];
+  if (typeof dom === "string") emotion = mapEmotionLabel(dom.toLowerCase());
+
+  const probs = f["probs"] ?? f["probabilities"];
+  if (!emotion && probs && typeof probs === "object") {
+    const pr = probs as Record<string, unknown>;
+    let bestKey: string | null = null;
+    let bestVal = -1;
+    for (const [k, v] of Object.entries(pr)) {
+      if (typeof v !== "number") continue;
+      if (v > bestVal) {
+        bestVal = v;
+        bestKey = k;
+      }
+    }
+    if (bestKey) {
+      emotion = mapEmotionLabel(bestKey.toLowerCase());
+      confidence = bestVal > 1 ? bestVal : bestVal * 100;
+    }
+  }
+
+  const maybeConf = f["confidence"];
+  if (typeof maybeConf === "number") {
+    confidence = maybeConf > 1 ? maybeConf : maybeConf * 100;
+  }
+
+  if (!emotion) return null;
+  return { emotion, confidence: Math.round(confidence) };
+}
 
 const VideoMeet = () => {
   const { id = "" } = useParams(); // session ID
@@ -34,99 +130,121 @@ const VideoMeet = () => {
     useMediaStream();
 
   const { startShare, error: shareError } = useScreenShare();
-  type Emotion = "Analyzing" | "Happy" | "Neutral" | "Engaged" | "Focused" | "Surprised" | "Thoughtful";
-  type Participant = {
-    id: string;
-    name: string;
-    emotion: Emotion;
-    emotionConfidence: number;
-  };
 
   const meetingParticipants = useMeetingStore((s) => s.participants);
   const toasts = useMeetingStore((s) => s.toasts);
   const popToast = useMeetingStore((s) => s.popToast);
   const upsert = useMeetingStore((s) => s.upsertParticipant);
 
+  const [transcriptLines, setTranscriptLines] = useState<TranscriptLine[]>([]);
+  const [verdictSummary, setVerdictSummary] = useState<string | null>(null);
+  const [verdictDetail, setVerdictDetail] = useState<unknown | null>(null);
+  const [verdictExpanded, setVerdictExpanded] = useState(false);
+
   // Ensure "self" exists in store immediately.
   useEffect(() => {
     upsert({
       id: participantId,
       name: participantName,
-      emotion: "Analyzing",
+      emotion: "Neutral",
       emotionConfidence: 0,
+      faceSignalReceived: false,
     });
   }, [participantId, participantName, upsert]);
 
-  const onEmotionMessage = (msg: unknown) => {
-    if (typeof msg !== "object" || msg === null) return;
-    const m = msg as { type?: unknown; participant_id?: unknown; payload?: unknown };
-    const type = typeof m.type === "string" ? m.type : undefined;
-    const pid = typeof m.participant_id === "string" ? m.participant_id : undefined;
-    if (type !== "emotion" || !pid) return;
+  const onAnalysisMessage = useCallback(
+    (msg: unknown) => {
+      if (typeof msg !== "object" || msg === null) return;
+      const m = msg as { type?: unknown; participant_id?: unknown; payload?: unknown };
+      const type = typeof m.type === "string" ? m.type : undefined;
+      const pid = typeof m.participant_id === "string" ? m.participant_id : undefined;
 
-    const payload = m.payload;
-    let emotion: Emotion | undefined;
-    let confidence = 0;
+      const store = useMeetingStore.getState();
+      const nameFor = (id: string) => store.participants[id]?.name ?? `Participant ${id}`;
 
-    // Flexible parsing: different AI implementations may send different payload shapes.
-    if (payload && typeof payload === "object") {
-      const p = payload as Record<string, unknown>;
-      const maybeEmotion = p["emotion"];
-      if (typeof maybeEmotion === "string") {
-        const normalized = maybeEmotion.toLowerCase();
-        // Map arbitrary AI emotion labels to our UI set.
-        if (normalized.includes("happy")) emotion = "Happy";
-        else if (normalized.includes("surpris")) emotion = "Surprised";
-        else if (normalized.includes("neutral")) emotion = "Neutral";
-        else if (normalized.includes("fear") || normalized.includes("disgust")) emotion = "Engaged";
-        else if (normalized.includes("sad")) emotion = "Focused";
-        else if (normalized.includes("angry")) emotion = "Thoughtful";
+      if (type === "emotion" && pid && m.payload && typeof m.payload === "object") {
+        const parsed = parseEmotionFromLegacyPayload(m.payload as Record<string, unknown>);
+        if (parsed) {
+          upsert({
+            id: pid,
+            name: nameFor(pid),
+            emotion: parsed.emotion,
+            emotionConfidence: parsed.confidence,
+            faceSignalReceived: true,
+          });
+        }
+        return;
       }
 
-      const maybeConfidence = p["confidence"];
-      if (typeof maybeConfidence === "number") {
-        // assume either 0..1 or 0..100
-        confidence = maybeConfidence > 1 ? maybeConfidence : maybeConfidence * 100;
+      if (type === "face_analysis" && pid && m.payload && typeof m.payload === "object") {
+        const parsed = parseFaceAnalysisPayload(m.payload as Record<string, unknown>);
+        if (parsed) {
+          upsert({
+            id: pid,
+            name: nameFor(pid),
+            emotion: parsed.emotion,
+            emotionConfidence: parsed.confidence,
+            faceSignalReceived: true,
+          });
+        }
+        return;
       }
 
-      const probs = p["probs"] ?? p["probabilities"];
-      if ((!emotion || emotion === "Analyzing") && probs && typeof probs === "object") {
-        const pr = probs as Record<string, unknown>;
-        // pick max prob from probs
-        let bestKey: string | null = null;
-        let bestVal = -1;
-        for (const [k, v] of Object.entries(pr)) {
-          if (typeof v !== "number") continue;
-          if (v > bestVal) {
-            bestVal = v;
-            bestKey = k;
+      if (type === "text_analysis" && pid && m.payload && typeof m.payload === "object") {
+        const p = m.payload as Record<string, unknown>;
+        const traceRaw = p["trace_id"];
+        const traceId = typeof traceRaw === "string" ? traceRaw : `local-${Date.now()}-${pid}`;
+        const partial = p["transcript_partial"];
+        const final = p["transcript_final"];
+        const text =
+          typeof final === "string" ? final : typeof partial === "string" ? partial : "";
+        const stage = p["stage"];
+        const isFinal =
+          typeof final === "string" ||
+          stage === "final" ||
+          (typeof stage === "string" && stage.toLowerCase().includes("final"));
+
+        setTranscriptLines((prev) => {
+          const idx = prev.findIndex((l) => l.traceId === traceId && l.participantId === pid);
+          const line: TranscriptLine = {
+            traceId,
+            participantId: pid,
+            speakerLabel: nameFor(pid),
+            text,
+            final: isFinal,
+            at: new Date().toISOString(),
+          };
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...line };
+            return next;
           }
-        }
-        if (bestKey) {
-          const normalized = bestKey.toLowerCase();
-          if (normalized.includes("happy")) emotion = "Happy";
-          else if (normalized.includes("surpris")) emotion = "Surprised";
-          else if (normalized.includes("neutral")) emotion = "Neutral";
-          else if (normalized.includes("fear") || normalized.includes("disgust")) emotion = "Engaged";
-          else if (normalized.includes("sad")) emotion = "Focused";
-          else if (normalized.includes("angry")) emotion = "Thoughtful";
-          confidence = bestVal > 1 ? bestVal : bestVal * 100;
-        }
+          return [...prev, line].slice(-80);
+        });
+        return;
       }
-    }
 
-    upsert({
-      id: pid,
-      name: meetingParticipants[pid]?.name ?? `Participant ${pid}`,
-      emotion: emotion ?? meetingParticipants[pid]?.emotion ?? "Neutral",
-      emotionConfidence: emotion ? Math.round(confidence) : meetingParticipants[pid]?.emotionConfidence ?? 0,
-    });
-  };
+      if ((type === "analysis_report_partial" || type === "analysis_report") && m.payload && typeof m.payload === "object") {
+        const p = m.payload as Record<string, unknown>;
+        const report = p["report"];
+        let summary: string | null = null;
+        if (report && typeof report === "object") {
+          const r = report as Record<string, unknown>;
+          if (typeof r.summary === "string") summary = r.summary;
+          else if (typeof r.headline === "string") summary = r.headline;
+        }
+        setVerdictDetail(report ?? p);
+        setVerdictSummary(summary ?? (type === "analysis_report" ? "Итоговый отчёт" : "Частичный отчёт"));
+        setVerdictExpanded(false);
+      }
+    },
+    [upsert]
+  );
 
   const { send, close } = useMeetingWebSocket(
     id,
     participantId,
-    onEmotionMessage,
+    onAnalysisMessage,
     () => {
       sessionStorage.setItem("meeting_notice", "Митинг завершён (хост вышел).");
       navigate("/sessions");
@@ -147,6 +265,7 @@ const VideoMeet = () => {
         name: v.name,
         emotion: (v.emotion as Emotion) ?? "Neutral",
         emotionConfidence: v.emotionConfidence ?? 0,
+        faceSignalReceived: v.faceSignalReceived === true,
       },
     ])
   );
@@ -165,8 +284,6 @@ const VideoMeet = () => {
 
   const emotionToClass = (emotion: Emotion) => {
     switch (emotion) {
-      case "Analyzing":
-        return "neutral";
       case "Happy":
         return "happy";
       case "Engaged":
@@ -204,109 +321,125 @@ const VideoMeet = () => {
 
   return (
     <div className="video-container">
-      {(mediaError || shareError) && (
-        <div
-          style={{
-            background: "#3b2a1f",
-            color: "white",
-            padding: "10px 12px",
-            borderRadius: 10,
-            marginBottom: 12,
-          }}
-          role="status"
-        >
-          {mediaError || shareError}
-        </div>
-      )}
-      {toasts.length > 0 && (
-        <div style={{ position: "fixed", top: 12, right: 12, zIndex: 10 }}>
-          {toasts.map((t, idx) => (
+      <div className="video-meet-layout">
+        <div className="video-meet-main">
+          {(mediaError || shareError) && (
             <div
-              key={`${idx}-${t}`}
               style={{
-                background: "rgba(0,0,0,0.75)",
+                background: "#3b2a1f",
                 color: "white",
                 padding: "10px 12px",
                 borderRadius: 10,
-                marginBottom: 8,
-                maxWidth: 320,
+                marginBottom: 12,
               }}
+              role="status"
             >
-              {t}
+              {mediaError || shareError}
             </div>
-          ))}
-        </div>
-      )}
-      <div className="video-grid">
-        {Object.values(participants).map((p) => {
-          const isSelf = p.id === participantId;
-          const showMicOff = isSelf && !micEnabled;
-          const showCamOff = isSelf && !camEnabled;
-          return (
-          <div key={p.id} className="video-tile">
-            <div className="tile-media">
-              {isSelf ? (
-                <>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    className={showCamOff ? "video-hidden" : ""}
-                  />
-                  {showCamOff && (
-                    <div className="video-placeholder video-placeholder--overlay" />
-                  )}
-                </>
-              ) : (
-                <div className="fake-video">
-                  <div className="face-placeholder" />
-                  <div className="video-placeholder" />
+          )}
+          {toasts.length > 0 && (
+            <div style={{ position: "fixed", top: 12, right: 12, zIndex: 10 }}>
+              {toasts.map((t, idx) => (
+                <div
+                  key={`${idx}-${t}`}
+                  style={{
+                    background: "rgba(0,0,0,0.75)",
+                    color: "white",
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    marginBottom: 8,
+                    maxWidth: 320,
+                  }}
+                >
+                  {t}
                 </div>
-              )}
+              ))}
             </div>
+          )}
+          <div className="video-grid">
+            {Object.values(participants).map((p) => {
+              const isSelf = p.id === participantId;
+              const showMicOff = isSelf && !micEnabled;
+              const showCamOff = isSelf && !camEnabled;
+              return (
+                <div key={p.id} className="video-tile">
+                  <div className="tile-media">
+                    {isSelf ? (
+                      <>
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          playsInline
+                          className={showCamOff ? "video-hidden" : ""}
+                        />
+                        {showCamOff && <div className="video-placeholder video-placeholder--overlay" />}
+                      </>
+                    ) : (
+                      <div className="fake-video">
+                        <div className="face-placeholder" />
+                        <div className="video-placeholder" />
+                      </div>
+                    )}
+                  </div>
 
-            <div className={`emotion-indicator ${emotionToClass(p.emotion)}`}>
-              {p.emotion === "Analyzing" ? "AI analyzing..." : `${p.emotion} ${p.emotionConfidence}%`}
-            </div>
+                  {!p.faceSignalReceived ? (
+                    <div className="emotion-indicator emotion-indicator--pending" title="Ожидание данных о лице с сервера">
+                      Лицо: —
+                    </div>
+                  ) : (
+                    <div className={`emotion-indicator ${emotionToClass(p.emotion)}`}>
+                      {p.emotion} {p.emotionConfidence}%
+                    </div>
+                  )}
 
-            <div className="participant-name">
-              {p.name}
-              {showMicOff ? " • Mic off" : ""}
-              {showCamOff ? " • Cam off" : ""}
-            </div>
+                  <div className="participant-name">
+                    {p.name}
+                    {showMicOff ? " • Mic off" : ""}
+                    {showCamOff ? " • Cam off" : ""}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          );
-        })}
-      </div>
 
-      <div className="controls">
-        <button
-          className={`control-btn mic-btn ${micEnabled ? "active" : ""}`}
-          onClick={toggleMic}
-          type="button"
-        >
-          🎤 {micEnabled ? "Микрофон: вкл" : "Микрофон: выкл"}
-        </button>
+          <div className="controls">
+            <button
+              className={`control-btn mic-btn ${micEnabled ? "active" : ""}`}
+              onClick={toggleMic}
+              type="button"
+            >
+              🎤 {micEnabled ? "Микрофон: вкл" : "Микрофон: выкл"}
+            </button>
 
-        <button
-          className={`control-btn cam-btn ${camEnabled ? "active" : ""}`}
-          onClick={toggleCam}
-          type="button"
-        >
-          📹 {camEnabled ? "Камера: вкл" : "Камера: выкл"}
-        </button>
+            <button
+              className={`control-btn cam-btn ${camEnabled ? "active" : ""}`}
+              onClick={toggleCam}
+              type="button"
+            >
+              📹 {camEnabled ? "Камера: вкл" : "Камера: выкл"}
+            </button>
 
-        <button className="control-btn share-btn" onClick={startShare} type="button">
-          🖥️ Поделиться экраном
-        </button>
+            <button className="control-btn share-btn" onClick={startShare} type="button">
+              🖥️ Поделиться экраном
+            </button>
 
-        <button className="control-btn" onClick={leaveMeeting} type="button">
-          Выйти
-        </button>
+            <button className="control-btn" onClick={leaveMeeting} type="button">
+              Выйти
+            </button>
 
-        <button className="control-btn end-btn" onClick={endMeeting} type="button">
-          Завершить
-        </button>
+            <button className="control-btn end-btn" onClick={endMeeting} type="button">
+              Завершить
+            </button>
+          </div>
+        </div>
+
+        <MeetingTranscriptRail
+          lines={transcriptLines}
+          verdictSummary={verdictSummary}
+          verdictDetail={verdictDetail}
+          verdictExpanded={verdictExpanded}
+          onToggleVerdict={() => setVerdictExpanded((e) => !e)}
+        />
       </div>
     </div>
   );

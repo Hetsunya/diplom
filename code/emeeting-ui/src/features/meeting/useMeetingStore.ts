@@ -5,6 +5,8 @@ export type MeetingParticipant = {
   name: string;
   emotion?: string;
   emotionConfidence?: number;
+  /** True after first emotion or face_analysis for this tile (replaces vague “analyzing”). */
+  faceSignalReceived?: boolean;
 };
 
 type MeetingState = {

@@ -405,31 +405,34 @@ DoD: при падении speech-service или face-провайдера ос�
 
 P1 — UI: транскрипт, чат, вердикт AI (план в `docs/UI_AI_ANALYSIS_PLAN.md`)
 
-BL-038 [ ]: Правый рейл «Live транскрипт» (не чат)
+BL-038 [x]: Правый рейл «Live транскрипт» (не чат)
 
 Цель: отображать поток `text_analysis` (partial/final) по спикерам, без смешивания с пользовательским чатом.
-Файлы: `emeeting-ui/src/pages/VideoMeet.tsx`, новый компонент `emeeting-ui/src/features/meeting/TranscriptRail.tsx` (или аналог)
+Файлы: `emeeting-ui/src/pages/VideoMeet.tsx`, `emeeting-ui/src/features/meeting/MeetingTranscriptRail.tsx`
 Оценка: 1–2 дн
 DoD: при live-сессии видны строки транскрипта; состояния не «вечный analyzing».
 
-BL-039 [ ]: Отдельная панель «Чат»
+BL-039 [~]: Отдельная панель «Чат»
 
 Цель: явное UI-разделение чата и транскрипта (макет + роутинг/состояние при необходимости).
+Статус: в рейле отдельный блок «Чат» с пояснением (ASR только выше); полноценного чат-UI / роутинга пока нет.
 Файлы: `emeeting-ui/src/pages/VideoMeet.tsx`, layout/meeting shell
 Оценка: 1 дн
 DoD: пользователь не путает ASR-текст с сообщениями чата.
 
-BL-040 [ ]: Плашка / блок «Вердикт» по `analysis_report_partial`
+BL-040 [x]: Плашка / блок «Вердикт» по `analysis_report_partial`
 
 Цель: краткий вывод нейросети + раскрытие деталей (drawer/modal).
-Файлы: `emeeting-ui/src/pages/VideoMeet.tsx`, `emeeting-ui/src/api/sessions.ts` (опц. REST fallback)
+Статус: кнопка + раскрытие JSON `report` в рейле; REST fallback не делали.
+Файлы: `emeeting-ui/src/pages/VideoMeet.tsx`, `emeeting-ui/src/features/meeting/MeetingTranscriptRail.tsx`; `emeeting-ui/src/api/sessions.ts` (опц. REST fallback)
 Оценка: 1 дн
 DoD: клик открывает подробности; пустое состояние без вводящего в заблуждение текста.
 
-BL-041 [ ]: Убрать или переработать «AI analyzing…»
+BL-041 [x]: Убрать или переработать «AI analyzing…»
 
 Цель: заменить на состояния пайплайна (listening / transcribing / verdict) или убрать дублирование с индикаторами рейла.
-Файлы: `emeeting-ui/src/pages/VideoMeet.tsx`
+Статус: до первого `emotion`/`face_analysis` — «Лицо: —»; после — эмоция + %; тип `Analyzing` убран.
+Файлы: `emeeting-ui/src/pages/VideoMeet.tsx`, `emeeting-ui/src/features/meeting/useMeetingStore.ts`
 Оценка: 0.5–1 дн
 DoD: нет «вечного» analyzing при отсутствии событий; согласовано с BL-038.
 
