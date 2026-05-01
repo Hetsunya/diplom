@@ -39,6 +39,6 @@ pip install -r requirements.txt
 - **План: что оставить / переписать / удалить:** [`../docs/AI_MODULES_ACTION_PLAN.md`](../docs/AI_MODULES_ACTION_PLAN.md)
 - Наблюдаемость / SLO: [`../docs/ANALYSIS_OBSERVABILITY.md`](../docs/ANALYSIS_OBSERVABILITY.md)
 - Конфиг модулей: `ai-gateway/modules.default.json`, памятка `ai-gateway/MEMO.md`
-- Отдельный ASR: каталог `speech-service/` (HTTP stub + контракт для `ai-gateway/adapters/speech_service.py`)
+- Отдельный ASR: каталог `speech-service/` (режимы **stub** и **whisper**/faster-whisper; см. `speech-service/README.md` и адаптер `ai-gateway/adapters/speech_service.py`). UI шлёт фрагменты микрофона как WS `type: "audio"`.
 
 Поведение `frame`: помимо legacy `emotion` шлюз шлёт `face_analysis` с полями `module`, `stage`, `trace_id`, `version` в `payload`.

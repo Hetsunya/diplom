@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMediaStream } from "../hooks/useMediaStream";
 import { useMeetingWebSocket } from "../features/meeting/useMeetingWebSocket";
@@ -8,6 +8,7 @@ import {
   MeetingTranscriptRail,
   type TranscriptLine,
 } from "../features/meeting/MeetingTranscriptRail";
+import { useMeetingAudioChunks } from "../features/meeting/useMeetingAudioChunks";
 
 export type Emotion = "Happy" | "Neutral" | "Engaged" | "Focused" | "Surprised" | "Thoughtful";
 
@@ -126,8 +127,17 @@ const VideoMeet = () => {
   const participantRole =
     sessionStorage.getItem("participant_role") || localStorage.getItem("participant_role") || "participant";
 
-  const { videoRef, captureFrame, toggleMic, toggleCam, micEnabled, camEnabled, error: mediaError } =
-    useMediaStream();
+  const {
+    videoRef,
+    streamRef,
+    mediaReady,
+    captureFrame,
+    toggleMic,
+    toggleCam,
+    micEnabled,
+    camEnabled,
+    error: mediaError,
+  } = useMediaStream();
 
   const { startShare, error: shareError } = useScreenShare();
 
@@ -250,6 +260,15 @@ const VideoMeet = () => {
       navigate("/sessions");
     }
   );
+
+  const sendRef = useRef(send);
+  sendRef.current = send;
+
+  useMeetingAudioChunks(streamRef, sendRef, {
+    enabled: micEnabled,
+    mediaReady,
+    timesliceMs: 3500,
+  });
 
   useEffect(() => {
     if (toasts.length === 0) return;

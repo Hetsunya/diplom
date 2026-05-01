@@ -36,7 +36,7 @@ func (h *Handler) registerDefaultWSHandlers() {
 		if h.analysisSvc != nil {
 			_ = h.analysisSvc.RecordInbound(context.Background(), analysis.InboundWSMessage{
 				Type:        msg.Type,
-				SessionID: sessionID,
+				SessionID:   sessionID,
 				Participant: msg.Participant,
 				Payload:     msg.Payload,
 				Timestamp:   msg.Timestamp,
@@ -119,6 +119,7 @@ func (h *Handler) registerDefaultWSHandlers() {
 	}
 	h.RegisterWSHandler("broadcast", broadcastHandler)
 	h.RegisterWSHandler("frame", broadcastHandler)
+	h.RegisterWSHandler("audio", broadcastHandler)
 	h.RegisterWSHandler("analytics", broadcastHandler)
 	// AI analytics inbound (from ai-gateway or future clients): persist + broadcast.
 	h.RegisterWSHandler(analysis.TypeTextAnalysis, persistBroadcast)

@@ -9,6 +9,7 @@ export const useMediaStream = () => {
   const canUseMedia = !!globalThis.navigator?.mediaDevices?.getUserMedia;
   const [micEnabled, setMicEnabled] = useState(() => canUseMedia);
   const [camEnabled, setCamEnabled] = useState(() => canUseMedia);
+  const [mediaReady, setMediaReady] = useState(false);
   const [error, setError] = useState<string | null>(() => {
     const md = globalThis.navigator?.mediaDevices;
     if (!md?.getUserMedia) {
@@ -26,6 +27,7 @@ export const useMediaStream = () => {
     md.getUserMedia({ video: true, audio: true })
       .then((stream) => {
         streamRef.current = stream;
+        setMediaReady(true);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
@@ -72,6 +74,8 @@ export const useMediaStream = () => {
 
   return {
     videoRef,
+    streamRef,
+    mediaReady,
     captureFrame,
     toggleMic,
     toggleCam,
