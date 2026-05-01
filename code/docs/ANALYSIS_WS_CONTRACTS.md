@@ -61,6 +61,13 @@ Aggregated report from the report orchestrator / own NN.
 - `generated_at` (RFC3339)
 - `config_snapshot` (object, optional): effective `modules.*` config at generation time
 
+Current stub orchestrator may include inside `report` (optional):
+
+- `pipeline_stage` (`idle` | `listening` | `transcribing` | `visual_only`)
+- `speech_ratio` (number, 0..1 proxy)
+- `participants[]` entries with fields such as
+  `audio_chunks`, `avg_speech_activity_proxy`, `avg_bitrate_kbps`, `last_emotion`, `last_transcript`
+
 ## trace_id
 
 Clients and services should attach one `trace_id` per logical utterance or per batch (e.g. UUID). The report orchestrator uses it to join partial features before calling the final NN.
