@@ -370,32 +370,39 @@ const VideoMeet = () => {
                           ref={videoRef}
                           autoPlay
                           playsInline
-                          className={showCamOff ? "video-hidden" : ""}
+                          className={`tile-media__video ${showCamOff ? "video-hidden" : ""}`}
                         />
                         {showCamOff && <div className="video-placeholder video-placeholder--overlay" />}
                       </>
                     ) : (
-                      <div className="fake-video">
+                      <div className="fake-video fake-video--remote">
                         <div className="face-placeholder" />
-                        <div className="video-placeholder" />
                       </div>
                     )}
-                  </div>
 
-                  {!p.faceSignalReceived ? (
-                    <div className="emotion-indicator emotion-indicator--pending" title="Ожидание данных о лице с сервера">
-                      Лицо: —
-                    </div>
-                  ) : (
-                    <div className={`emotion-indicator ${emotionToClass(p.emotion)}`}>
-                      {p.emotion} {p.emotionConfidence}%
-                    </div>
-                  )}
+                    {!p.faceSignalReceived ? (
+                      <div
+                        className="emotion-indicator emotion-indicator--pending"
+                        title="Ожидание данных о лице с сервера"
+                      >
+                        Лицо: —
+                      </div>
+                    ) : (
+                      <div className={`emotion-indicator ${emotionToClass(p.emotion)}`}>
+                        {p.emotion} {p.emotionConfidence}%
+                      </div>
+                    )}
 
-                  <div className="participant-name">
-                    {p.name}
-                    {showMicOff ? " • Mic off" : ""}
-                    {showCamOff ? " • Cam off" : ""}
+                    <div className="participant-chip">
+                      <span className="participant-chip__name">{p.name}</span>
+                      {(showMicOff || showCamOff) && (
+                        <span className="participant-chip__status">
+                          {showMicOff ? "Mic off" : ""}
+                          {showMicOff && showCamOff ? " · " : ""}
+                          {showCamOff ? "Cam off" : ""}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
