@@ -46,5 +46,6 @@ pip install -r requirements.txt
 - Если внешняя NN вернула «пустой» (хоть и валидный по shape) отчёт, gateway автоматически делает fallback на локальный агрегат по текущим фичам сессии.
 - В `analysis_report_partial.payload` теперь передаётся `report_source`: `remote` | `local_fallback` | `local_stub`.
 - Docker-образ `ai-gateway` включает системные библиотеки для OpenCV/DeepFace (`libxcb1`, `libgl1`, `libglib2.0-0`, `libsm6`, `libxext6`, `libxrender1`) — без них возможны падения вида `libxcb.so.1`.
+- Для текущего DeepFace/TensorFlow стека в `ai-gateway/requirements.txt` добавлен `tf-keras` (иначе gateway может падать с ошибкой `requires tf-keras package`).
 
 Поведение `frame`: помимо legacy `emotion` шлюз шлёт `face_analysis` с полями `module`, `stage`, `trace_id`, `version` в `payload`.

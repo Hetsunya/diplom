@@ -1,6 +1,7 @@
 websockets
 asyncio
 deepface
+tf-keras
 opencv-python
 numpy
 Pillow
