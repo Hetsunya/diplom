@@ -34,6 +34,23 @@ services:
       timeout: 5s
       retries: 10
 
+  speech-service:
+    build:
+      context: ./code/speech-service
+    container_name: emeeting-speech-service
+    profiles: ["ai"]
+    environment:
+      SPEECH_ASR_ENGINE: ${SPEECH_ASR_ENGINE:-whisper}
+      WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-base}
+    expose:
+      - "8090"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   ai-gateway:
     build:
       context: ./code/ai-gateway
@@ -41,11 +58,14 @@ services:
     profiles: ["ai"]
     environment:
       BACKEND_WS_BASE_URL: ws://backend:8080
-      SESSION_ID: 1
+      SESSION_ID: ${AI_GATEWAY_SESSION_ID:-1}
       AI_GATEWAY_EMAIL: demo1@example.com
       AI_GATEWAY_PASSWORD: demo1pass
+      AI_GATEWAY_MODULES_CONFIG: /app/modules.docker.json
     depends_on:
       backend:
+        condition: service_healthy
+      speech-service:
         condition: service_healthy
 
   ui:

@@ -2,15 +2,17 @@
 
 set -e
 
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+
 # === Backend ===
 (
-  cd "$(dirname "$0")/emeeting-backend"
+  cd "$ROOT/code/emeeting-backend"
   go run ./cmd/server/main.go
 ) &
 
 # === Frontend ===
 (
-  cd "$(dirname "$0")/emeeting-ui"
+  cd "$ROOT/code/emeeting-ui"
   npm run dev
 ) &
 

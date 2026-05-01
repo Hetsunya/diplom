@@ -1,0 +1,39 @@
+{
+  "modules": {
+    "text": {
+      "enabled": true,
+      "provider": "http",
+      "model": "whisper-docker-v1",
+      "params": {
+        "speech_service_url": "http://speech-service:8090",
+        "timeout_sec": 60,
+        "retries": 2,
+        "backoff_sec": 0.5
+      }
+    },
+    "audio": {
+      "enabled": true,
+      "provider": "baseline",
+      "model": "audio-features-v1",
+      "params": {}
+    },
+    "face": {
+      "enabled": true,
+      "provider": "deepface",
+      "model": "emotion-v1",
+      "params": {
+        "min_interval_sec": 0.2,
+        "min_confidence": 5.0
+      }
+    },
+    "report": {
+      "enabled": true,
+      "provider": "stub-nn",
+      "model": "report-v1",
+      "params": {
+        "interval_sec": 30,
+        "own_nn_url": ""
+      }
+    }
+  }
+}

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";

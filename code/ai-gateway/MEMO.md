@@ -9,7 +9,8 @@ Current source entrypoint: `main.py`.
 ## Configuration (modular)
 
 - Default module toggles and providers: [`modules.default.json`](modules.default.json).
-- Override path: env `AI_GATEWAY_MODULES_CONFIG` → path to JSON with the same `modules` shape.
+- Docker Compose (repo root `--profile ai`): [`modules.docker.json`](modules.docker.json) → URL ASR `http://speech-service:8090`; включается через `AI_GATEWAY_MODULES_CONFIG=/app/modules.docker.json`.
+- Override path: env `AI_GATEWAY_MODULES_CONFIG` → любой JSON с тем же видом `modules`.
 - Keys: `text`, `audio`, `face`, `report` — each has `enabled`, `provider`, `model`, `params`.
 - Text/ASR: set `modules.text.enabled=true` and `modules.text.params.speech_service_url` to a running [`speech-service`](../speech-service/) (or your ASR HTTP API compatible with `adapters/speech_service.py`).
 - Text/ASR retry controls:

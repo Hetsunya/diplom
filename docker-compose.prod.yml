@@ -60,6 +60,44 @@ services:
       timeout: 5s
       retries: 20
 
+  speech-service:
+    image: diplom-speech-service:latest
+    build:
+      context: ./code/speech-service
+    container_name: emeeting-speech-service
+    profiles: ["ai"]
+    restart: unless-stopped
+    environment:
+      SPEECH_ASR_ENGINE: ${SPEECH_ASR_ENGINE:-whisper}
+      WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-base}
+    expose:
+      - "8090"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8090/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  ai-gateway:
+    image: diplom-ai-gateway:latest
+    build:
+      context: ./code/ai-gateway
+    container_name: emeeting-ai-gateway
+    profiles: ["ai"]
+    restart: unless-stopped
+    environment:
+      BACKEND_WS_BASE_URL: ${BACKEND_WS_BASE_URL:-ws://backend:8080}
+      SESSION_ID: ${AI_GATEWAY_SESSION_ID:-1}
+      AI_GATEWAY_EMAIL: ${AI_GATEWAY_EMAIL:-demo1@example.com}
+      AI_GATEWAY_PASSWORD: ${AI_GATEWAY_PASSWORD:-demo1pass}
+      AI_GATEWAY_MODULES_CONFIG: /app/modules.docker.json
+    depends_on:
+      backend:
+        condition: service_healthy
+      speech-service:
+        condition: service_healthy
+
   caddy:
     image: caddy:2.9-alpine
     container_name: emeeting-caddy

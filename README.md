@@ -4,8 +4,9 @@
 
 - `code/emeeting-ui` - React + TypeScript frontend
 - `code/emeeting-backend` - Go (Gin) backend API + WebSocket
-- `code/ai-gateway` - Python gateway for WS/AI handlers
-- `docker-compose.yml` - local stack orchestration
+- `code/ai-gateway` - Python gateway for WS/AI handlers (DeepFace, отчёты, вызов ASR)
+- `code/speech-service` - HTTP ASR (stub или faster-whisper), см. `SPEECH_ASR_ENGINE`
+- `docker-compose.yml` / `docker-compose.prod.yml` - оркестрация стека
 
 ## Runbook: quick start (Docker Compose)
 
@@ -13,25 +14,38 @@ Requirements:
 - Docker Desktop (or Docker Engine)
 - Docker Compose plugin
 
-1) Start full stack:
+1) Start stack **без** тяжёлого AI (db + backend + ui):
 
 ```bash
 docker compose up --build
 ```
 
-2) Open services:
+2) Опционально — **AI профиль** (speech-service + ai-gateway; первый запуск Whisper может долго качать модель):
+
+```bash
+docker compose --profile ai up --build
+```
+
+Переменные (опционально):
+
+- `SPEECH_ASR_ENGINE=stub` — быстрый контрактный stub без распознавания (меньше CPU/RAM при сборке).
+- `AI_GATEWAY_SESSION_ID` — ID комнаты WS (`SESSION_ID` в контейнере gateway), должен совпадать с тем же номером в URL встречи в UI (по умолчанию `1`).
+
+В Docker gateway читает конфиг **`code/ai-gateway/modules.docker.json`** (`speech_service_url: http://speech-service:8090`). Локально без Compose используйте `modules.default.json` и свой URL.
+
+3) Open services:
 - UI: `http://localhost:5173`
 - Backend API: `http://localhost:8080`
 - Backend health: `http://localhost:8080/ws/health`
 - Postgres: `localhost:5432`
 
-3) Stop stack:
+4) Stop stack:
 
 ```bash
 docker compose down
 ```
 
-4) Reset DB data (fresh bootstrap):
+5) Reset DB data (fresh bootstrap):
 
 ```bash
 docker compose down -v
@@ -66,8 +80,22 @@ Default UI URL: `http://localhost:5173`
 ```bash
 cd code/ai-gateway
 python -m pip install -r requirements.txt
+export SESSION_ID=1   # совпадайте с id сессии в UI
 python main.py
 ```
+
+Конфиг модулей: по умолчанию `modules.default.json`; переопределение путём `AI_GATEWAY_MODULES_CONFIG=/path/to.json`.
+
+### Speech service (ASR)
+
+```bash
+cd code/speech-service
+python -m pip install -r requirements.txt
+# опционально: export SPEECH_ASR_ENGINE=whisper  (нужен ffmpeg)
+uvicorn main:app --host 0.0.0.0 --port 8090
+```
+
+Подробнее: `code/speech-service/README.md`.
 
 ## Database migrations
 
@@ -111,7 +139,11 @@ python main.py
   - `VITE_WS_URL`
 - AI gateway config in compose:
   - `BACKEND_WS_BASE_URL`
-  - `SESSION_ID`
+  - `SESSION_ID` (или `AI_GATEWAY_SESSION_ID` в корневом `docker-compose.yml`)
+  - `AI_GATEWAY_MODULES_CONFIG` (в образе с Compose: `/app/modules.docker.json`)
+- Speech service (`--profile ai`):
+  - `SPEECH_ASR_ENGINE` (`stub` | `whisper`)
+  - `WHISPER_MODEL_SIZE` (например `base`, `tiny`)
 
 ## Seed users (demo auth)
 
@@ -137,6 +169,16 @@ TODO: будет cookie-based auth (HttpOnly cookie / session token) вмест�
 - `docker-compose.prod.yml` – production stack (db + backend + ui + caddy)
 - `Caddyfile` – HTTPS + reverse proxy
 - `.env.prod.example` – example environment file
+
+### AI на проде
+
+Те же сервисы, что и локально, включаются профилем **`ai`**:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod --profile ai up -d --build
+```
+
+Без профиля поднимаются только db, backend, ui, caddy. Убедитесь, что ресурсов хватает под Whisper (CPU/RAM) или задайте `SPEECH_ASR_ENGINE=stub`.
 
 ### Deploy steps
 
