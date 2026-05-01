@@ -13,6 +13,7 @@ type MeetingTranscriptRailProps = {
   lines: TranscriptLine[];
   verdictSummary: string | null;
   verdictDetail: unknown | null;
+  verdictSource: string | null;
   verdictExpanded: boolean;
   onToggleVerdict: () => void;
 };
@@ -21,6 +22,7 @@ export function MeetingTranscriptRail({
   lines,
   verdictSummary,
   verdictDetail,
+  verdictSource,
   verdictExpanded,
   onToggleVerdict,
 }: MeetingTranscriptRailProps) {
@@ -29,7 +31,14 @@ export function MeetingTranscriptRail({
   return (
     <aside className="meeting-transcript-rail" aria-label="Транскрипт и вердикт AI">
       <div className="meeting-transcript-rail__section meeting-transcript-rail__verdict">
-        <div className="meeting-transcript-rail__section-title">Вердикт AI</div>
+        <div className="meeting-transcript-rail__section-title-row">
+          <div className="meeting-transcript-rail__section-title">Вердикт AI</div>
+          {verdictSource && (
+            <span className={`meeting-transcript-rail__source-badge meeting-transcript-rail__source-badge--${verdictSource}`}>
+              {verdictSource}
+            </span>
+          )}
+        </div>
         {verdictSummary ? (
           <>
             <button type="button" className="meeting-transcript-rail__verdict-btn" onClick={onToggleVerdict}>

@@ -149,6 +149,7 @@ const VideoMeet = () => {
   const [transcriptLines, setTranscriptLines] = useState<TranscriptLine[]>([]);
   const [verdictSummary, setVerdictSummary] = useState<string | null>(null);
   const [verdictDetail, setVerdictDetail] = useState<unknown | null>(null);
+  const [verdictSource, setVerdictSource] = useState<string | null>(null);
   const [verdictExpanded, setVerdictExpanded] = useState(false);
 
   // Ensure "self" exists in store immediately.
@@ -237,6 +238,8 @@ const VideoMeet = () => {
       if ((type === "analysis_report_partial" || type === "analysis_report") && m.payload && typeof m.payload === "object") {
         const p = m.payload as Record<string, unknown>;
         const report = p["report"];
+        const srcRaw = p["report_source"];
+        const source = typeof srcRaw === "string" ? srcRaw : null;
         let summary: string | null = null;
         if (report && typeof report === "object") {
           const r = report as Record<string, unknown>;
@@ -245,6 +248,7 @@ const VideoMeet = () => {
         }
         setVerdictDetail(report ?? p);
         setVerdictSummary(summary ?? (type === "analysis_report" ? "Итоговый отчёт" : "Частичный отчёт"));
+        setVerdictSource(source);
         setVerdictExpanded(false);
       }
     },
@@ -463,6 +467,7 @@ const VideoMeet = () => {
           lines={transcriptLines}
           verdictSummary={verdictSummary}
           verdictDetail={verdictDetail}
+          verdictSource={verdictSource}
           verdictExpanded={verdictExpanded}
           onToggleVerdict={() => setVerdictExpanded((e) => !e)}
         />

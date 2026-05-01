@@ -308,6 +308,43 @@ footer {
     margin-bottom: 8px;
 }
 
+.meeting-transcript-rail__section-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.meeting-transcript-rail__source-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-radius: 999px;
+    padding: 3px 8px;
+    border: 1px solid #d0d7de;
+    color: #5f6b72;
+    background: #f8f9fa;
+}
+
+.meeting-transcript-rail__source-badge--remote {
+    color: #1e8449;
+    border-color: #a9dfbf;
+    background: #eafaf1;
+}
+
+.meeting-transcript-rail__source-badge--local_fallback {
+    color: #935116;
+    border-color: #f8c471;
+    background: #fef5e7;
+}
+
+.meeting-transcript-rail__source-badge--local_stub {
+    color: #6c3483;
+    border-color: #d2b4de;
+    background: #f4ecf7;
+}
+
 .meeting-transcript-rail__muted {
     margin: 0;
     font-size: 0.85rem;
