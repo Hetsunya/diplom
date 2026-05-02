@@ -1,5 +1,7 @@
 Отлично — вот готовый технический backlog с приоритетом, оценкой и привязкой к файлам, чтобы можно было сразу заносить в трекер.
 
+**Где что лежит (монорепо):** каталог `code/` — основной код; **прод docker-compose и `.env.prod.example`** — в **корне репозитория** на уровень выше `code/` (`docker-compose.prod.yml`, `.env.prod.example`, `Caddyfile`). Локальный стек: `docker-compose.yml` там же.
+
 Backlog (приоритетный)
 P0 — Стабильный базовый контур (блокеры)
 BL-001 [x]: Зафиксировать API-контракт v1 (UI ↔ Backend)
@@ -234,7 +236,7 @@ DoD: `TestMiddleware_RequireRole` + тест на блокировку brute-for
 ---
 
 P0 — Release/VDS (единое решение для Linux/Windows + прод)
-BL-025 [ ]: Продовый reverse-proxy + HTTPS (чтобы работал getUserMedia везде)
+BL-025 [~]: Продовый reverse-proxy + HTTPS (чтобы работал getUserMedia везде)
 
 Цель: камера/микрофон работают не только на localhost, без “secure context” проблем.
 Результат:
@@ -242,16 +244,18 @@ BL-025 [ ]: Продовый reverse-proxy + HTTPS (чтобы работал ge
 - единый origin: `https://<domain>` проксирует `/api` и `/ws` на backend
 Оценка: 1 дн
 DoD: `navigator.mediaDevices.getUserMedia` доступен на VDS, UI/WS/API работают через один домен.
+Статус: **базово закрыто составом `docker-compose.prod.yml`** (сервис `caddy`, `DOMAIN`, volume сертификатов). Остаётся ручной настройкой: реальный DNS на VDS, заполнение `.env.prod`, проверка с браузера.
 
-BL-026 [ ]: Prod docker-compose (secrets/env/volumes) + .env.prod.example
+BL-026 [x]: Prod docker-compose (secrets/env/volumes) + .env.prod.example
 
 Цель: воспроизводимый деплой на VDS без ручных правок.
 Результат:
-- `docker-compose.prod.yml`
-- env: `POSTGRES_DSN`, `JWT_SECRET`, `CORS_ALLOW_ORIGIN`, etc
-- persist volumes для Postgres, бэкапы
+- `docker-compose.prod.yml` (корень репо, не в `code/`)
+- `.env.prod.example` с `JWT_SECRET`, `POSTGRES_*`, `CORS_ALLOW_ORIGIN`, `VITE_*`, опционально AI profile
+- том `postgres_data` для Postgres; Caddy + HTTPS на 80/443
 Оценка: 6–12 ч
 DoD: поднятие на чистой VDS одной командой, после рестарта данные на месте.
+Статус: реализовано; см. корневой `README.md` (`docker compose -f docker-compose.prod.yml --env-file .env.prod …`). **Не автоматизировано:** scheduled pg_dump / внешние бэкапы — вне карточки (ручной процесс или отдельная задача).
 
 BL-027 [ ]: Auth hardening для prod (cookie Secure + SameSite + rotation)
 
@@ -303,7 +307,7 @@ P0 — AI modules implementation (единая папка модулей)
 | BL-032 | не сделано | `audio_analysis` baseline proxy в `modules/audio/signal.py` + `pipeline.py` |
 | BL-033 | **частично** | `modules/face/analysis.py`: `face_analysis` + legacy `emotion`, throttling, `min_confidence`; quality guards/alias-контракт в DoD — впереди |
 | BL-034 | **частично** | `ai-gateway/report_loop.py` + `feature_store.py`; полноценный fusion/windowing — впереди |
-| BL-035 | не сделано | REST есть, RBAC/фильтры `from/to/module` — нет |
+| BL-035 | **частично** | фильтры `module`/`participant_id`/`from`/`to`/`limit` + доступ: организатор vs гость (`participant_id` обязателен); отчёт только организатору; audit-лог `[ANALYSIS_ACCESS]`; роли host/co-host из meeting-сервиса без отдельной таблицы — не делали |
 | BL-036 | **частично** | `smoke_ws_emotion_test.py` (face+emotion), `e2e_analysis_readpath_check.py`; полный hybrid smoke — впереди |
 | BL-037 | не сделано | prod readiness AI |
 
@@ -363,7 +367,7 @@ BL-034 [ ]: Report orchestrator v1 (fusion text+audio+face -> own NN)
 Оценка: 2–3 дн
 DoD: по завершении сессии есть финальный `analysis_report`, структура совпадает с контрактом, конфиг-снимок сохранен.
 
-BL-035 [ ]: Backend RBAC + API фильтры для аналитики
+BL-035 [~]: Backend RBAC + API фильтры для аналитики
 
 Цель: безопасный доступ к аналитике и удобная выборка.
 Файлы: `emeeting-backend/internal/analysis/http_handlers.go`, `emeeting-backend/internal/analysis/repository.go`, `middleware/auth.go`
@@ -373,6 +377,7 @@ BL-035 [ ]: Backend RBAC + API фильтры для аналитики
 - audit лог доступа к participant-level данным
 Оценка: 1–2 дн
 DoD: host/co-host видят полный отчет, participant — только разрешенный уровень детализации.
+Статус (2026): организатор (`session.created_by`) — полный `/report` и `/events`; не организатор — `/events` только с `participant_id`; фильтры по времени и модулю; лог `[ANALYSIS_ACCESS]`. Отдельные роли meeting без БД участников — вперёд.
 
 BL-036 [ ]: E2E тест-контур AI pipeline (hybrid)
 
@@ -413,11 +418,11 @@ BL-038 [x]: Правый рейл «Live транскрипт» (не чат)
 Оценка: 1–2 дн
 DoD: при live-сессии видны строки транскрипта; состояния не «вечный analyzing».
 
-BL-039 [~]: Отдельная панель «Чат»
+BL-039 [x]: Отдельная панель «Чат»
 
 Цель: явное UI-разделение чата и транскрипта (макет + роутинг/состояние при необходимости).
-Статус: в рейле отдельный блок «Чат» с пояснением (ASR только выше); полноценного чат-UI / роутинга пока нет.
-Файлы: `emeeting-ui/src/pages/VideoMeet.tsx`, layout/meeting shell
+Статус: отдельная секция **`MeetingChatSection`** в правом рейле; транскрипт (ASR) выше, чат ниже с подсказкой «Отдельно от ASR». WS `chat_message`, сохранение в **`session_chat_message`** (`008_session_chat`), **`GET /sessions/:id/chat/messages`**, подгрузка истории для новых участников. Отдельный роут вида `/meet/:id/chat` не делали — не требуется для DoD.
+Файлы: `emeeting-ui/src/features/meeting/MeetingChatSection.tsx`, `MeetingTranscriptRail.tsx`, `VideoMeet.tsx`; backend `ws_handler.go` + `internal/chat`, миграция `008_session_chat`.
 Оценка: 1 дн
 DoD: пользователь не путает ASR-текст с сообщениями чата.
 

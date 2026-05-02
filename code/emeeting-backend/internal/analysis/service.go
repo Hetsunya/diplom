@@ -49,9 +49,9 @@ func (s *Service) GetLatestReportJSON(ctx context.Context, sessionID int) ([]byt
 	return s.repo.LatestReport(ctx, sessionID)
 }
 
-func (s *Service) ListEventsJSON(ctx context.Context, sessionID int, limit int) ([]byte, error) {
+func (s *Service) ListEventsJSON(ctx context.Context, sessionID int, f EventsFilter) ([]byte, error) {
 	if s == nil || s.repo == nil {
 		return nil, fmt.Errorf("analysis service unavailable")
 	}
-	return s.repo.ListEvents(ctx, sessionID, limit)
+	return s.repo.ListEvents(ctx, sessionID, f)
 }

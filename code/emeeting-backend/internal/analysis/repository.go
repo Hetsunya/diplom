@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -137,17 +138,49 @@ func (r *Repository) LatestReport(ctx context.Context, sessionID int) ([]byte, e
 	return json.Marshal(out)
 }
 
-func (r *Repository) ListEvents(ctx context.Context, sessionID int, limit int) ([]byte, error) {
+func (r *Repository) ListEvents(ctx context.Context, sessionID int, f EventsFilter) ([]byte, error) {
+	limit := f.Limit
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
-	rows, err := r.db.QueryContext(ctx, `
+
+	q := strings.Builder{}
+	q.WriteString(`
 		SELECT analysis_event_id, session_id, event_type, participant_id, trace_id, module, stage, model_version, payload, created_at
 		FROM analysis_event
-		WHERE session_id = $1
-		ORDER BY created_at DESC
-		LIMIT $2
-	`, sessionID, limit)
+		WHERE session_id = $1`)
+	args := []any{sessionID}
+	argN := 2
+
+	if fp := strings.TrimSpace(f.GuestParticipantID); fp != "" {
+		fmt.Fprintf(&q, " AND participant_id = $%d", argN)
+		args = append(args, fp)
+		argN++
+	} else if pp := strings.TrimSpace(f.ParticipantID); pp != "" {
+		fmt.Fprintf(&q, " AND participant_id = $%d", argN)
+		args = append(args, pp)
+		argN++
+	}
+	if mod := strings.TrimSpace(f.Module); mod != "" {
+		fmt.Fprintf(&q, " AND module = $%d", argN)
+		args = append(args, mod)
+		argN++
+	}
+	if f.From != nil {
+		fmt.Fprintf(&q, " AND created_at >= $%d", argN)
+		args = append(args, *f.From)
+		argN++
+	}
+	if f.To != nil {
+		fmt.Fprintf(&q, " AND created_at <= $%d", argN)
+		args = append(args, *f.To)
+		argN++
+	}
+
+	fmt.Fprintf(&q, " ORDER BY created_at DESC LIMIT $%d", argN)
+	args = append(args, limit)
+
+	rows, err := r.db.QueryContext(ctx, q.String(), args...)
 	if err != nil {
 		return nil, err
 	}

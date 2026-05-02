@@ -78,6 +78,28 @@ Response `200`:
 
 Auth: same as other session routes (cookie / Bearer). Live delivery uses WebSocket `chat_message`; successful inserts include `chat_message_id` in the broadcast payload.
 
+### Session analysis (persisted WS analytics)
+
+#### `GET /sessions/:id/analysis/report`
+
+- Доступен только **организатору** сессии (`session.created_by` = текущий пользователь). Агрегированный ответ содержит данные всех участников — гостям по ссылке недоступен (`403`).
+- Устаревшие строки без `created_by`: отчёт читают все аутентифицированные пользователи (обратная совместимость).
+
+#### `GET /sessions/:id/analysis/events`
+
+Query-параметры:
+
+| Параметр | Описание |
+|----------|----------|
+| `limit` | По умолчанию `100`, максимум `500` |
+| `module` | Фильтр по колонке `module` (например `text`, `face`) |
+| `participant_id` | Для **организатора** — необязательное сужение по участнику; для **остальных** — **обязательно**, только события этого участника |
+| `from`, `to` | Границы по `created_at`, формат **RFC3339** (например `2026-05-01T12:00:00Z`) |
+
+Правило доступа: организатор видит все события (плюс фильтры); участник, зашедший по ссылке, обязан указать свой `participant_id` с клиента (идентификатор вкладки из UI).
+
+Успешные и отклонённые обращения пишутся в серверный лог с префиксом `[ANALYSIS_ACCESS]`.
+
 ## Reports
 
 ### `GET /reports/:id`

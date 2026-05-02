@@ -12,7 +12,7 @@ type Module struct {
 
 func NewModule(db *sql.DB) *Module {
 	svc := NewService(db)
-	return &Module{h: NewHTTPHandler(svc)}
+	return &Module{h: NewHTTPHandler(svc, db)}
 }
 
 func (m *Module) RegisterRoutes(r *gin.Engine) {
