@@ -72,6 +72,7 @@ function parseFaceAnalysisPayload(p: Record<string, unknown>): { emotion: Emotio
   const ff = p["face_features"];
   if (!ff || typeof ff !== "object") return null;
   const f = ff as Record<string, unknown>;
+  if (f["face_detected"] === false) return null;
   let emotion: Emotion | undefined;
   let confidence = 0;
   const dom = f["dominant_emotion"];

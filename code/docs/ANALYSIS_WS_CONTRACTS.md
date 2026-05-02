@@ -45,6 +45,7 @@ Low-level voice / prosody features (not raw transcript).
 Facial emotion / presence.
 
 - `face_features` (object): `dominant_emotion`, `probs`, `face_detected`, `confidence`
+- optional `guard_reason` when `face_detected` is false (e.g. `no_face`) — UI should ignore emotion fields
 
 ### `emotion` (legacy alias)
 

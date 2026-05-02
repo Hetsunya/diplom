@@ -62,8 +62,10 @@ def _stub_report(session_id: int, features: list[dict[str, Any]]) -> dict[str, A
                 audio_bitrate_acc[pid].append(float(bitrate))
 
         elif k == "face":
-            payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
-            ff = payload.get("face_features") if isinstance(payload.get("face_features"), dict) else {}
+            ff = data.get("face_features") if isinstance(data.get("face_features"), dict) else {}
+            if not ff:
+                payload = data.get("payload") if isinstance(data.get("payload"), dict) else {}
+                ff = payload.get("face_features") if isinstance(payload.get("face_features"), dict) else {}
             dom = ff.get("dominant_emotion")
             if isinstance(dom, str) and dom.strip():
                 participants[pid]["last_emotion"] = dom

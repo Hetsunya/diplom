@@ -307,7 +307,7 @@ P0 — AI modules implementation (единая папка модулей)
 | BL-030 | **сделано** | `ai-gateway/modules/**` (face/audio/text/ping/report), `handlers` грузит `modules.registry`; `plugins/*` — тонкие shims |
 | BL-031 | **сделано (v1)** | `normalize.py` + `features.py` + `transcription.py`; `speech_service.py` (retry/CB); юнит-тесты `tests/test_text_*.py`; тяжёлый NLP — вне v1 |
 | BL-032 | **частично** | `modules/audio/signal.py`: energy/zcr/pause/jitter/shimmer + `modules.audio.params`; `pipeline.py`: интервалы между чанками; WebM/Opus без demux — эвристика по сырым байтам |
-| BL-033 | **частично** | `modules/face/analysis.py`: `face_analysis` + legacy `emotion`, throttling, `min_confidence`; quality guards/alias-контракт в DoD — впереди |
+| BL-033 | **сделано (v2 baseline)** | `modules/face/schema.py`, `frame_quality.py`, `params.py`, `analysis.py`; `report_loop` читает `data.face_features`; UI игнор `face_detected=false` |
 | BL-034 | **частично** | `ai-gateway/report_loop.py` + `feature_store.py`; полноценный fusion/windowing — впереди |
 | BL-035 | **частично** | фильтры `module`/`participant_id`/`from`/`to`/`limit` + доступ: организатор vs гость (`participant_id` обязателен); отчёт только организатору; audit-лог `[ANALYSIS_ACCESS]`; роли host/co-host из meeting-сервиса без отдельной таблицы — не делали |
 | BL-036 | **частично** | `smoke_ws_emotion_test.py` (face+emotion), `e2e_analysis_readpath_check.py`; полный hybrid smoke — впереди |
@@ -349,7 +349,7 @@ BL-032 [~]: Audio module v1 (voice/signal features)
 DoD: `audio_analysis` стабильно публикуется, latency в целевом диапазоне p95, есть fallback при невалидном чанке.
 Статус (2026): baseline-v3 — `energy_rms_norm`, `zero_crossing_rate`, `pause_ratio`, `chunk_interval_ms` / `activity_pulses_per_min`, `timing_jitter_ms`, `shimmer_proxy`; `extract_audio_features_safe` при ошибке; пороги в `modules.audio.params`. Полный PCM/WebRTC decode и p95 — не замеряли.
 
-BL-033 [ ]: Face module v2 (emotion alias + quality guards)
+BL-033 [x]: Face module v2 (emotion alias + quality guards)
 
 Цель: стабилизировать модуль лица и подготовить к прод-режиму.
 Файлы: `ai-gateway/modules/face/**`, `ai-gateway/contracts.py`, `emeeting-backend/internal/analysis/**`
@@ -359,6 +359,7 @@ BL-033 [ ]: Face module v2 (emotion alias + quality guards)
 - вынесенные настройки провайдера/модели (`modules.face.*`)
 Оценка: 1 дн
 DoD: UI совместим с legacy `emotion`, а новый канал `face_analysis` используется для агрегаторов/отчетов.
+Статус (2026-05): конфиг `enforce_detection`, `detector_backend`, `align`, `min_laplacian_var`, `min_face_side_px`, `emit_no_face_face_analysis`; blur/small-region/low-confidence — фильтры; опционально `face_analysis` без legacy при `no_face` (если включён emit); `_stub_report` учитывает `data.face_features` как в gateway; `VideoMeet` не парсит эмоцию при `face_detected=false`.
 
 BL-034 [ ]: Report orchestrator v1 (fusion text+audio+face -> own NN)
 
