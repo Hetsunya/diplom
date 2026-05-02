@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+import time
+from collections import defaultdict, deque
 from typing import Any
 
 from contracts import analysis_envelope, build_trace_id, has_required_envelope_fields
 from feature_store import get_feature_store
 from gateway_config import get_gateway_config
-from modules.audio.signal import extract_audio_features
+from modules.audio.signal import extract_audio_features_safe
 from modules.text.transcription import transcribe_and_emit_text_analysis
 from observability import incr
 
@@ -17,6 +19,11 @@ class AudioPipelinePlugin:
     name = "audio"
     priority = 150
 
+    def __init__(self) -> None:
+        self._last_chunk_mono_ms: dict[str, float] = {}
+        self._iat_ms: dict[str, deque[float]] = defaultdict(lambda: deque(maxlen=12))
+        self._rms_hist: dict[str, deque[float]] = defaultdict(lambda: deque(maxlen=8))
+
     def metadata(self) -> dict[str, str]:
         cfg = get_gateway_config()
         m = cfg.module("audio")
@@ -24,7 +31,7 @@ class AudioPipelinePlugin:
             "module": self.name,
             "provider": (m.provider if m else ""),
             "model": (m.model if m else ""),
-            "version": (m.model if m else "audio-features-v1"),
+            "version": (m.model if m else "audio-features-v2"),
         }
 
     def can_handle(self, msg: dict[str, Any]) -> bool:
@@ -45,8 +52,31 @@ class AudioPipelinePlugin:
         payload = msg.get("payload") if isinstance(msg.get("payload"), dict) else {}
 
         if audio_mod and audio_mod.enabled:
-            audio_ver = audio_mod.model or "audio-features-v1"
-            audio_features = extract_audio_features(payload)
+            audio_ver = audio_mod.model or "audio-features-v2"
+            params = audio_mod.params or {}
+            key = f"{session_id}:{participant_id}"
+            now_ms = time.monotonic() * 1000.0
+            last_ms = self._last_chunk_mono_ms.get(key)
+            inter_arrival = None if last_ms is None else (now_ms - last_ms)
+            self._last_chunk_mono_ms[key] = now_ms
+            if inter_arrival is not None:
+                self._iat_ms[key].append(inter_arrival)
+            ts_ms = payload.get("timeslice_ms")
+            duration_override = float(ts_ms) if isinstance(ts_ms, (int, float)) and ts_ms > 0 else None
+            prev_rms = list(self._rms_hist[key])
+            audio_features = extract_audio_features_safe(
+                payload,
+                params,
+                inter_arrival_ms=inter_arrival,
+                duration_ms_override=duration_override,
+                iat_history_ms=list(self._iat_ms[key]),
+                rms_history_for_shimmer=prev_rms if prev_rms else None,
+            )
+            er = audio_features.get("energy_rms_norm")
+            if isinstance(er, (int, float)):
+                self._rms_hist[key].append(float(er))
+            if audio_features.get("degraded"):
+                incr("audio_features_degraded")
             audio_out = {
                 "type": "audio_analysis",
                 "session_id": session_id,

@@ -14,8 +14,12 @@
     "audio": {
       "enabled": true,
       "provider": "baseline",
-      "model": "audio-features-v1",
-      "params": {}
+      "model": "audio-features-v2",
+      "params": {
+        "min_chunk_bytes": 400,
+        "max_rms_samples": 8000,
+        "pause_threshold_ms": 2000
+      }
     },
     "face": {
       "enabled": true,

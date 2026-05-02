@@ -306,7 +306,7 @@ P0 — AI modules implementation (единая папка модулей)
 |----|--------------------|----------------------|
 | BL-030 | **сделано** | `ai-gateway/modules/**` (face/audio/text/ping/report), `handlers` грузит `modules.registry`; `plugins/*` — тонкие shims |
 | BL-031 | **частично** | `modules/text/transcription.py` + `adapters/speech_service.py` (retry + **circuit-breaker** по `speech_service_url`); полноценные `text_features`/NLP — впереди |
-| BL-032 | не сделано | `audio_analysis` baseline proxy в `modules/audio/signal.py` + `pipeline.py` |
+| BL-032 | **частично** | `modules/audio/signal.py`: energy/zcr/pause/jitter/shimmer + `modules.audio.params`; `pipeline.py`: интервалы между чанками; WebM/Opus без demux — эвристика по сырым байтам |
 | BL-033 | **частично** | `modules/face/analysis.py`: `face_analysis` + legacy `emotion`, throttling, `min_confidence`; quality guards/alias-контракт в DoD — впереди |
 | BL-034 | **частично** | `ai-gateway/report_loop.py` + `feature_store.py`; полноценный fusion/windowing — впереди |
 | BL-035 | **частично** | фильтры `module`/`participant_id`/`from`/`to`/`limit` + доступ: организатор vs гость (`participant_id` обязателен); отчёт только организатору; audit-лог `[ANALYSIS_ACCESS]`; роли host/co-host из meeting-сервиса без отдельной таблицы — не делали |
@@ -336,7 +336,7 @@ BL-031 [ ]: Text module v1 (ASR + NLP поверх транскрибации)
 Оценка: 1–2 дн
 DoD: в live-сессии приходят `text_analysis` события с `trace_id`, `stage`, `version`; при ошибке speech-service gateway не падает.
 
-BL-032 [ ]: Audio module v1 (voice/signal features)
+BL-032 [~]: Audio module v1 (voice/signal features)
 
 Цель: заменить текущий stub на реальный анализ аудио-сигнала.
 Файлы: `ai-gateway/modules/audio/**`, `docs/ANALYSIS_WS_CONTRACTS.md`, `docs/ANALYSIS_OBSERVABILITY.md`
@@ -346,6 +346,7 @@ BL-032 [ ]: Audio module v1 (voice/signal features)
 - конфигурируемые пороги/окна (`modules.audio.params`)
 Оценка: 1–2 дн
 DoD: `audio_analysis` стабильно публикуется, latency в целевом диапазоне p95, есть fallback при невалидном чанке.
+Статус (2026): baseline-v3 — `energy_rms_norm`, `zero_crossing_rate`, `pause_ratio`, `chunk_interval_ms` / `activity_pulses_per_min`, `timing_jitter_ms`, `shimmer_proxy`; `extract_audio_features_safe` при ошибке; пороги в `modules.audio.params`. Полный PCM/WebRTC decode и p95 — не замеряли.
 
 BL-033 [ ]: Face module v2 (emotion alias + quality guards)
 
