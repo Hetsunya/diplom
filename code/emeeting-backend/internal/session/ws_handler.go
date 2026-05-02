@@ -131,6 +131,8 @@ func (h *Handler) registerDefaultWSHandlers() {
 	h.RegisterWSHandler("join", joinHandler)
 	h.RegisterWSHandler("leave", leaveHandler)
 	h.RegisterWSHandler("end_meeting", endMeetingHandler)
+	// Participant text chat (UI); broadcast only — not persisted as analysis events.
+	h.RegisterWSHandler("chat_message", broadcastHandler)
 }
 
 func (h *Handler) dispatchWSMessage(sessionID int, msg WSMessage) {

@@ -6,6 +6,7 @@ import { useMeetingStore } from "../features/meeting/useMeetingStore";
 import { useScreenShare } from "../hooks/useScreenShare";
 import {
   MeetingTranscriptRail,
+  type ChatLine,
   type TranscriptLine,
 } from "../features/meeting/MeetingTranscriptRail";
 import { useMeetingAudioChunks } from "../features/meeting/useMeetingAudioChunks";
@@ -147,6 +148,7 @@ const VideoMeet = () => {
   const upsert = useMeetingStore((s) => s.upsertParticipant);
 
   const [transcriptLines, setTranscriptLines] = useState<TranscriptLine[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatLine[]>([]);
   const [lastTextAt, setLastTextAt] = useState<number | null>(null);
   const [verdictSummary, setVerdictSummary] = useState<string | null>(null);
   const [verdictDetail, setVerdictDetail] = useState<unknown | null>(null);
@@ -173,6 +175,23 @@ const VideoMeet = () => {
 
       const store = useMeetingStore.getState();
       const nameFor = (id: string) => store.participants[id]?.name ?? `Participant ${id}`;
+
+      if (type === "chat_message" && pid && m.payload && typeof m.payload === "object") {
+        const p = m.payload as Record<string, unknown>;
+        const text = typeof p.text === "string" ? p.text.trim() : "";
+        if (!text) return;
+        const nameRaw = p.name;
+        const dispName = typeof nameRaw === "string" && nameRaw.trim() ? nameRaw.trim() : nameFor(pid);
+        const clientId = typeof p.client_id === "string" ? p.client_id : "";
+        const tsRaw = (m as { timestamp?: unknown }).timestamp;
+        const at = typeof tsRaw === "string" ? tsRaw : new Date().toISOString();
+        const id = clientId ? `${pid}:${clientId}` : `${pid}-${at}-${text.slice(0, 48)}`;
+        setChatMessages((prev) => {
+          if (prev.some((x) => x.id === id)) return prev;
+          return [...prev, { id, participantId: pid, name: dispName, text, at }].slice(-120);
+        });
+        return;
+      }
 
       if (type === "emotion" && pid && m.payload && typeof m.payload === "object") {
         const parsed = parseEmotionFromLegacyPayload(m.payload as Record<string, unknown>);
@@ -257,7 +276,7 @@ const VideoMeet = () => {
     [upsert]
   );
 
-  const { send, close } = useMeetingWebSocket(
+  const { send, close, connected } = useMeetingWebSocket(
     id,
     participantId,
     onAnalysisMessage,
@@ -265,6 +284,21 @@ const VideoMeet = () => {
       sessionStorage.setItem("meeting_notice", "Митинг завершён (хост вышел).");
       navigate("/sessions");
     }
+  );
+
+  const sendChatMessage = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      const client_id =
+        globalThis.crypto?.randomUUID?.() ?? `c_${Date.now()}_${Math.floor(Math.random() * 1e9)}`;
+      send("chat_message", {
+        text: trimmed.slice(0, 2000),
+        name: participantName,
+        client_id,
+      });
+    },
+    [send, participantName]
   );
 
   useMeetingAudioChunks(streamRef, send, {
@@ -470,6 +504,10 @@ const VideoMeet = () => {
           verdictSource={verdictSource}
           verdictExpanded={verdictExpanded}
           onToggleVerdict={() => setVerdictExpanded((e) => !e)}
+          chatMessages={chatMessages}
+          currentParticipantId={participantId}
+          onSendChat={sendChatMessage}
+          chatConnected={connected}
         />
       </div>
     </div>

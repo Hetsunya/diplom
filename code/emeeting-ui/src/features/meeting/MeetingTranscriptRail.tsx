@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { MeetingChatSection, type ChatLine } from "./MeetingChatSection";
 
 export type TranscriptLine = {
   traceId: string;
@@ -9,6 +10,8 @@ export type TranscriptLine = {
   at: string;
 };
 
+export type { ChatLine };
+
 type MeetingTranscriptRailProps = {
   lines: TranscriptLine[];
   asrStatus: string;
@@ -17,6 +20,10 @@ type MeetingTranscriptRailProps = {
   verdictSource: string | null;
   verdictExpanded: boolean;
   onToggleVerdict: () => void;
+  chatMessages: ChatLine[];
+  currentParticipantId: string;
+  onSendChat: (text: string) => void;
+  chatConnected?: boolean;
 };
 
 export function MeetingTranscriptRail({
@@ -27,6 +34,10 @@ export function MeetingTranscriptRail({
   verdictSource,
   verdictExpanded,
   onToggleVerdict,
+  chatMessages,
+  currentParticipantId,
+  onSendChat,
+  chatConnected = true,
 }: MeetingTranscriptRailProps) {
   const linesShown = useMemo(() => [...lines].reverse(), [lines]);
   const sourceClass =
@@ -43,7 +54,7 @@ export function MeetingTranscriptRail({
           : null;
 
   return (
-    <aside className="meeting-transcript-rail" aria-label="Транскрипт и вердикт AI">
+    <aside className="meeting-transcript-rail" aria-label="Транскрипт, вердикт AI и чат">
       <div className="meeting-transcript-rail__section meeting-transcript-rail__verdict">
         <div className="meeting-transcript-rail__section-title-row">
           <div className="meeting-transcript-rail__section-title">Вердикт AI</div>
@@ -101,13 +112,12 @@ export function MeetingTranscriptRail({
         </div>
       </div>
 
-      <div className="meeting-transcript-rail__section meeting-transcript-rail__chat-note">
-        <div className="meeting-transcript-rail__section-title">Чат</div>
-        <p className="meeting-transcript-rail__muted">
-          Отдельный чат участников будет здесь или в отдельной панели (BL-039). Сейчас эта колонка только для AI-транскрипта и
-          вердикта.
-        </p>
-      </div>
+      <MeetingChatSection
+        messages={chatMessages}
+        currentParticipantId={currentParticipantId}
+        onSend={onSendChat}
+        canSend={chatConnected}
+      />
     </aside>
   );
 }

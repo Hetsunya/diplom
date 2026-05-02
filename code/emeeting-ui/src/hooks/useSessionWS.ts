@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const DEFAULT_WS_URL = "ws://localhost:8080";
 const WS_URL = import.meta.env.VITE_WS_URL || DEFAULT_WS_URL;
@@ -31,6 +31,7 @@ export const useSessionWS = (
   };
 
   const ws = useRef<WebSocket | null>(null);
+  const [connected, setConnected] = useState(false);
   const onMessageRef = useRef(onMessage);
   const reconnectAttempt = useRef(0);
   const reconnectTimer = useRef<number | null>(null);
@@ -77,6 +78,7 @@ export const useSessionWS = (
 
       ws.current.onopen = () => {
         reconnectAttempt.current = 0;
+        setConnected(true);
         sendJoin();
       };
 
@@ -91,6 +93,7 @@ export const useSessionWS = (
       };
 
       ws.current.onclose = () => {
+        setConnected(false);
         if (disposed) return;
         if (!reconnectEnabled) return;
 
@@ -131,5 +134,5 @@ export const useSessionWS = (
 
   const close = () => ws.current?.close();
 
-  return { send, close };
+  return { send, close, connected };
 };
