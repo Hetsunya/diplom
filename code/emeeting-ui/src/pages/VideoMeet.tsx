@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import type { CSSProperties } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMediaStream } from "../hooks/useMediaStream";
 import { useMeetingWebSocket } from "../features/meeting/useMeetingWebSocket";
 import { useMeetingStore } from "../features/meeting/useMeetingStore";
@@ -105,9 +106,88 @@ function parseFaceAnalysisPayload(p: Record<string, unknown>): { emotion: Emotio
   return { emotion, confidence: Math.round(confidence) };
 }
 
+/** Debug overlay: bbox + gate info (typed `face_debug` from ai-gateway). */
+type FaceDebugPayload = {
+  frameW: number;
+  frameH: number;
+  region: { x: number; y: number; w: number; h: number } | null;
+  gatePassed: boolean;
+  skipReason: string | null;
+  dominant: string;
+  modelConfidence: number;
+  minConfidence: number;
+  traceId: string;
+};
+
+function parseFaceDebugPayload(p: Record<string, unknown>): FaceDebugPayload | null {
+  const fw = p["frame_width"];
+  const fh = p["frame_height"];
+  if (typeof fw !== "number" || typeof fh !== "number" || fw <= 0 || fh <= 0) return null;
+  const regionRaw = p["region"];
+  let region: FaceDebugPayload["region"] = null;
+  if (regionRaw && typeof regionRaw === "object") {
+    const r = regionRaw as Record<string, unknown>;
+    const x = r["x"];
+    const y = r["y"];
+    const w = r["w"];
+    const h = r["h"];
+    if (
+      typeof x === "number" &&
+      typeof y === "number" &&
+      typeof w === "number" &&
+      typeof h === "number"
+    ) {
+      region = { x, y, w, h };
+    }
+  }
+  const dom = p["dominant_emotion"];
+  const mc = p["model_confidence"];
+  const gp = p["gate_passed"];
+  const sr = p["skip_reason"];
+  const mic = p["min_confidence"];
+  const tid = p["trace_id"];
+  return {
+    frameW: fw,
+    frameH: fh,
+    region,
+    gatePassed: gp === true,
+    skipReason: sr == null ? null : String(sr),
+    dominant: typeof dom === "string" ? dom : "?",
+    modelConfidence: typeof mc === "number" ? mc : 0,
+    minConfidence: typeof mic === "number" ? mic : 0,
+    traceId: typeof tid === "string" ? tid : "",
+  };
+}
+
+/** Map frame pixels → CSS box inside `.tile-media` (16:9, video `object-fit: contain`). */
+function faceDebugOverlayStyle(
+  region: { x: number; y: number; w: number; h: number },
+  frameW: number,
+  frameH: number
+): CSSProperties {
+  const boxW = 1;
+  const boxH = 9 / 16;
+  const s = Math.min(boxW / frameW, boxH / frameH);
+  const dispW = frameW * s;
+  const dispH = frameH * s;
+  const ox = (boxW - dispW) / 2;
+  const oy = (boxH - dispH) / 2;
+  const left = ox + region.x * s;
+  const top = oy + region.y * s;
+  const w = region.w * s;
+  const h = region.h * s;
+  return {
+    left: `${left * 100}%`,
+    top: `${(top / boxH) * 100}%`,
+    width: `${w * 100}%`,
+    height: `${(h / boxH) * 100}%`,
+  };
+}
+
 const VideoMeet = () => {
   const { id = "" } = useParams(); // session ID
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const getOrCreateParticipant = () => {
     const existingId = sessionStorage.getItem("participant_id") || localStorage.getItem("participant_id");
     if (existingId) return existingId;
@@ -157,6 +237,13 @@ const VideoMeet = () => {
   const [verdictDetail, setVerdictDetail] = useState<unknown | null>(null);
   const [verdictSource, setVerdictSource] = useState<string | null>(null);
   const [verdictExpanded, setVerdictExpanded] = useState(false);
+  const [faceDebugByParticipant, setFaceDebugByParticipant] = useState<
+    Record<string, FaceDebugPayload>
+  >({});
+
+  const faceDebugUi =
+    searchParams.get("faceDebug") === "1" ||
+    (typeof localStorage !== "undefined" && localStorage.getItem("emeeting_face_debug") === "1");
 
   useEffect(() => {
     resetMeetingStore();
@@ -263,6 +350,14 @@ const VideoMeet = () => {
             emotionConfidence: parsed.confidence,
             faceSignalReceived: true,
           });
+        }
+        return;
+      }
+
+      if (type === "face_debug" && pid && m.payload && typeof m.payload === "object") {
+        const parsed = parseFaceDebugPayload(m.payload as Record<string, unknown>);
+        if (parsed) {
+          setFaceDebugByParticipant((prev) => ({ ...prev, [pid]: parsed }));
         }
         return;
       }
@@ -463,9 +558,12 @@ const VideoMeet = () => {
               const isSelf = p.id === participantId;
               const showMicOff = isSelf && !micEnabled;
               const showCamOff = isSelf && !camEnabled;
+              const faceDbg = faceDebugUi ? faceDebugByParticipant[p.id] : undefined;
               return (
                 <div key={p.id} className="video-tile">
-                  <div className="tile-media">
+                  <div
+                    className={`tile-media ${faceDebugUi && isSelf ? "tile-media--face-debug" : ""}`}
+                  >
                     {isSelf ? (
                       <>
                         <video
@@ -480,6 +578,35 @@ const VideoMeet = () => {
                       <div className="fake-video fake-video--remote">
                         <div className="face-placeholder" />
                       </div>
+                    )}
+
+                    {faceDbg && (
+                      <>
+                        {faceDbg.region && (
+                          <div
+                            className="face-debug-box"
+                            style={faceDebugOverlayStyle(
+                              faceDbg.region,
+                              faceDbg.frameW,
+                              faceDbg.frameH
+                            )}
+                          />
+                        )}
+                        <div className="face-debug-hud">
+                          <div>
+                            {faceDbg.dominant} model={faceDbg.modelConfidence.toFixed(1)} minThr=
+                            {faceDbg.minConfidence.toFixed(1)}{" "}
+                            {faceDbg.gatePassed ? "pass" : `skip:${faceDbg.skipReason ?? "?"}`}
+                          </div>
+                          <div>
+                            frame {faceDbg.frameW}×{faceDbg.frameH}
+                            {faceDbg.traceId ? ` · ${faceDbg.traceId.slice(0, 8)}…` : ""}
+                          </div>
+                          {!faceDbg.region && (
+                            <div className="face-debug-hud__warn">region=null — bbox от OpenCV нет</div>
+                          )}
+                        </div>
+                      </>
                     )}
 
                     {!p.faceSignalReceived ? (

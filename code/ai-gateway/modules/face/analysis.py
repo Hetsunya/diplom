@@ -129,6 +129,56 @@ class FaceAnalysisPlugin:
         await ws.send(json.dumps(legacy))
         incr("emotion_legacy_sent")
 
+    async def _emit_face_debug(
+        self,
+        *,
+        ws: Any,
+        session_id: Any,
+        participant_id: Any,
+        ts: Any,
+        trace_id: str,
+        frame_w: int,
+        frame_h: int,
+        dominant: str,
+        model_confidence: float,
+        gate_passed: bool,
+        skip_reason: str | None,
+        min_confidence: float,
+        region_x: int | None,
+        region_y: int | None,
+        region_w: int | None,
+        region_h: int | None,
+    ) -> None:
+        region = None
+        if (
+            region_x is not None
+            and region_y is not None
+            and region_w is not None
+            and region_h is not None
+            and region_w > 0
+            and region_h > 0
+        ):
+            region = {"x": region_x, "y": region_y, "w": region_w, "h": region_h}
+        dbg = {
+            "type": "face_debug",
+            "session_id": session_id,
+            "participant_id": participant_id,
+            "payload": {
+                "trace_id": trace_id,
+                "frame_width": frame_w,
+                "frame_height": frame_h,
+                "region": region,
+                "dominant_emotion": dominant,
+                "model_confidence": round(float(model_confidence), 4),
+                "gate_passed": gate_passed,
+                "skip_reason": skip_reason,
+                "min_confidence": float(min_confidence),
+            },
+            "timestamp": ts,
+        }
+        await ws.send(json.dumps(dbg))
+        incr("face_debug_sent")
+
     async def process(self, msg: dict[str, Any], ws: Any) -> None:
         cfg = get_gateway_config()
         mod = cfg.module("face")
@@ -219,8 +269,52 @@ class FaceAnalysisPlugin:
             confidence_val = float(norm["confidence"])
             region_w = norm.get("region_w")
             region_h = norm.get("region_h")
+            region_x = norm.get("region_x")
+            region_y = norm.get("region_y")
+            rx_i = region_x if isinstance(region_x, int) else None
+            ry_i = region_y if isinstance(region_y, int) else None
+            rw_i = region_w if isinstance(region_w, int) else None
+            rh_i = region_h if isinstance(region_h, int) else None
 
+            skip_reason: str | None = None
+            face_features = None
             if confidence_val < fp.min_confidence:
+                skip_reason = "low_confidence"
+            else:
+                face_features = build_face_features_positive(
+                    dominant=str(dominant),
+                    probs=probs,
+                    confidence=confidence_val,
+                    region_w=rw_i,
+                    region_h=rh_i,
+                    min_face_side_px=fp.min_face_side_px,
+                )
+                if face_features is None:
+                    skip_reason = "small_region"
+
+            gate_passed = face_features is not None
+
+            if fp.emit_debug_face:
+                await self._emit_face_debug(
+                    ws=ws,
+                    session_id=session_id,
+                    participant_id=participant_id,
+                    ts=ts,
+                    trace_id=trace_id,
+                    frame_w=int(img_bgr.shape[1]),
+                    frame_h=int(img_bgr.shape[0]),
+                    dominant=str(dominant),
+                    model_confidence=confidence_val,
+                    gate_passed=gate_passed,
+                    skip_reason=skip_reason,
+                    min_confidence=fp.min_confidence,
+                    region_x=rx_i,
+                    region_y=ry_i,
+                    region_w=rw_i,
+                    region_h=rh_i,
+                )
+
+            if skip_reason == "low_confidence":
                 incr("face_low_confidence_skipped")
                 log_event(
                     "face_low_confidence",
@@ -230,14 +324,6 @@ class FaceAnalysisPlugin:
                 )
                 return
 
-            face_features = build_face_features_positive(
-                dominant=str(dominant),
-                probs=probs,
-                confidence=confidence_val,
-                region_w=region_w if isinstance(region_w, int) else None,
-                region_h=region_h if isinstance(region_h, int) else None,
-                min_face_side_px=fp.min_face_side_px,
-            )
             if face_features is None:
                 incr("face_small_region_skipped")
                 log_event("face_small_region", trace_id=trace_id, module="face")

@@ -8,7 +8,8 @@
         "speech_service_url": "http://speech-service:8090",
         "timeout_sec": 60,
         "retries": 2,
-        "backoff_sec": 0.5
+        "backoff_sec": 0.5,
+        "debug_log_transcribe": true
       }
     },
     "audio": {
@@ -30,7 +31,8 @@
         "min_laplacian_var": 0,
         "min_face_side_px": 0,
         "emit_no_face_face_analysis": false,
-        "max_concurrent_inferences": 2
+        "max_concurrent_inferences": 2,
+        "emit_debug_face": true
       }
     },
     "report": {

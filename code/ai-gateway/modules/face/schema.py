@@ -38,12 +38,16 @@ def normalize_deepface_result(result: Any) -> dict[str, Any] | None:
         confidence_val = 0.0
 
     region = obj.get("region")
-    region_w = region_h = None
+    region_w = region_h = region_x = region_y = None
     if isinstance(region, dict):
         rw = region.get("w")
         rh = region.get("h")
         if isinstance(rw, (int, float)) and isinstance(rh, (int, float)):
             region_w, region_h = int(rw), int(rh)
+        rx = region.get("x", region.get("left"))
+        ry = region.get("y", region.get("top"))
+        if isinstance(rx, (int, float)) and isinstance(ry, (int, float)):
+            region_x, region_y = int(rx), int(ry)
 
     return {
         "dominant_emotion": dominant,
@@ -51,6 +55,8 @@ def normalize_deepface_result(result: Any) -> dict[str, Any] | None:
         "confidence": float(confidence_val),
         "region_w": region_w,
         "region_h": region_h,
+        "region_x": region_x,
+        "region_y": region_y,
     }
 
 

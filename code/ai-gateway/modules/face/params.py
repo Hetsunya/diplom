@@ -17,6 +17,7 @@ class FaceRuntimeParams:
     min_face_side_px: int
     emit_no_face_face_analysis: bool
     max_concurrent_inferences: int
+    emit_debug_face: bool
 
     @staticmethod
     def from_dict(p: dict[str, Any]) -> FaceRuntimeParams:
@@ -30,4 +31,5 @@ class FaceRuntimeParams:
             min_face_side_px=int(p.get("min_face_side_px", 0)),
             emit_no_face_face_analysis=bool(p.get("emit_no_face_face_analysis", False)),
             max_concurrent_inferences=max(1, int(p.get("max_concurrent_inferences", 2))),
+            emit_debug_face=bool(p.get("emit_debug_face", False)),
         )

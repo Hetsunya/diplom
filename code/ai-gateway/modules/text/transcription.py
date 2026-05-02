@@ -16,6 +16,18 @@ from modules.text.normalize import has_transcript_content, normalize_asr_respons
 from observability import incr, log_event
 
 
+def _approx_raw_audio_bytes(audio_payload: dict[str, Any]) -> int:
+    b64 = (
+        audio_payload.get("chunk_base64")
+        or audio_payload.get("data_base64")
+        or audio_payload.get("base64")
+    )
+    if not isinstance(b64, str):
+        return 0
+    n = len(b64.strip())
+    return max(0, (n * 3) // 4)
+
+
 async def transcribe_and_emit_text_analysis(
     *,
     msg: dict[str, Any],
@@ -40,6 +52,18 @@ async def transcribe_and_emit_text_analysis(
     cb_failures = int(text_mod.params.get("circuit_failure_threshold", 5))
     cb_open_sec = float(text_mod.params.get("circuit_open_sec", 30.0))
     text_ver = text_mod.model or "stub-v1"
+
+    if bool(text_mod.params.get("debug_log_transcribe")):
+        log_event(
+            "speech_transcribe_attempt",
+            trace_id=trace_id,
+            module="text",
+            extra={
+                "approx_raw_bytes": _approx_raw_audio_bytes(payload),
+                "chunk_seq": payload.get("chunk_seq"),
+                "final_chunk": payload.get("final_chunk"),
+            },
+        )
 
     result = await asyncio.to_thread(
         functools.partial(

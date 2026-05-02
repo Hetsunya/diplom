@@ -30,6 +30,7 @@ class TestFaceRuntimeParams(unittest.TestCase):
         self.assertFalse(p.enforce_detection)
         self.assertEqual(p.min_face_side_px, 0)
         self.assertEqual(p.max_concurrent_inferences, 2)
+        self.assertFalse(p.emit_debug_face)
 
 
 @unittest.skipUnless(_HAS_CV, "requires numpy and opencv")
@@ -54,6 +55,20 @@ class TestFaceSchema(unittest.TestCase):
         assert n is not None
         self.assertEqual(n["dominant_emotion"], "happy")
         self.assertEqual(n["confidence"], 80.0)
+
+    def test_normalize_region_xy(self) -> None:
+        n = normalize_deepface_result(
+            {
+                "dominant_emotion": "neutral",
+                "emotion": {"neutral": 12.0},
+                "region": {"x": 10, "y": 20, "w": 100, "h": 120},
+            }
+        )
+        assert n is not None
+        self.assertEqual(n["region_x"], 10)
+        self.assertEqual(n["region_y"], 20)
+        self.assertEqual(n["region_w"], 100)
+        self.assertEqual(n["region_h"], 120)
 
     def test_small_region_filtered(self) -> None:
         ff = build_face_features_positive(

@@ -140,6 +140,7 @@ func (h *Handler) registerDefaultWSHandlers() {
 	h.RegisterWSHandler("frame", broadcastHandler)
 	h.RegisterWSHandler("audio", broadcastHandler)
 	h.RegisterWSHandler("analytics", broadcastHandler)
+	h.RegisterWSHandler("face_debug", broadcastHandler)
 	// AI analytics inbound (from ai-gateway or future clients): persist + broadcast.
 	h.RegisterWSHandler(analysis.TypeTextAnalysis, persistBroadcast)
 	h.RegisterWSHandler(analysis.TypeAudioAnalysis, persistBroadcast)

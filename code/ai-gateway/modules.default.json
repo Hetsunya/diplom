@@ -34,7 +34,8 @@
         "min_laplacian_var": 0,
         "min_face_side_px": 0,
         "emit_no_face_face_analysis": false,
-        "max_concurrent_inferences": 2
+        "max_concurrent_inferences": 2,
+        "emit_debug_face": false
       }
     },
     "report": {
