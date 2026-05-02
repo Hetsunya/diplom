@@ -1,6 +1,6 @@
 # AI Gateway — WS analysis contracts (v1)
 
-Canonical documentation: [`../docs/ANALYSIS_WS_CONTRACTS.md`](../docs/ANALYSIS_WS_CONTRACTS.md).
+Canonical documentation: [`../docs/ANALYSIS_WS_CONTRACTS.md`](../docs/ANALYSIS_WS_CONTRACTS.md). Индекс всех документов: [`../docs/README.md`](../docs/README.md).
 
 Quick reference:
 

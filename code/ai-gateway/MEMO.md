@@ -2,75 +2,98 @@
 
 ## Purpose
 
-`ai-gateway` is a standalone WebSocket worker that subscribes to meeting session events, runs AI processing, and sends analysis events back to the backend broadcast channel.
+`ai-gateway` — отдельный WebSocket worker: подписан на события сессии встречи, выполняет AI-обработку и отправляет аналитические сообщения обратно в канал broadcast backend.
 
-Current source entrypoint: `main.py`.
+Точка входа: `main.py`.
 
 ## Configuration (modular)
 
-- Default module toggles and providers: [`modules.default.json`](modules.default.json).
-- Docker Compose (repo root `--profile ai`): [`modules.docker.json`](modules.docker.json) → URL ASR `http://speech-service:8090`; включается через `AI_GATEWAY_MODULES_CONFIG=/app/modules.docker.json`.
-- Override path: env `AI_GATEWAY_MODULES_CONFIG` → любой JSON с тем же видом `modules`.
-- Keys: `text`, `audio`, `face`, `report` — each has `enabled`, `provider`, `model`, `params`.
-- Text/ASR: set `modules.text.enabled=true` and `modules.text.params.speech_service_url` to a running [`speech-service`](../speech-service/) (or your ASR HTTP API compatible with `adapters/speech_service.py`).
-- Text/ASR retry controls:
-  - `modules.text.params.timeout_sec`
-  - `modules.text.params.retries`
-  - `modules.text.params.backoff_sec`
-- ASR circuit breaker (see `adapters/speech_service.py`):
-  - `modules.text.params.circuit_failure_threshold` (default 5)
-  - `modules.text.params.circuit_open_sec` (default 30)
-- Report: `modules.report.params.interval_sec` (min 5s enforced in code), `own_nn_url` optional (`POST {url}/v1/report`).
-- Face quality/performance controls:
-  - `modules.face.params.min_interval_sec` (throttling per participant)
-  - `modules.face.params.min_confidence` (skip low-confidence inference results)
+| Источник | Описание |
+|----------|----------|
+| [`modules.default.json`](modules.default.json) | Локальный профиль по умолчанию |
+| [`modules.docker.json`](modules.docker.json) | Образ Compose (`AI_GATEWAY_MODULES_CONFIG=/app/modules.docker.json`) |
+| Env **`AI_GATEWAY_MODULES_CONFIG`** | Любой JSON с ключом верхнего уровня `modules` |
 
-Loader: [`gateway_config.py`](gateway_config.py). Snapshot for reports: `config_snapshot()`.
+Структура каждого модуля: `enabled`, `provider`, `model`, `params`.
 
-## Current Runtime Flow
+### text (ASR через HTTP)
 
-1. `main.py` loads config (`load_gateway_config` / `set_gateway_config`), builds WS URL from `BACKEND_WS_BASE_URL` + `SESSION_ID`.
-2. `SessionWSClient` (`ws_client.py`): token via `POST /auth/token`, `Authorization` on WS, reconnect backoff.
-3. If `report` module enabled: background `report_loop` sends periodic `analysis_report_partial` on the same socket.
-4. `handle_message` (`handlers.py`): runs **all** analyzers from `modules/registry.py` whose `can_handle` matches, sorted by `priority` (lower runs first). Legacy `plugins/*.py` re-export the same instances for compatibility.
-5. Plugins send results with `ws.send(...)`; see v1 contracts in [`../docs/ANALYSIS_WS_CONTRACTS.md`](../docs/ANALYSIS_WS_CONTRACTS.md) and [`CONTRACTS.md`](CONTRACTS.md).
-6. Before sending `face_analysis` / `audio_analysis` / `text_analysis`, gateway validates required v1 envelope fields: `module`, `version`, `stage`, `trace_id`.
+- `modules.text.params.speech_service_url` → работающий [`speech-service`](../speech-service/) или совместимый API (`adapters/speech_service.py`).
+- Таймауты / retry: `timeout_sec`, `retries`, `backoff_sec`.
+- Circuit breaker: `circuit_failure_threshold`, `circuit_open_sec`; счётчик **`speech_service_circuit_open`** при быстром отказе.
 
-## Implemented analyzers (`modules/`)
+### audio + text chain
 
-| Module | Priority | Behavior |
-|--------|----------|----------|
-| `modules/ping/handler.py` | 50 | Metrics + log for backend heartbeats |
-| `modules/face/analysis.py` | 100 | DeepFace → `face_analysis` (v1 envelope) + legacy `emotion` |
-| `modules/audio/pipeline.py` | 150 | Optional `audio_analysis` stub; optional speech HTTP → `text_analysis` (`modules/text/transcription.py`) |
+- `modules/audio/pipeline.py`: опционально `audio_analysis`, затем вызов `modules/text/transcription.py` при включённом `text`.
+
+### face
+
+- Throttling: `min_interval_sec`.
+- Качество: `min_confidence`, `min_laplacian_var`, `min_face_side_px`, `enforce_detection`, `detector_backend`, `align`, `emit_no_face_face_analysis`.
+- Нагрузка: **`max_concurrent_inferences`** (default `2`) — `Semaphore` + `asyncio.to_thread` для DeepFace.
+
+### report
+
+- `interval_sec`, **`report_wake_floor_sec`** (минимальная пауза между тиками цикла отчёта).
+- `report_bucket_sec` — окна для `report.fusion`.
+- Опционально **`own_nn_url`** → `POST {url}/v1/report` с телом `features`, `fusion`, `config_snapshot`, `stage`.
+
+### Hot-reload без рестарта
+
+- Env **`AI_GATEWAY_CONFIG_POLL_SEC`** (секунды; **`0`** = выключено): при изменении **mtime** файла `AI_GATEWAY_MODULES_CONFIG` конфиг перечитывается из `handlers.handle_message`.
+
+Загрузчик: [`gateway_config.py`](gateway_config.py). Снимок для отчётов: `config_snapshot()`.
+
+## Runtime flow
+
+1. `main.py`: `set_gateway_config(load_gateway_config())`, URL WS из `BACKEND_WS_BASE_URL` + `SESSION_ID`.
+2. `SessionWSClient`: токен `POST /auth/token`, заголовок на WS, backoff при обрыве.
+3. Фоновая задача **`report_loop`**: периодические **`analysis_report_partial`** и финальный **`analysis_report`** при отмене задачи (закрытие соединения).
+4. `handle_message` → плагины из **`modules/registry.py`** по `priority` и `can_handle`. Совместимость: тонкие shims в `plugins/*.py`.
+5. Исходящие аналитические типы проверяются на обязательные поля v1: `module`, `version`, `stage`, `trace_id` (см. [`docs/ANALYSIS_WS_CONTRACTS.md`](../docs/ANALYSIS_WS_CONTRACTS.md)).
+
+## Modules (`modules/`)
+
+| Модуль | Priority | Поведение |
+|--------|----------|-----------|
+| `ping/handler.py` | 50 | Heartbeat / диагностика |
+| `face/analysis.py` | 100 | DeepFace → `face_analysis` + legacy `emotion` |
+| `audio/pipeline.py` | 150 | `audio_analysis` + опционально ASR → `text_analysis` |
+
+Оркестрация отчёта: каталог **`modules/report/`** (`windowing`, `stub_builder`, `orchestrator`, `data_quality`); драйвер asyncio остаётся в **`report_loop.py`**.
 
 ## Observability
 
-- [`observability.py`](observability.py): counters (`incr`), structured `log_event`, `snapshot_metrics()`.
-- Use `trace_id` from v1 payloads for correlation (see contracts).
+- [`observability.py`](observability.py): `incr`, `log_event`, `snapshot_metrics()`, **`observe_module_latency`**, **`snapshot_health()`** (p95/max/avg по последним сэмплам).
+- Корреляция: `trace_id` в payload v1.
+- Отчёты: **`report.data_quality`** (`complete`, `degraded_sources`, дельты счётчиков между тиками).
 
-## Backend Integration
+Подробнее: [`docs/ANALYSIS_OBSERVABILITY.md`](../docs/ANALYSIS_OBSERVABILITY.md).
 
-- WS: `GET /ws/sessions/:id` (auth). Analytics inbound types are registered for **persist + broadcast**: `text_analysis`, `audio_analysis`, `face_analysis`, `analysis_report`, `analysis_report_partial`, `emotion` (legacy).
-- REST (after migration `007_analysis`): `GET /sessions/:id/analysis/report`, `GET /sessions/:id/analysis/events?limit=`.
+## Backend integration
 
-## Local Run Checklist
+- WS `GET /ws/sessions/:id` (auth). Типы с persist + broadcast: `text_analysis`, `audio_analysis`, `face_analysis`, `analysis_report`, `analysis_report_partial`, `emotion` (legacy).
+- REST: `GET /sessions/:id/analysis/report`, `GET /sessions/:id/analysis/events?limit=`.
 
-1. Env (see `.env.example`): `BACKEND_WS_BASE_URL`, `SESSION_ID`, `AI_GATEWAY_EMAIL`, `AI_GATEWAY_PASSWORD`, optional `AI_GATEWAY_MODULES_CONFIG`.
+## Local checks
+
+1. Env из `.env.example`: `BACKEND_WS_BASE_URL`, `SESSION_ID`, `AI_GATEWAY_*`, опционально `AI_GATEWAY_MODULES_CONFIG`, `AI_GATEWAY_CONFIG_POLL_SEC`.
 2. `pip install -r requirements.txt`
-3. Apply DB migration `007_analysis` on Postgres.
+3. Миграции backend с аналитикой применены к Postgres.
 4. `python main.py`
-5. Optional: `python smoke_ws_emotion_test.py` → expects both `face_analysis` and legacy `emotion`.
-6. Optional backend read-path check:
-   - `python e2e_analysis_readpath_check.py`
-   - sends synthetic `face_analysis` + `analysis_report_partial`, then verifies:
-     - `GET /sessions/:id/analysis/events`
-     - `GET /sessions/:id/analysis/report`
+5. Лицо: `python smoke_ws_emotion_test.py` — ожидаются `face_analysis` и `emotion`.
+6. Полный hybrid (тяжёлые зависимости): `python hybrid_pipeline_smoke.py`.
+7. Контракты без ML: `python -m unittest discover -s tests`.
+8. Read-path к backend: `python e2e_analysis_readpath_check.py`.
 
-## How To Add a New Analyzer
+## Добавить новый анализатор
 
-1. Add a package under `modules/<domain>/` exporting `plugin = ...` with `name`, `priority`, `can_handle`, `async process`, optional `metadata()`.
-2. Register it in `modules/registry.py` (`iter_plugins`).
-3. Optionally add `plugins/<name>.py` shim re-exporting `plugin` if external docs still reference `plugins/`.
-4. Follow v1 envelope in outbound `payload` (`module`, `stage`, `trace_id`, `version`) — document in `docs/ANALYSIS_WS_CONTRACTS.md`.
-5. Register new `type` on backend in `internal/session/ws_handler.go` + `internal/analysis` if it should be persisted.
+1. Пакет `modules/<domain>/` с `plugin`, полями `name`, `priority`, `can_handle`, `async process`, опционально `metadata()`.
+2. Регистрация в `modules/registry.py`.
+3. При необходимости shim в `plugins/<name>.py`.
+4. Контракт → [`docs/ANALYSIS_WS_CONTRACTS.md`](../docs/ANALYSIS_WS_CONTRACTS.md).
+5. Backend: регистрация типа в `internal/session/ws_handler.go` и `internal/analysis`, если нужен persist.
+
+## Документация проекта
+
+Индекс: [`docs/README.md`](../docs/README.md). План замены заглушек: [`docs/AI_STUB_TO_PRODUCTION_ROADMAP.md`](../docs/AI_STUB_TO_PRODUCTION_ROADMAP.md).

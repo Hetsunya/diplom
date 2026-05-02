@@ -312,6 +312,7 @@ P0 — AI modules implementation (единая папка модулей)
 | BL-035 | **частично** | фильтры `module`/`participant_id`/`from`/`to`/`limit` + доступ: организатор vs гость (`participant_id` обязателен); отчёт только организатору; audit-лог `[ANALYSIS_ACCESS]`; роли host/co-host из meeting-сервиса без отдельной таблицы — не делали |
 | BL-036 | **сделано (контур)** | `hybrid_pipeline_smoke.py` + `hybrid_contract.py` + `tests/test_hybrid_contract.py`; Go `TestWS_AnalysisInboundBroadcast`; `report_wake_floor_sec` для быстрого partial |
 | BL-037 | **сделано (baseline)** | hot-reload JSON, face semaphore, latency rings + `snapshot_health`, `report.data_quality`, prod compose `AI_GATEWAY_CONFIG_POLL_SEC` |
+| BL-AI-101…109 | **план** | замена stub/эвристик на прод-модели: см. конец файла + `docs/AI_STUB_TO_PRODUCTION_ROADMAP.md` |
 
 BL-030 [x]: Единый layout для AI-модулей в одной папке
 
@@ -451,3 +452,78 @@ BL-041 [x]: Убрать или переработать «AI analyzing…»
 DoD: нет «вечного» analyzing при отсутствии событий; согласовано с BL-038.
 
 Опционально позже (фаза D в плане): bubble под активным спикером — отдельная карточка после diarization/VAD в данных.
+
+---
+
+P2 — AI: от заглушек к продакшену (модели вместо stub / эвристик)
+
+Дорожная карта по фазам: **`docs/AI_STUB_TO_PRODUCTION_ROADMAP.md`**. Индекс документации: **`docs/README.md`**.
+
+Рекомендуемый порядок: **BL-AI-101 → BL-AI-105 → BL-AI-102 → BL-AI-106 → BL-AI-104 → BL-AI-103 → BL-AI-107/108** (параллельно CI BL-AI-109 по мере готовности железа).
+
+BL-AI-101 [ ]: Production ASR (speech-service)
+
+Цель: заменить повседневную эксплуатацию на предсказуемое распознавание (качество/latency под профиль CPU/GPU).
+Файлы: `speech-service/**`, `ai-gateway/adapters/speech_service.py`, `docker-compose*.yml`
+Результат: выбранный движок (улучшенный Whisper / whisper.cpp server / облачный API) за контрактом `POST /v1/transcribe`; политики очереди и ресурсов в Compose; baseline метрики latency/error на стороне gateway уже есть.
+Оценка: 3–10 дн (зависит от облака vs self-hosted)
+DoD: на эталонных записях WER/latency в целевых порогах; `text_analysis` стабильно в live; при падении ASR CB не роняет остальной пайплайн.
+
+BL-AI-102 [ ]: Audio pipeline v2 (decode + SER/просодия)
+
+Цель: уйти от эвристик только по «сырым» чанкам там, где нужен контент речи.
+Файлы: `ai-gateway/modules/audio/**`, опционально отдельный лёгкий decode-сервис
+Результат: надёжный путь WebRTC/WebM/Opus → PCM (или эквивалент); признаки SER/stress/tempo поверх PCM; контракт `audio_analysis` сохраняется.
+Оценка: 1–3 нед
+DoD: документированный формат входа; регрессионные фикстуры чанков; p95 latency в `ANALYSIS_OBSERVABILITY` целях.
+
+BL-AI-103 [ ]: Face provider v3 (лёгкий inference / приватность)
+
+Цель: снизить холодный старт и зависимость от TF-стека или улучшить качество на «сложных» камерах.
+Файлы: `ai-gateway/modules/face/**`, Docker образ gateway
+Результат: второй провайдер за флагом конфига (ONNX/MediaPipe/иное) или оптимизированный DeepFace-путь; документирование GDPR/хранения кадров.
+Оценка: 1–2 нед
+DoD: переключение только через `modules.face.*` без смены контракта UI.
+
+BL-AI-104 [ ]: Сервис отчёта «своей НС» под `own_nn_url`
+
+Цель: финальный `analysis_report` с модельным телом, а не только stub-агрегатом.
+Файлы: `ai-gateway/own_nn_client.py`, `modules/report/**`, отдельный repo/образ модели
+Результат: обученная или зафиксированная версия модели; вход `features` + `fusion`; валидируемый JSON `report`; версия в `model_version`.
+Оценка: 2–6 нед
+DoD: E2E: после сессии REST/UI видят содержательный отчёт; fallback на stub при 5xx сохраняется.
+
+BL-AI-105 [ ]: NLP над транскриптом (реальные text_features)
+
+Цель: заменить эвристический блок в `modules/text/features.py` на модель/API (sentiment/topics/keyphrases) по согласованной схеме.
+Файлы: `ai-gateway/modules/text/**`, `docs/ANALYSIS_WS_CONTRACTS.md`
+Оценка: 3–10 дн
+DoD: воспроизводимый офлайн-тест на корпусе фраз; поля в `text_analysis.payload` описаны в контракте.
+
+BL-AI-106 [ ]: Diarization / привязка речи к участнику
+
+Цель: транскрипт и отчёт отражают «кто сказал» без ручной разметки.
+Файлы: `speech-service` или отдельный worker, `ai-gateway`, `emeeting-ui` (отображение)
+Оценка: 2–4 нед
+DoD: для записи с 2 спикерами корректное разделение в эталонном наборе; интеграция с `participant_id` или явным speaker_label в контракте.
+
+BL-AI-107 [ ]: Экспорт метрик (Prometheus или аналог)
+
+Цель: алерты по error-rate / latency / отставанию отчёта без ручного разбора логов.
+Файлы: `ai-gateway/**`, `docs/ANALYSIS_OBSERVABILITY.md`, опционально sidecar
+Оценка: 2–5 дн
+DoD: dashboard или минимальный scrape target; описание ключевых метрик в доке.
+
+BL-AI-108 [ ]: Аудит каталога `code/AI/solutions/`
+
+Цель: убрать шум, оставить эталоны и ссылки на upstream.
+Файлы: `AI/solutions/**`, `AI/solutions/SELECTION.md`
+Оценка: 0.5–2 дн
+DoD: таблица «используем / архив / удалено»; размер репо снижен или заменён submodule-ссылками.
+
+BL-AI-109 [ ]: CI: опциональный прогон hybrid/smoke на образе с AI
+
+Цель: ловить регрессии контракта на пайплайне с реальными зависимостями (за флагом или nightly).
+Файлы: `.github/workflows/ci.yml`, `ai-gateway/hybrid_pipeline_smoke.py`
+Оценка: 1–3 дн
+DoD: workflow документирован; не блокирует основной CI без железа/GPU.

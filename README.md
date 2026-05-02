@@ -8,6 +8,12 @@
 - `code/speech-service` - HTTP ASR (stub или faster-whisper), см. `SPEECH_ASR_ENGINE`
 - `docker-compose.yml` / `docker-compose.prod.yml` - оркестрация стека
 
+## Документация
+
+- **Индекс (`code/docs/README.md`):** контракты API/WS, наблюдаемость, планы UI и AI, ссылки на README сервисов.
+- **Замена заглушек AI (`code/docs/AI_STUB_TO_PRODUCTION_ROADMAP.md`):** фазы и связь с беклогом **BL-AI-101…** в `code/cursor backlog.md`.
+- **Беклог задач:** `code/cursor backlog.md`.
+
 ## Runbook: quick start (Docker Compose)
 
 Requirements:
@@ -149,13 +155,14 @@ uvicorn main:app --host 0.0.0.0 --port 8090
   - `BACKEND_WS_BASE_URL`
   - `SESSION_ID` (или `AI_GATEWAY_SESSION_ID` в корневом `docker-compose.yml`)
   - `AI_GATEWAY_MODULES_CONFIG` (в образе с Compose: `/app/modules.docker.json`)
+  - `AI_GATEWAY_CONFIG_POLL_SEC` (период опроса файла конфига для hot-reload; в prod см. `docker-compose.prod.yml`)
 - Speech service (`--profile ai`):
   - `SPEECH_ASR_ENGINE` (`stub` | `whisper`)
   - `WHISPER_MODEL_SIZE` (например `base`, `tiny`)
 
 ## Seed users (demo auth)
 
-Демо пользователи хранятся в таблице `auth_user` (пароль в `password_hash` хранится как SHA-256 hex).
+Демо пользователи хранятся в таблице `auth_user` (пароли — **bcrypt** в `password_hash`; при необходимости при первом входе выполняется rehash со старых схем).
 
 1. `demo1@example.com` / `demo1pass`
 2. `demo2@example.com` / `demo2pass`

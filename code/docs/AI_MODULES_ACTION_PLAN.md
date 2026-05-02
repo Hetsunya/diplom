@@ -15,7 +15,7 @@
 | **Адаптер `speech_service.py`** (ретраи, backoff, маппинг в `text_analysis`) | Обвязка правильная; меняется только URL и поведение внешнего сервиса. |
 | **UI: правый рейл транскрипта/вердикта + обработка новых типов WS** | Уже привязано к контракту; доработки — контент и UX, не архитектурный откат. |
 | **`feature_store` + `report_loop` как каркас оркестрации** | Логика «снимок фич → partial report» остаётся; меняется содержимое отчёта и источники фич. |
-| **Документы** `ANALYSIS_OBSERVABILITY.md`, `UI_AI_ANALYSIS_PLAN.md`, `AI/README.md`, `AI/solutions/SELECTION.md` | Референсы для команды и текста диплома — поддерживать актуальными, не удалять без замены. |
+| **Документы** `docs/README.md` (индекс), `ANALYSIS_OBSERVABILITY.md`, `UI_AI_ANALYSIS_PLAN.md`, `AI_STUB_TO_PRODUCTION_ROADMAP.md`, `AI/README.md`, `AI/solutions/SELECTION.md` | Референсы для команды и текста диплома — поддерживать актуальными, не удалять без замены. |
 
 ---
 
@@ -26,7 +26,7 @@
 | **`speech-service/`** | Реализованы режимы **stub** и **whisper** (faster-whisper + ffmpeg); см. `speech-service/Dockerfile` | По желанию — заменить движок на `whisperX-FastAPI` из `AI/solutions/` или коммерческий API, сохранив контракт `/v1/transcribe`. |
 | **`plugins/audio.py` — блок `audio_analysis`** | Уже считаются proxy-фичи по чанку (`chunk_size_bytes`, `bitrate_kbps_est`, `speech_activity_proxy`), UI шлёт `type: "audio"` | Следующий шаг: заменить proxy на реальный DSP/SER (идеи из `emotion-recognition-using-speech` в `AI/solutions/`) и добавить калибровку/нормализацию по участнику. |
 | **`report_loop` / `own_nn_client`** | Stub-агрегат v2 (pipeline_stage, speech_ratio, per-participant proxy) + опциональный HTTP к «своей НС» | Интерфейс оставить; следующий шаг — заменить эвристики на модельный расчёт при наличии `own_nn_url` и добавить валидацию структуры `report`. |
-| **Дублирование документации** (`ai-gateway/MEMO.md`, `CONTRACTS.md` vs `docs/*`) | Частичное пересечение | **Не переписывать логику**, а **слить или явно развести роли**: один источник истины для контракта (`docs/`), краткая памятка в репо gateway. |
+| **Дублирование документации** (`ai-gateway/MEMO.md`, `CONTRACTS.md` vs `docs/*`) | Частичное пересечение | Роли разведены: **`docs/README.md`** — индекс; **`ANALYSIS_WS_CONTRACTS.md`** — канон контракта; **`MEMO.md`** — операционная памятка gateway; **`CONTRACTS.md`** — краткая отсылка. |
 | **Структура плагинов внутри `ai-gateway`** (если по backlog вынос в `modules/`) | Плагины лежат в `plugins/` | По желанию — **рефакторинг раскладки файлов** без смены протокола (косметика для масштабирования). |
 
 ---
@@ -49,18 +49,20 @@
 2. **Аудио-фаза 2**: заменить proxy-фичи на real DSP/SER, оставить текущий клиентский поток чанков как fallback.
 3. **Уточнить формат отчёта** под диплом (поля `report.summary`, per-participant) и подключить HTTP к модели или улучшить stub.
 4. **Уборка `AI/solutions`**: список репо «оставить 1–2 reference» в README + удаление остальных при необходимости диска.
-5. **Консолидация документации** (п. 2 таблицы выше) одним проходом.
+5. **Дальнейшая замена заглушек** — см. **`docs/AI_STUB_TO_PRODUCTION_ROADMAP.md`** и беклог **BL-AI-101…** в `cursor backlog.md`.
 
 ---
 
 ## 5. Связанные файлы
 
+- Индекс документации: `docs/README.md`
 - Контракты: `docs/ANALYSIS_WS_CONTRACTS.md`
+- Дорожная карта AI (прод): `docs/AI_STUB_TO_PRODUCTION_ROADMAP.md`
 - Конфиг модулей: `ai-gateway/modules.default.json`
 - Отбор решений: `AI/solutions/SELECTION.md`, `AI/solutions/IMPLEMENTATION_PLAN.md`
 - План UI: `docs/UI_AI_ANALYSIS_PLAN.md`
-- Бэклог задач: `cursor backlog.md` (BL-030…)
+- Бэклог задач: `cursor backlog.md` (BL-030…BL-037; расширение **BL-AI-101…**)
 
 ---
 
-*Версия плана: 2026-05. Обновляйте таблицы при изменении архитектуры.*
+*Версия плана: 2026-05 (обновление индекса доков и беклога BL-AI-*). Обновляйте таблицы при изменении архитектуры.*

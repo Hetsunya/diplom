@@ -35,8 +35,10 @@ pip install -r requirements.txt
 
 См. также:
 
+- **Индекс документации:** [`../docs/README.md`](../docs/README.md)
 - Контракты v1: [`../docs/ANALYSIS_WS_CONTRACTS.md`](../docs/ANALYSIS_WS_CONTRACTS.md)
 - **План: что оставить / переписать / удалить:** [`../docs/AI_MODULES_ACTION_PLAN.md`](../docs/AI_MODULES_ACTION_PLAN.md)
+- **От заглушек к продакшену (дорожная карта + беклог BL-AI-*):** [`../docs/AI_STUB_TO_PRODUCTION_ROADMAP.md`](../docs/AI_STUB_TO_PRODUCTION_ROADMAP.md)
 - Наблюдаемость / SLO: [`../docs/ANALYSIS_OBSERVABILITY.md`](../docs/ANALYSIS_OBSERVABILITY.md)
 - Конфиг модулей: `ai-gateway/modules.default.json`, памятка `ai-gateway/MEMO.md`
 - Отдельный ASR: каталог `speech-service/` (режимы **stub** и **whisper**/faster-whisper; см. `speech-service/README.md` и адаптер `ai-gateway/adapters/speech_service.py`). UI шлёт фрагменты микрофона как WS `type: "audio"`.
