@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type Module struct {
@@ -19,6 +20,9 @@ func (m *Module) RegisterRoutes(router *gin.Engine) {
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+
+	// Prometheus scrape target (no secrets in default registry).
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	router.GET("/ready", func(c *gin.Context) {
 		if m.db == nil {

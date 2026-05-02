@@ -257,7 +257,7 @@ BL-026 [x]: Prod docker-compose (secrets/env/volumes) + .env.prod.example
 DoD: поднятие на чистой VDS одной командой, после рестарта данные на месте.
 Статус: реализовано; см. корневой `README.md` (`docker compose -f docker-compose.prod.yml --env-file .env.prod …`). **Не автоматизировано:** scheduled pg_dump / внешние бэкапы — вне карточки (ручной процесс или отдельная задача).
 
-BL-027 [ ]: Auth hardening для prod (cookie Secure + SameSite + rotation)
+BL-027 [~]: Auth hardening для prod (cookie Secure + SameSite + rotation)
 
 Цель: убрать “иногда надо перезапуск” и сделать поведение токенов предсказуемым.
 Результат:
@@ -266,6 +266,7 @@ BL-027 [ ]: Auth hardening для prod (cookie Secure + SameSite + rotation)
 - refresh flow стабилен
 Оценка: 4–8 ч
 DoD: логин сохраняется после F5, `/sessions` не ловит 401 без причины.
+Статус: **Secure** по `TLS` / `X-Forwarded-Proto` (Caddy) уже было; **SameSite** — эвристика: тот же hostname, что и API → **Lax** (раньше для не-localhost сразу ставился **None**). Опция **`AUTH_COOKIE_SAMESITE`** (strict|lax|none) в `internal/auth/handler.go` + `emeeting-backend/.env.example`. Ротация refresh — прежняя в `POST /auth/refresh`.
 
 BL-028 [x]: ai-gateway: сервис‑аккаунт/токен для WS или отдельный internal-канал
 
@@ -280,7 +281,7 @@ DoD: ai-gateway стабильно подключается и не падает
 - Реализовано: `/auth/token` (выдаёт TokenPair JSON для сервисов), поддержка `Authorization: Bearer <JWT>` в `RequireAuth`, настройки env для ai-gateway.
 - Проверено: gateway подключается к `/ws/sessions/:id` без 401 в docker-compose.
 
-BL-029 [ ]: Observability для релиза (логирование/health/метрики)
+BL-029 [~]: Observability для релиза (логирование/health/метрики)
 
 Цель: быстро понимать “почему не работает” без дебага в браузере.
 Результат:
@@ -292,7 +293,8 @@ DoD: по логам видно origin/cookies/auth path и причины от�
 Статус (частично):
 - Реализовано: `X-Request-ID` middleware + access log с rid/origin/host/xfp/uid.
 - Реализовано: `GET /health` и `GET /ready` (ready проверяет Ping к Postgres).
-- Не закрыто по DoD BL-029: метрики/алерты/SLO для прод-наблюдаемости (отдельный трек).
+- Реализовано: `GET /metrics` (Prometheus `client_golang` default registry, без auth — для скрейпа за firewall / allowlist).
+- Не закрыто по DoD BL-029: бизнес-алерты/SLO, кастомные RED counts (отдельный трек).
 
 ---
 

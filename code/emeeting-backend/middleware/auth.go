@@ -12,7 +12,7 @@ import (
 func RequireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
-		if path == "/auth/login" || path == "/auth/refresh" || path == "/auth/token" || path == "/ws/health" || path == "/health" || path == "/ready" {
+		if path == "/auth/login" || path == "/auth/refresh" || path == "/auth/token" || path == "/ws/health" || path == "/health" || path == "/ready" || path == "/metrics" {
 			c.Next()
 			return
 		}

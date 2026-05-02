@@ -1,8 +1,11 @@
 package auth
 
 import (
+	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -103,7 +106,7 @@ func (h *Handler) Logout(c *gin.Context) {
 func setTokenCookies(c *gin.Context, pair *TokenPair) {
 	secure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
 	httpOnly := true
-	sameSite := cookieSameSite(c)
+	sameSite := effectiveSameSite(c)
 
 	// Important: SameSite=None requires Secure in modern browsers; if we're on plain HTTP,
 	// fall back to Lax so cookies are still accepted (proxy makes requests same-site).
@@ -128,7 +131,7 @@ func setTokenCookies(c *gin.Context, pair *TokenPair) {
 func clearTokenCookies(c *gin.Context) {
 	secure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
 	httpOnly := true
-	sameSite := cookieSameSite(c)
+	sameSite := effectiveSameSite(c)
 	if !secure && sameSite == http.SameSiteNoneMode {
 		sameSite = http.SameSiteLaxMode
 	}
@@ -153,9 +156,22 @@ func clearTokenCookies(c *gin.Context) {
 	})
 }
 
-func cookieSameSite(c *gin.Context) http.SameSite {
-	// If UI and API are on different sites (common in docker dev: 172.18.x.x -> localhost),
-	// Lax cookies won't be sent on fetch() POSTs. In that case, use SameSite=None.
+// effectiveSameSite chooses SameSite; AUTH_COOKIE_SAMESITE=strict|lax|none overrides for ops.
+func effectiveSameSite(c *gin.Context) http.SameSite {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("AUTH_COOKIE_SAMESITE"))) {
+	case "strict":
+		return http.SameSiteStrictMode
+	case "lax":
+		return http.SameSiteLaxMode
+	case "none":
+		return http.SameSiteNoneMode
+	}
+	return cookieSameSiteHeuristic(c)
+}
+
+// cookieSameSiteHeuristic: same hostname as API (типичный прод под одним доменом/Caddy) → Lax;
+// иначе (кросс-сайт dev) → None + Secure.
+func cookieSameSiteHeuristic(c *gin.Context) http.SameSite {
 	origin := c.GetHeader("Origin")
 	if origin == "" {
 		return http.SameSiteLaxMode
@@ -164,8 +180,15 @@ func cookieSameSite(c *gin.Context) http.SameSite {
 	if err != nil {
 		return http.SameSiteLaxMode
 	}
-	host := u.Hostname()
-	if host == "localhost" || host == "127.0.0.1" {
+	originHost := u.Hostname()
+	if originHost == "localhost" || originHost == "127.0.0.1" {
+		return http.SameSiteLaxMode
+	}
+	reqHost := c.Request.Host
+	if h, _, err := net.SplitHostPort(reqHost); err == nil {
+		reqHost = h
+	}
+	if strings.EqualFold(originHost, reqHost) {
 		return http.SameSiteLaxMode
 	}
 	return http.SameSiteNoneMode
