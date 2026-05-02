@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
@@ -17,6 +18,7 @@ app = FastAPI(title="emeeting-speech-service", version="0.2.0")
 
 _engine = os.getenv("SPEECH_ASR_ENGINE", "stub").strip().lower()
 _executor = ThreadPoolExecutor(max_workers=int(os.getenv("SPEECH_ASR_WORKERS", "1")))
+_logger = logging.getLogger("speech_service")
 
 
 class TranscribeRequest(BaseModel):
@@ -70,16 +72,28 @@ def _whisper_sync(req: TranscribeRequest) -> dict[str, Any]:
 
     suffix = suffix_from_mime(mime)
     text, meta = transcribe_media_bytes(raw, suffix, language=lang)
+    if meta.get("error"):
+        _logger.warning(
+            "whisper_transcribe_failed trace_id=%s participant=%s error=%s msg=%s",
+            req.trace_id,
+            req.participant_id,
+            meta.get("error"),
+            meta.get("message"),
+        )
     final_marker = bool(audio.get("final_chunk")) or bool(audio.get("is_final"))
+    text_features: dict[str, object] = {
+        "confidence": meta.get("confidence"),
+        "model_size": meta.get("model_size"),
+        "sentiment": "neutral",
+    }
+    if meta.get("error"):
+        text_features["error"] = meta["error"]
+        text_features["message"] = meta.get("message")
     return {
         "transcript_partial": text,
         "transcript_final": text if final_marker and text else None,
         "language": meta.get("language") or lang or "unknown",
-        "text_features": {
-            "confidence": meta.get("confidence"),
-            "model_size": meta.get("model_size"),
-            "sentiment": "neutral",
-        },
+        "text_features": text_features,
     }
 
 

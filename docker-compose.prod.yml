@@ -70,6 +70,7 @@ services:
     environment:
       SPEECH_ASR_ENGINE: ${SPEECH_ASR_ENGINE:-whisper}
       WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-base}
+      WHISPER_VAD_FILTER: ${WHISPER_VAD_FILTER:-false}
     expose:
       - "8090"
     healthcheck:

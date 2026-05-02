@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import functools
 import json
 from typing import Any, Literal, cast
 
@@ -39,17 +41,20 @@ async def transcribe_and_emit_text_analysis(
     cb_open_sec = float(text_mod.params.get("circuit_open_sec", 30.0))
     text_ver = text_mod.model or "stub-v1"
 
-    result = transcribe_audio_chunk(
-        base_url,
-        session_id=int(session_id),
-        participant_id=str(participant_id),
-        trace_id=trace_id,
-        audio_payload=payload,
-        timeout_sec=timeout_sec,
-        retries=retries,
-        backoff_sec=backoff_sec,
-        circuit_failure_threshold=cb_failures,
-        circuit_open_sec=cb_open_sec,
+    result = await asyncio.to_thread(
+        functools.partial(
+            transcribe_audio_chunk,
+            base_url,
+            session_id=int(session_id),
+            participant_id=str(participant_id),
+            trace_id=trace_id,
+            audio_payload=payload,
+            timeout_sec=timeout_sec,
+            retries=retries,
+            backoff_sec=backoff_sec,
+            circuit_failure_threshold=cb_failures,
+            circuit_open_sec=cb_open_sec,
+        )
     )
     if not isinstance(result, dict):
         incr("text_analysis_errors")

@@ -41,7 +41,20 @@ def transcribe_media_bytes(data: bytes, suffix: str, *, language: str | None) ->
         if lang:
             kwargs["language"] = lang
 
-        segments, info = model.transcribe(str(path), **kwargs)
+        vad_env = os.getenv("WHISPER_VAD_FILTER", "false").strip().lower()
+        kwargs["vad_filter"] = vad_env in ("1", "true", "yes", "on")
+
+        try:
+            segments, info = model.transcribe(str(path), **kwargs)
+        except Exception as exc:
+            return "", {
+                "confidence": 0.0,
+                "language": lang or "unknown",
+                "model_size": model_size,
+                "error": type(exc).__name__,
+                "message": str(exc)[:240],
+            }
+
         parts: list[str] = []
         for seg in segments:
             t = (seg.text or "").strip()
