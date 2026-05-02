@@ -204,10 +204,11 @@ async def report_loop(ws_holder: list[Any], session_id: int) -> None:
     own_url = str(mod.params.get("own_nn_url", "") or "")
     model_ver = mod.model or "report-v1"
     bucket_sec = float(mod.params.get("report_bucket_sec", 30.0))
+    wake_floor = float(mod.params.get("report_wake_floor_sec", 5.0))
 
     try:
         while True:
-            await asyncio.sleep(max(interval, 5.0))
+            await asyncio.sleep(max(interval, wake_floor))
             ws = ws_holder[0] if ws_holder else None
             feats = get_feature_store().snapshot_session(session_id)
             await _send_report(

@@ -39,7 +39,8 @@
       "params": {
         "interval_sec": 30,
         "own_nn_url": "",
-        "report_bucket_sec": 30
+        "report_bucket_sec": 30,
+        "report_wake_floor_sec": 5
       }
     }
   }

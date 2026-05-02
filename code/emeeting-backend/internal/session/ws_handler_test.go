@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"emeeting/internal/analysis"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
@@ -239,6 +241,69 @@ func TestMeeting_UserDisconnect_WithCoHost(t *testing.T) {
 		if typ == "meeting_ended" {
 			t.Fatalf("did not expect meeting_ended when co-host present")
 		}
+	}
+}
+
+func TestWS_AnalysisInboundBroadcast(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil, nil)
+	r := gin.New()
+	r.GET("/ws/sessions/:id", handler.WS)
+
+	server := httptest.NewServer(r)
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws/sessions/1"
+
+	connA, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial A: %v", err)
+	}
+	defer connA.Close()
+
+	connB, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial B: %v", err)
+	}
+	defer connB.Close()
+
+	ts := time.Now().UTC()
+	in := WSMessage{
+		Type:        analysis.TypeTextAnalysis,
+		SessionID:   1,
+		Participant: "p_hybrid",
+		Payload: map[string]any{
+			"module":             "text",
+			"version":            "t-v1",
+			"stage":              "partial",
+			"trace_id":           "trace-go-hybrid",
+			"transcript_partial": "hello",
+		},
+		Timestamp: ts,
+	}
+	if err := connA.WriteJSON(in); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	_ = connB.SetReadDeadline(time.Now().Add(4 * time.Second))
+	for {
+		var got map[string]any
+		if err := connB.ReadJSON(&got); err != nil {
+			t.Fatalf("read: %v", err)
+		}
+		typ, _ := got["type"].(string)
+		if typ != analysis.TypeTextAnalysis {
+			continue
+		}
+		payload, ok := got["payload"].(map[string]any)
+		if !ok {
+			t.Fatalf("payload type %#v", got["payload"])
+		}
+		if payload["trace_id"] != "trace-go-hybrid" {
+			t.Fatalf("trace_id: %#v", payload["trace_id"])
+		}
+		return
 	}
 }
 

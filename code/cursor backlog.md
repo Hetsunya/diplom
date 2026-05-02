@@ -310,7 +310,7 @@ P0 — AI modules implementation (единая папка модулей)
 | BL-033 | **сделано (v2 baseline)** | `modules/face/schema.py`, `frame_quality.py`, `params.py`, `analysis.py`; `report_loop` читает `data.face_features`; UI игнор `face_detected=false` |
 | BL-034 | **сделано (v1 orchestrator)** | `modules/report/*` + `report_loop.py` (partial + **final** on cancel); `fusion` + `report_bucket_sec`; `own_nn_client` POST с `fusion` |
 | BL-035 | **частично** | фильтры `module`/`participant_id`/`from`/`to`/`limit` + доступ: организатор vs гость (`participant_id` обязателен); отчёт только организатору; audit-лог `[ANALYSIS_ACCESS]`; роли host/co-host из meeting-сервиса без отдельной таблицы — не делали |
-| BL-036 | **частично** | `smoke_ws_emotion_test.py` (face+emotion), `e2e_analysis_readpath_check.py`; полный hybrid smoke — впереди |
+| BL-036 | **сделано (контур)** | `hybrid_pipeline_smoke.py` + `hybrid_contract.py` + `tests/test_hybrid_contract.py`; Go `TestWS_AnalysisInboundBroadcast`; `report_wake_floor_sec` для быстрого partial |
 | BL-037 | не сделано | prod readiness AI |
 
 BL-030 [x]: Единый layout для AI-модулей в одной папке
@@ -385,7 +385,7 @@ BL-035 [~]: Backend RBAC + API фильтры для аналитики
 DoD: host/co-host видят полный отчет, participant — только разрешенный уровень детализации.
 Статус (2026): организатор (`session.created_by`) — полный `/report` и `/events`; не организатор — `/events` только с `participant_id`; фильтры по времени и модулю; лог `[ANALYSIS_ACCESS]`. Отдельные роли meeting без БД участников — вперёд.
 
-BL-036 [ ]: E2E тест-контур AI pipeline (hybrid)
+BL-036 [x]: E2E тест-контур AI pipeline (hybrid)
 
 Цель: поймать регрессии на сквозном потоке до релиза.
 Файлы: `ai-gateway/smoke_ws_emotion_test.py` (расширить), новые `ai-gateway/tests/*`, `emeeting-backend/internal/session/ws_handler_test.go`
@@ -395,6 +395,7 @@ BL-036 [ ]: E2E тест-контур AI pipeline (hybrid)
 - smoke: partial report -> final report
 Оценка: 1–2 дн
 DoD: один сценарий запуска проверяет полный hybrid pipeline и валидирует обязательные поля контракта.
+Статус (2026-05): `hybrid_pipeline_smoke.py` (локальный WS hub + stub `/v1/transcribe` + отмена gateway → финальный `analysis_report`); **контракт без ML**: `tests/test_hybrid_contract.py`; backend: `TestWS_AnalysisInboundBroadcast` для `text_analysis`. Полный smoke как у emotion-теста требует DeepFace/tf stack.
 
 BL-037 [ ]: Prod readiness AI (ресурсы, деградация, алерты)
 

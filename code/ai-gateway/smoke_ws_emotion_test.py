@@ -1,3 +1,5 @@
+"""Face/emotion smoke. Full multimodal + partial/final reports: see hybrid_pipeline_smoke.py."""
+
 import asyncio
 import base64
 import io
