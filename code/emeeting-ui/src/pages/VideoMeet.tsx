@@ -147,6 +147,7 @@ const VideoMeet = () => {
   const toasts = useMeetingStore((s) => s.toasts);
   const popToast = useMeetingStore((s) => s.popToast);
   const upsert = useMeetingStore((s) => s.upsertParticipant);
+  const resetMeetingStore = useMeetingStore((s) => s.reset);
 
   const [transcriptLines, setTranscriptLines] = useState<TranscriptLine[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatLine[]>([]);
@@ -156,7 +157,11 @@ const VideoMeet = () => {
   const [verdictSource, setVerdictSource] = useState<string | null>(null);
   const [verdictExpanded, setVerdictExpanded] = useState(false);
 
-  // Ensure "self" exists in store immediately.
+  useEffect(() => {
+    resetMeetingStore();
+  }, [id, resetMeetingStore]);
+
+  // Ensure "self" exists in store immediately (snapshot с сервера затем дополнит список).
   useEffect(() => {
     upsert({
       id: participantId,

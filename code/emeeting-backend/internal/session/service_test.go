@@ -15,7 +15,8 @@ func (r *repoSpy) Create(input models.Session) (int, error) {
 	return 42, nil
 }
 
-func (r *repoSpy) List() ([]models.Session, error) {
+func (r *repoSpy) ListForUser(userID int) ([]models.Session, error) {
+	_ = userID
 	return []models.Session{}, nil
 }
 

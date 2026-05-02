@@ -11,20 +11,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type busSpy struct {
-	lastSessionID int
-	lastMessage   WSMessage
-}
-
-func (b *busSpy) Add(sessionID int, conn *websocket.Conn)    {}
-func (b *busSpy) Remove(sessionID int, conn *websocket.Conn) {}
-func (b *busSpy) Broadcast(sessionID int, message any) {
-	b.lastSessionID = sessionID
-	if typed, ok := message.(WSMessage); ok {
-		b.lastMessage = typed
-	}
-}
-
 func TestWSSessionConnectionSmoke(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -129,20 +115,19 @@ func TestE2E_MeetingFlow(t *testing.T) {
 }
 
 func TestWSDispatchUsesRegisteredHandler(t *testing.T) {
-	spy := &busSpy{}
-	handler := NewHandler(NewService(newFakeRepo()), spy, nil, nil)
+	hub := NewSessionHub()
+	handler := NewHandler(NewService(newFakeRepo()), hub, nil, nil)
 
-	handler.RegisterWSHandler("custom", func(sessionID int, msg WSMessage) {
+	var invoked bool
+	handler.RegisterWSHandler("custom", func(sessionID int, _ *websocket.Conn, msg WSMessage) {
+		invoked = true
 		msg.Type = "custom_processed"
-		handler.hub.Broadcast(sessionID, msg)
+		hub.Broadcast(sessionID, msg)
 	})
 
-	handler.dispatchWSMessage(7, WSMessage{Type: "custom"})
-	if spy.lastSessionID != 7 {
-		t.Fatalf("expected session 7, got %d", spy.lastSessionID)
-	}
-	if spy.lastMessage.Type != "custom_processed" {
-		t.Fatalf("expected transformed type, got %q", spy.lastMessage.Type)
+	handler.dispatchWSMessage(7, nil, WSMessage{Type: "custom"})
+	if !invoked {
+		t.Fatalf("custom handler not invoked")
 	}
 }
 

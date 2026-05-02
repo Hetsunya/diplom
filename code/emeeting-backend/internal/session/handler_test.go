@@ -29,6 +29,7 @@ func newFakeRepo() *fakeRepo {
 				Title:         "Seed Session",
 				SessionType:   models.SessionMeeting,
 				StartDatetime: &start,
+				CreatedBy:     ptrInt(1),
 			},
 		},
 	}
@@ -42,10 +43,12 @@ func (r *fakeRepo) Create(input models.Session) (int, error) {
 	return id, nil
 }
 
-func (r *fakeRepo) List() ([]models.Session, error) {
-	result := make([]models.Session, 0, len(r.sessions))
+func (r *fakeRepo) ListForUser(userID int) ([]models.Session, error) {
+	var result []models.Session
 	for _, s := range r.sessions {
-		result = append(result, s)
+		if s.CreatedBy != nil && *s.CreatedBy == userID {
+			result = append(result, s)
+		}
 	}
 	return result, nil
 }
@@ -58,11 +61,19 @@ func (r *fakeRepo) Get(id int) (*models.Session, error) {
 	return &s, nil
 }
 
+func withAuthUser(uid int) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Set("authUserID", uid)
+		c.Next()
+	}
+}
+
 func setupRouterForSessionTests(repo Repository) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	svc := NewService(repo)
 	handler := NewHandler(svc, NewSessionHub(), nil, nil)
 	r := gin.New()
+	r.Use(withAuthUser(1))
 	r.GET("/sessions", handler.List)
 	r.POST("/sessions", handler.Create)
 	r.GET("/sessions/:id", handler.Get)

@@ -30,11 +30,11 @@ func (h *Handler) RegisterWSHandler(messageType string, handler WSMessageHandler
 
 func (h *Handler) registerDefaultWSHandlers() {
 	// Default behavior for known command types is broadcast.
-	broadcastHandler := func(sessionID int, msg WSMessage) {
+	broadcastHandler := func(sessionID int, _ *websocket.Conn, msg WSMessage) {
 		h.hub.Broadcast(sessionID, msg)
 	}
 
-	persistBroadcast := func(sessionID int, msg WSMessage) {
+	persistBroadcast := func(sessionID int, _ *websocket.Conn, msg WSMessage) {
 		if h.analysisSvc != nil {
 			_ = h.analysisSvc.RecordInbound(context.Background(), analysis.InboundWSMessage{
 				Type:        msg.Type,
@@ -46,10 +46,7 @@ func (h *Handler) registerDefaultWSHandlers() {
 		}
 		h.hub.Broadcast(sessionID, msg)
 	}
-	joinHandler := func(sessionID int, msg WSMessage) {
-		// Keep backwards compatibility: still broadcast "join" WSMessage.
-		h.hub.Broadcast(sessionID, msg)
-
+	joinHandler := func(sessionID int, conn *websocket.Conn, msg WSMessage) {
 		var name string
 		if msg.Payload != nil {
 			if m, ok := msg.Payload.(map[string]any); ok {
@@ -58,6 +55,13 @@ func (h *Handler) registerDefaultWSHandlers() {
 				}
 			}
 		}
+		pid := strings.TrimSpace(msg.Participant)
+		if pid != "" && conn != nil {
+			h.hub.SetJoinMeta(sessionID, conn, pid, name)
+		}
+
+		// Keep backwards compatibility: still broadcast "join" WSMessage.
+		h.hub.Broadcast(sessionID, msg)
 
 		payload, _ := json.Marshal(map[string]any{
 			"participant_id": msg.Participant,
@@ -69,8 +73,21 @@ func (h *Handler) registerDefaultWSHandlers() {
 			Payload:   payload,
 			Timestamp: time.Now().UTC(),
 		})
+
+		// Полный список уже подключённых — чтобы поздние вкладки видели ранних без перезагрузки.
+		if conn != nil {
+			snap := h.hub.ParticipantSnapshot(sessionID)
+			snapBody, _ := json.Marshal(map[string]any{"participants": snap})
+			h.hub.SendJSON(conn, WSEvent{
+				Type:      "participants_snapshot",
+				Payload:   snapBody,
+				Timestamp: time.Now().UTC(),
+			})
+		}
 	}
-	leaveHandler := func(sessionID int, msg WSMessage) {
+	leaveHandler := func(sessionID int, conn *websocket.Conn, msg WSMessage) {
+		h.hub.RemoveConnJoinMeta(sessionID, conn)
+
 		// Keep backwards compatibility: still broadcast "leave" WSMessage.
 		h.hub.Broadcast(sessionID, msg)
 
@@ -94,7 +111,7 @@ func (h *Handler) registerDefaultWSHandlers() {
 			Timestamp: time.Now().UTC(),
 		})
 	}
-	endMeetingHandler := func(sessionID int, msg WSMessage) {
+	endMeetingHandler := func(sessionID int, _ *websocket.Conn, msg WSMessage) {
 		// Only host should be allowed to end meeting. We accept role passed in payload
 		// (server also tracks roles per connection for disconnect rules).
 		role := ""
@@ -166,7 +183,7 @@ func parseChatInbound(payload any) (text, name, clientID string, ok bool) {
 }
 
 func (h *Handler) chatMessageHandler() WSMessageHandler {
-	return func(sessionID int, msg WSMessage) {
+	return func(sessionID int, _ *websocket.Conn, msg WSMessage) {
 		if h.chatRepo == nil {
 			return
 		}
@@ -199,7 +216,7 @@ func (h *Handler) chatMessageHandler() WSMessageHandler {
 	}
 }
 
-func (h *Handler) dispatchWSMessage(sessionID int, msg WSMessage) {
+func (h *Handler) dispatchWSMessage(sessionID int, conn *websocket.Conn, msg WSMessage) {
 	h.wsMu.RLock()
 	handler, ok := h.wsMap[msg.Type]
 	h.wsMu.RUnlock()
@@ -208,7 +225,7 @@ func (h *Handler) dispatchWSMessage(sessionID int, msg WSMessage) {
 		h.hub.Broadcast(sessionID, msg)
 		return
 	}
-	handler(sessionID, msg)
+	handler(sessionID, conn, msg)
 }
 
 func (h *Handler) WS(c *gin.Context) {
@@ -368,7 +385,7 @@ func (h *Handler) WS(c *gin.Context) {
 			participantName = ""
 		}
 
-		h.dispatchWSMessage(sessionID, msg)
+		h.dispatchWSMessage(sessionID, conn, msg)
 	}
 
 }

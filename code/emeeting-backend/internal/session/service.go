@@ -14,8 +14,8 @@ func (s *service) Create(input models.Session) (int, error) {
 	return s.repo.Create(input)
 }
 
-func (s *service) List() ([]models.Session, error) {
-	return s.repo.List()
+func (s *service) ListForUser(userID int) ([]models.Session, error) {
+	return s.repo.ListForUser(userID)
 }
 
 func (s *service) Get(id int) (*models.Session, error) {

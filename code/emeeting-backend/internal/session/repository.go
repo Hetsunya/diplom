@@ -62,13 +62,14 @@ func (r *PostgresRepository) Create(s models.Session) (int, error) {
 	return id, nil
 }
 
-// List возвращает все сессии
-func (r *PostgresRepository) List() ([]models.Session, error) {
+// ListForUser возвращает сессии, созданные указанным пользователем (планировщик видит только свои).
+func (r *PostgresRepository) ListForUser(userID int) ([]models.Session, error) {
 	rows, err := r.db.Query(`
 		SELECT session_id, title, description, session_type, start_datetime, end_datetime, location_type, physical_location, created_by
 		FROM session
+		WHERE created_by = $1
 		ORDER BY start_datetime DESC
-	`)
+	`, userID)
 	if err != nil {
 		return nil, err
 	}

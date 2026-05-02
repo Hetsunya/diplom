@@ -9,23 +9,17 @@ import (
 
 type Repository interface {
 	Create(input models.Session) (int, error)
-	List() ([]models.Session, error)
+	ListForUser(userID int) ([]models.Session, error)
 	Get(id int) (*models.Session, error)
 }
 
 type Service interface {
 	Create(input models.Session) (int, error)
-	List() ([]models.Session, error)
+	ListForUser(userID int) ([]models.Session, error)
 	Get(id int) (*models.Session, error)
 }
 
-type Bus interface {
-	Add(sessionID int, conn *websocket.Conn)
-	Remove(sessionID int, conn *websocket.Conn)
-	Broadcast(sessionID int, message any)
-}
-
-type WSMessageHandler func(sessionID int, msg WSMessage)
+type WSMessageHandler func(sessionID int, conn *websocket.Conn, msg WSMessage)
 
 type WSMessage struct {
 	Type        string    `json:"type"`

@@ -33,7 +33,7 @@ Response: `204 No Content`
 ## Sessions
 
 ### `GET /sessions`
-Response `200`: array of sessions.
+Response `200`: массив сессий **только созданных текущим пользователем** (`created_by = sub` из JWT). Участники, переходящие по прямой ссылке на `/meet/:id`, список чужих созвонов не видят — только организатор планирует и делится ссылкой.
 
 ### `POST /sessions`
 Request:
@@ -53,7 +53,7 @@ Request:
 Response `201`: created session object.
 
 ### `GET /sessions/:id`
-Response `200`: single session object.
+Response `200`: объект сессии по id (любой аутентифицированный пользователь может открыть по ссылке для входа на звонок).
 
 ### `GET /sessions/:id/chat/messages`
 Query: `limit` (optional, default 100, max 200).

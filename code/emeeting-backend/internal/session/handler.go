@@ -13,11 +13,12 @@ import (
 	"emeeting/internal/analysis"
 	"emeeting/internal/chat"
 	"emeeting/internal/models"
+	"emeeting/middleware"
 )
 
 type Handler struct {
 	service     Service
-	hub         Bus
+	hub         *SessionHub
 	analysisSvc *analysis.Service
 	chatRepo    *chat.Repository
 	wsMu        sync.RWMutex
@@ -27,7 +28,7 @@ type Handler struct {
 	connRoles map[int]map[*websocket.Conn]string
 }
 
-func NewHandler(service Service, hub Bus, analysisSvc *analysis.Service, chatRepo *chat.Repository) *Handler {
+func NewHandler(service Service, hub *SessionHub, analysisSvc *analysis.Service, chatRepo *chat.Repository) *Handler {
 	h := &Handler{
 		service:     service,
 		hub:         hub,
@@ -78,6 +79,12 @@ func (h *Handler) Create(c *gin.Context) {
 		endTime = &t
 	}
 
+	uid, ok := middleware.AuthUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	session := models.Session{
 		Title:            input.Title,
 		SessionType:      input.SessionType,
@@ -86,7 +93,7 @@ func (h *Handler) Create(c *gin.Context) {
 		Description:      input.Description,
 		LocationType:     input.LocationType,
 		PhysicalLocation: input.PhysicalLocation,
-		CreatedBy:        ptrInt(1), // временно админский ID
+		CreatedBy:        &uid,
 	}
 
 	log.Printf("DEBUG: creating session %+v", session)
@@ -102,7 +109,12 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	sessions, err := h.service.List()
+	uid, ok := middleware.AuthUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	sessions, err := h.service.ListForUser(uid)
 	if err != nil {
 		log.Printf("ERROR: failed to list sessions: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

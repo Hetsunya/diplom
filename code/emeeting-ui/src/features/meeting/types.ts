@@ -16,3 +16,12 @@ export type UserLeftPayload = {
   left_at?: string;
 };
 
+export type ParticipantSnapshotEntry = {
+  participant_id: string;
+  name?: string;
+};
+
+export type ParticipantsSnapshotPayload = {
+  participants: ParticipantSnapshotEntry[];
+};
+

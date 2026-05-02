@@ -57,6 +57,16 @@ func RequireAuth() gin.HandlerFunc {
 	}
 }
 
+// AuthUserID returns the authenticated user id set by RequireAuth.
+func AuthUserID(c *gin.Context) (int, bool) {
+	v, ok := c.Get("authUserID")
+	if !ok {
+		return 0, false
+	}
+	id, ok := v.(int)
+	return id, ok && id > 0
+}
+
 func RequireRole(allowed ...string) gin.HandlerFunc {
 	allow := make(map[string]bool, len(allowed))
 	for _, r := range allowed {

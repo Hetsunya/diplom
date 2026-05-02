@@ -1,9 +1,15 @@
-import type { UserJoinedPayload, UserLeftPayload, WSEvent } from "./types";
+import type {
+  ParticipantsSnapshotPayload,
+  UserJoinedPayload,
+  UserLeftPayload,
+  WSEvent,
+} from "./types";
 import type { MeetingParticipant } from "./useMeetingStore";
 
 type Ops = {
   upsertParticipant: (p: MeetingParticipant) => void;
   removeParticipant: (id: string) => void;
+  replaceParticipantsFromSnapshot?: (list: Pick<MeetingParticipant, "id" | "name">[]) => void;
   pushToast?: (message: string) => void;
   onMeetingEnded?: (payload: unknown) => void;
 };
@@ -41,6 +47,29 @@ export function handleMeetingEvent(msg: unknown, ops: Ops) {
 
   if (type === "meeting_ended") {
     ops.onMeetingEnded?.(payload);
+    return;
+  }
+
+  if (type === "participants_snapshot" && isRecord(payload)) {
+    const p = payload as unknown as ParticipantsSnapshotPayload & Record<string, unknown>;
+    const raw = p.participants;
+    if (!Array.isArray(raw) || !ops.replaceParticipantsFromSnapshot) return;
+    const list: Pick<MeetingParticipant, "id" | "name">[] = [];
+    for (const item of raw) {
+      if (!isRecord(item)) continue;
+      const id =
+        typeof item.participant_id === "string"
+          ? item.participant_id
+          : typeof item["participant_id"] === "string"
+            ? (item["participant_id"] as string)
+            : undefined;
+      if (!id) continue;
+      const nameRaw = item.name ?? item["name"];
+      const name =
+        typeof nameRaw === "string" && nameRaw.length > 0 ? nameRaw : `Participant ${id}`;
+      list.push({ id, name });
+    }
+    ops.replaceParticipantsFromSnapshot(list);
     return;
   }
 
