@@ -311,7 +311,7 @@ P0 — AI modules implementation (единая папка модулей)
 | BL-034 | **сделано (v1 orchestrator)** | `modules/report/*` + `report_loop.py` (partial + **final** on cancel); `fusion` + `report_bucket_sec`; `own_nn_client` POST с `fusion` |
 | BL-035 | **частично** | фильтры `module`/`participant_id`/`from`/`to`/`limit` + доступ: организатор vs гость (`participant_id` обязателен); отчёт только организатору; audit-лог `[ANALYSIS_ACCESS]`; роли host/co-host из meeting-сервиса без отдельной таблицы — не делали |
 | BL-036 | **сделано (контур)** | `hybrid_pipeline_smoke.py` + `hybrid_contract.py` + `tests/test_hybrid_contract.py`; Go `TestWS_AnalysisInboundBroadcast`; `report_wake_floor_sec` для быстрого partial |
-| BL-037 | не сделано | prod readiness AI |
+| BL-037 | **сделано (baseline)** | hot-reload JSON, face semaphore, latency rings + `snapshot_health`, `report.data_quality`, prod compose `AI_GATEWAY_CONFIG_POLL_SEC` |
 
 BL-030 [x]: Единый layout для AI-модулей в одной папке
 
@@ -397,7 +397,7 @@ BL-036 [x]: E2E тест-контур AI pipeline (hybrid)
 DoD: один сценарий запуска проверяет полный hybrid pipeline и валидирует обязательные поля контракта.
 Статус (2026-05): `hybrid_pipeline_smoke.py` (локальный WS hub + stub `/v1/transcribe` + отмена gateway → финальный `analysis_report`); **контракт без ML**: `tests/test_hybrid_contract.py`; backend: `TestWS_AnalysisInboundBroadcast` для `text_analysis`. Полный smoke как у emotion-теста требует DeepFace/tf stack.
 
-BL-037 [ ]: Prod readiness AI (ресурсы, деградация, алерты)
+BL-037 [x]: Prod readiness AI (ресурсы, деградация, алерты)
 
 Цель: контролируемое поведение под нагрузкой и при деградации внешних сервисов.
 Файлы: `ai-gateway/observability.py`, `docs/ANALYSIS_OBSERVABILITY.md`, `docker-compose.prod.yml` (или эквивалент)
@@ -407,6 +407,7 @@ BL-037 [ ]: Prod readiness AI (ресурсы, деградация, алерт�
 - метрики и алерты: error-rate, module latency, report generation lag
 Оценка: 1–2 дн
 DoD: при падении speech-service или face-провайдера остальные модули продолжают работу, отчет формируется с пометкой неполных данных.
+Статус (2026-05): `AI_GATEWAY_CONFIG_POLL_SEC` + `maybe_reload_gateway_config` (mtime); face `max_concurrent_inferences` + semaphore/`to_thread`; `observe_module_latency` + `snapshot_health`; `speech_service_circuit_open` counter; `report.data_quality` (`modules/report/data_quality.py`); compose env для poll; тесты `test_data_quality`, `test_gateway_config_reload`, `test_observability_health`. Внешние алерты Prometheus — по желанию поверх логов/`snapshot_health`.
 
 Рекомендуемый порядок внедрения (AI спринты)
 Спринт 7 (структура + контракты): BL-030 → BL-031

@@ -92,6 +92,8 @@ services:
       AI_GATEWAY_EMAIL: ${AI_GATEWAY_EMAIL:-demo1@example.com}
       AI_GATEWAY_PASSWORD: ${AI_GATEWAY_PASSWORD:-demo1pass}
       AI_GATEWAY_MODULES_CONFIG: /app/modules.docker.json
+      # Poll interval (seconds) to reload modules JSON from disk without restarting (0 = disable).
+      AI_GATEWAY_CONFIG_POLL_SEC: ${AI_GATEWAY_CONFIG_POLL_SEC:-10}
     depends_on:
       backend:
         condition: service_healthy

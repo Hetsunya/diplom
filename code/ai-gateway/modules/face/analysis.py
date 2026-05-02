@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import json
 import time
@@ -18,7 +19,30 @@ from modules.face.schema import (
     is_no_face_deepface_error,
     normalize_deepface_result,
 )
-from observability import incr, log_event
+from observability import incr, log_event, monotonic_ms, observe_module_latency
+
+_face_sem: asyncio.Semaphore | None = None
+_face_sem_capacity: int = -1
+
+
+def _ensure_face_sem(capacity: int) -> asyncio.Semaphore:
+    global _face_sem, _face_sem_capacity
+    cap = max(1, int(capacity))
+    if _face_sem is None or _face_sem_capacity != cap:
+        _face_sem = asyncio.Semaphore(cap)
+        _face_sem_capacity = cap
+    return _face_sem
+
+
+def _deepface_emotion_sync(img_rgb: Any, fp: FaceRuntimeParams) -> Any:
+    return DeepFace.analyze(
+        img_rgb,
+        actions=["emotion"],
+        enforce_detection=fp.enforce_detection,
+        detector_backend=fp.detector_backend,
+        align=fp.align,
+        silent=True,
+    )
 
 
 class FaceAnalysisPlugin:
@@ -155,14 +179,11 @@ class FaceAnalysisPlugin:
             img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
 
             try:
-                result = DeepFace.analyze(
-                    img_rgb,
-                    actions=["emotion"],
-                    enforce_detection=fp.enforce_detection,
-                    detector_backend=fp.detector_backend,
-                    align=fp.align,
-                    silent=True,
-                )
+                sem = _ensure_face_sem(fp.max_concurrent_inferences)
+                t0 = monotonic_ms()
+                async with sem:
+                    result = await asyncio.to_thread(_deepface_emotion_sync, img_rgb, fp)
+                observe_module_latency("face", monotonic_ms() - t0)
             except Exception as exc:
                 if fp.emit_no_face_face_analysis and is_no_face_deepface_error(exc):
                     ff = build_face_features_guard(reason="no_face")

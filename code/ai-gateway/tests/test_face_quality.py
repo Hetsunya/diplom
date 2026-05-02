@@ -29,6 +29,7 @@ class TestFaceRuntimeParams(unittest.TestCase):
         self.assertEqual(p.detector_backend, "opencv")
         self.assertFalse(p.enforce_detection)
         self.assertEqual(p.min_face_side_px, 0)
+        self.assertEqual(p.max_concurrent_inferences, 2)
 
 
 @unittest.skipUnless(_HAS_CV, "requires numpy and opencv")

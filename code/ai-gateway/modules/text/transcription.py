@@ -58,6 +58,8 @@ async def transcribe_and_emit_text_analysis(
     if result.get("_error"):
         log_event("speech_error", trace_id=trace_id, module="text", extra={"err": result["_error"]})
         incr("text_analysis_errors")
+        if result.get("_circuit_open"):
+            incr("speech_service_circuit_open")
         return
 
     norm = normalize_asr_response(result)

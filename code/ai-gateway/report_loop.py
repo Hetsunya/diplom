@@ -9,14 +9,17 @@ from typing import Any
 from contracts import build_trace_id
 from feature_store import get_feature_store
 from gateway_config import config_snapshot, get_gateway_config
+from modules.report.data_quality import augment_report_data_quality
 from modules.report.orchestrator import build_report_ws_message, resolve_report_body
 from modules.report.stub_builder import build_stub_report
-from observability import incr, log_event, monotonic_ms
+from observability import incr, log_event, monotonic_ms, snapshot_metrics
 
 # Backwards compatibility for tests importing `_stub_report`.
 _stub_report = build_stub_report
 
 _PIPELINE_STAGES = {"idle", "listening", "transcribing", "visual_only"}
+
+_REPORT_QUALITY_PREV: dict[str, int] | None = None
 
 
 def _to_non_empty_str(v: Any, default: str) -> str:
@@ -129,7 +132,32 @@ def sanitize_report_shape(raw: Any, *, session_id: int) -> dict[str, Any]:
     fusion = _sanitize_fusion(raw.get("fusion"))
     if fusion is not None:
         out["fusion"] = fusion
+    dq = _sanitize_data_quality(raw.get("data_quality"))
+    if dq is not None:
+        out["data_quality"] = dq
     return out
+
+
+def _sanitize_data_quality(v: Any) -> dict[str, Any] | None:
+    if not isinstance(v, dict):
+        return None
+    complete = bool(v.get("complete"))
+    ds = v.get("degraded_sources")
+    degraded = [str(x) for x in ds] if isinstance(ds, list) else []
+    notes_raw = v.get("notes")
+    notes = [str(x) for x in notes_raw] if isinstance(notes_raw, list) else []
+    cw = v.get("counters_window")
+    counters: dict[str, int] = {}
+    if isinstance(cw, dict):
+        for k, val in cw.items():
+            if isinstance(k, str) and isinstance(val, (int, float)):
+                counters[k] = int(val)
+    return {
+        "complete": complete,
+        "degraded_sources": degraded,
+        "notes": notes,
+        "counters_window": counters,
+    }
 
 
 async def _send_report(
@@ -143,6 +171,7 @@ async def _send_report(
     msg_type: str,
     envelope_stage: str,
 ) -> None:
+    global _REPORT_QUALITY_PREV
     if ws is None or not getattr(ws, "open", True):
         return
     t0 = monotonic_ms()
@@ -157,6 +186,9 @@ async def _send_report(
         bucket_sec=bucket_sec,
         sanitize_report_shape=sanitize_report_shape,
     )
+    curr_metrics = snapshot_metrics()
+    report_body = augment_report_data_quality(report_body, curr_metrics, _REPORT_QUALITY_PREV)
+    _REPORT_QUALITY_PREV = dict(curr_metrics)
     out = build_report_ws_message(
         session_id=session_id,
         report_body=report_body,

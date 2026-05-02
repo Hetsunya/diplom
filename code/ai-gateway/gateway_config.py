@@ -52,18 +52,50 @@ def load_gateway_config() -> GatewayConfig:
 
 
 _CFG: GatewayConfig | None = None
+_TRACK_PATH: str | None = None
+_TRACK_MTIME_NS: int | None = None
+
+
+def _refresh_config_track() -> None:
+    """Remember mounted JSON path+mtime for hot-reload (see maybe_reload_gateway_config)."""
+    global _TRACK_PATH, _TRACK_MTIME_NS
+    path = os.getenv("AI_GATEWAY_MODULES_CONFIG", "").strip()
+    if path and Path(path).is_file():
+        _TRACK_PATH = path
+        _TRACK_MTIME_NS = Path(path).stat().st_mtime_ns
+    else:
+        _TRACK_PATH = None
+        _TRACK_MTIME_NS = None
 
 
 def get_gateway_config() -> GatewayConfig:
     global _CFG
     if _CFG is None:
         _CFG = load_gateway_config()
+        _refresh_config_track()
     return _CFG
+
+
+def maybe_reload_gateway_config() -> bool:
+    """Reload modules JSON from disk when AI_GATEWAY_MODULES_CONFIG file changed."""
+    global _CFG, _TRACK_MTIME_NS
+    if not _TRACK_PATH:
+        return False
+    try:
+        st = Path(_TRACK_PATH).stat()
+    except OSError:
+        return False
+    if _TRACK_MTIME_NS is None or st.st_mtime_ns != _TRACK_MTIME_NS:
+        _CFG = load_gateway_config()
+        _TRACK_MTIME_NS = st.st_mtime_ns
+        return True
+    return False
 
 
 def set_gateway_config(cfg: GatewayConfig) -> None:
     global _CFG
     _CFG = cfg
+    _refresh_config_track()
 
 
 def config_snapshot() -> dict[str, Any]:

@@ -12,7 +12,7 @@ from feature_store import get_feature_store
 from gateway_config import get_gateway_config
 from modules.audio.signal import extract_audio_features_safe
 from modules.text.transcription import transcribe_and_emit_text_analysis
-from observability import incr
+from observability import incr, monotonic_ms, observe_module_latency
 
 
 class AudioPipelinePlugin:
@@ -52,6 +52,7 @@ class AudioPipelinePlugin:
         payload = msg.get("payload") if isinstance(msg.get("payload"), dict) else {}
 
         if audio_mod and audio_mod.enabled:
+            t_audio = monotonic_ms()
             audio_ver = audio_mod.model or "audio-features-v2"
             params = audio_mod.params or {}
             key = f"{session_id}:{participant_id}"
@@ -104,6 +105,7 @@ class AudioPipelinePlugin:
                 data={"audio_features": audio_features},
             )
             incr("audio_analysis_sent")
+            observe_module_latency("audio", monotonic_ms() - t_audio)
 
         if not text_mod or not text_mod.enabled:
             return
