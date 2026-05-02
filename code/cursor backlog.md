@@ -305,7 +305,7 @@ P0 — AI modules implementation (единая папка модулей)
 | ID | Фактический статус | Куда смотреть в репо |
 |----|--------------------|----------------------|
 | BL-030 | **сделано** | `ai-gateway/modules/**` (face/audio/text/ping/report), `handlers` грузит `modules.registry`; `plugins/*` — тонкие shims |
-| BL-031 | **частично** | `modules/text/transcription.py` + `adapters/speech_service.py` (retry + **circuit-breaker** по `speech_service_url`); полноценные `text_features`/NLP — впереди |
+| BL-031 | **сделано (v1)** | `normalize.py` + `features.py` + `transcription.py`; `speech_service.py` (retry/CB); юнит-тесты `tests/test_text_*.py`; тяжёлый NLP — вне v1 |
 | BL-032 | **частично** | `modules/audio/signal.py`: energy/zcr/pause/jitter/shimmer + `modules.audio.params`; `pipeline.py`: интервалы между чанками; WebM/Opus без demux — эвристика по сырым байтам |
 | BL-033 | **частично** | `modules/face/analysis.py`: `face_analysis` + legacy `emotion`, throttling, `min_confidence`; quality guards/alias-контракт в DoD — впереди |
 | BL-034 | **частично** | `ai-gateway/report_loop.py` + `feature_store.py`; полноценный fusion/windowing — впереди |
@@ -325,7 +325,7 @@ BL-030 [x]: Единый layout для AI-модулей в одной папк�
 DoD: все активные анализаторы грузятся из `ai-gateway/modules/**`, старые `plugins/*` либо проксируют, либо удалены без потери функционала.
 Статус: `handlers` → `modules.registry.iter_plugins()`; `plugins/*.py` — shims.
 
-BL-031 [ ]: Text module v1 (ASR + NLP поверх транскрибации)
+BL-031 [x]: Text module v1 (ASR + NLP поверх транскрибации)
 
 Цель: получить стабильный поток `text_analysis` partial/final из отдельного speech-service.
 Файлы: `ai-gateway/modules/text/**`, `ai-gateway/adapters/speech_service.py`, `speech-service/**`, `docs/ANALYSIS_WS_CONTRACTS.md`
@@ -335,6 +335,7 @@ BL-031 [ ]: Text module v1 (ASR + NLP поверх транскрибации)
 - базовые `text_features` (sentiment/topics/keyphrases/confidence) как отдельный шаг
 Оценка: 1–2 дн
 DoD: в live-сессии приходят `text_analysis` события с `trace_id`, `stage`, `version`; при ошибке speech-service gateway не падает.
+Статус (2026-05): `normalize_asr_response` (алиасы `text`/`final`/`segments`), `enrich_text_features` (эвристика при пустых полях), пропуск пустого транскрипта без WS-шума; тесты `test_text_normalize.py`, `test_text_features.py`, `test_text_transcription.py`.
 
 BL-032 [~]: Audio module v1 (voice/signal features)
 

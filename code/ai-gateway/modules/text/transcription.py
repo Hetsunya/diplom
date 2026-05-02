@@ -9,6 +9,8 @@ from adapters.speech_service import transcribe_audio_chunk
 from contracts import analysis_envelope, has_required_envelope_fields
 from feature_store import get_feature_store
 from gateway_config import ModuleCfg
+from modules.text.features import enrich_text_features
+from modules.text.normalize import has_transcript_content, normalize_asr_response
 from observability import incr, log_event
 
 
@@ -58,8 +60,18 @@ async def transcribe_and_emit_text_analysis(
         incr("text_analysis_errors")
         return
 
-    transcript_partial = result.get("transcript_partial")
-    transcript_final = result.get("transcript_final")
+    norm = normalize_asr_response(result)
+    if not has_transcript_content(norm):
+        log_event("speech_skip", module="text", trace_id=trace_id, extra={"reason": "empty_transcript"})
+        return
+
+    transcript_partial = norm.get("transcript_partial")
+    transcript_final = norm.get("transcript_final")
+    text_features = enrich_text_features(
+        transcript_partial=transcript_partial if isinstance(transcript_partial, str) else None,
+        transcript_final=transcript_final if isinstance(transcript_final, str) else None,
+        text_features=norm.get("text_features") if isinstance(norm.get("text_features"), dict) else {},
+    )
     stage_name = cast(
         Literal["partial", "final"],
         "final" if transcript_final else "partial",
@@ -77,8 +89,8 @@ async def transcribe_and_emit_text_analysis(
                 extra={
                     "transcript_partial": transcript_partial,
                     "transcript_final": transcript_final,
-                    "language": result.get("language"),
-                    "text_features": result.get("text_features") or {},
+                    "language": norm.get("language"),
+                    "text_features": text_features,
                 },
             ),
         },
