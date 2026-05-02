@@ -70,6 +70,28 @@ class TestFaceSchema(unittest.TestCase):
         self.assertEqual(n["region_w"], 100)
         self.assertEqual(n["region_h"], 120)
 
+    def test_normalize_numpy_like_emotion_scores(self) -> None:
+        """TensorFlow/DeepFace often returns scalars that are not Python float."""
+
+        class NpFloatLike:
+            def __init__(self, v: float) -> None:
+                self._v = v
+
+            def __float__(self) -> float:
+                return self._v
+
+        n = normalize_deepface_result(
+            {
+                "dominant_emotion": "happy",
+                "emotion": {"happy": NpFloatLike(82.3), "sad": NpFloatLike(17.7)},
+                "region": {"x": NpFloatLike(1.0), "y": NpFloatLike(2.0), "w": NpFloatLike(50.0), "h": NpFloatLike(60.0)},
+            }
+        )
+        assert n is not None
+        self.assertAlmostEqual(n["confidence"], 82.3, places=5)
+        self.assertEqual(n["region_x"], 1)
+        self.assertEqual(n["probs"]["happy"], 82.3)
+
     def test_small_region_filtered(self) -> None:
         ff = build_face_features_positive(
             dominant="neutral",

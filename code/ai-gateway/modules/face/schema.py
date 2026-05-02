@@ -2,7 +2,31 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
+
+
+def _coerce_float(v: Any) -> float | None:
+    """DeepFace/TensorFlow often returns numpy scalars; `isinstance(x, float)` is False for those."""
+    if v is None or isinstance(v, bool):
+        return None
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(x):
+        return None
+    return x
+
+
+def _sanitize_emotion_probs(probs: dict[Any, Any]) -> dict[str, float]:
+    out: dict[str, float] = {}
+    for k, v in probs.items():
+        key = k if isinstance(k, str) else str(k)
+        fv = _coerce_float(v)
+        if fv is not None:
+            out[key] = fv
+    return out
 
 
 def is_no_face_deepface_error(exc: BaseException) -> bool:
@@ -28,26 +52,32 @@ def normalize_deepface_result(result: Any) -> dict[str, Any] | None:
     else:
         return None
 
-    dominant = obj.get("dominant_emotion")
-    probs = obj.get("emotion")
-    if not isinstance(dominant, str) or not isinstance(probs, dict):
+    dominant_raw = obj.get("dominant_emotion")
+    probs_raw = obj.get("emotion")
+    if not isinstance(probs_raw, dict):
+        return None
+    dominant = dominant_raw if isinstance(dominant_raw, str) else None
+    if dominant is None and dominant_raw is not None:
+        dominant = str(dominant_raw).strip() or None
+    if not dominant:
         return None
 
-    confidence_val = probs.get(dominant, 0)
-    if not isinstance(confidence_val, (int, float)):
+    probs = _sanitize_emotion_probs(probs_raw)
+    confidence_val = probs.get(dominant)
+    if confidence_val is None:
         confidence_val = 0.0
 
     region = obj.get("region")
     region_w = region_h = region_x = region_y = None
     if isinstance(region, dict):
-        rw = region.get("w")
-        rh = region.get("h")
-        if isinstance(rw, (int, float)) and isinstance(rh, (int, float)):
-            region_w, region_h = int(rw), int(rh)
-        rx = region.get("x", region.get("left"))
-        ry = region.get("y", region.get("top"))
-        if isinstance(rx, (int, float)) and isinstance(ry, (int, float)):
-            region_x, region_y = int(rx), int(ry)
+        rw = _coerce_float(region.get("w"))
+        rh = _coerce_float(region.get("h"))
+        if rw is not None and rh is not None:
+            region_w, region_h = int(round(rw)), int(round(rh))
+        rx = _coerce_float(region.get("x", region.get("left")))
+        ry = _coerce_float(region.get("y", region.get("top")))
+        if rx is not None and ry is not None:
+            region_x, region_y = int(round(rx)), int(round(ry))
 
     return {
         "dominant_emotion": dominant,

@@ -64,6 +64,8 @@ services:
       AI_GATEWAY_EMAIL: demo1@example.com
       AI_GATEWAY_PASSWORD: demo1pass
       AI_GATEWAY_MODULES_CONFIG: /app/modules.docker.json
+      CUDA_VISIBLE_DEVICES: "-1"
+      TF_CPP_MIN_LOG_LEVEL: "2"
     depends_on:
       backend:
         condition: service_healthy
