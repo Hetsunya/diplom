@@ -2,7 +2,7 @@ import os
 import time
 from typing import Any, Protocol
 
-from observability import log_event
+from observability import incr, log_event
 
 
 class Plugin(Protocol):
@@ -42,6 +42,9 @@ def _plugin_sort_key(p: Plugin) -> int:
 async def handle_message(msg: dict[str, Any], ws: Any) -> None:
     """Dispatch to all plugins that can handle the message (sorted by priority)."""
     global _LAST_CFG_POLL_MONO
+    if msg.get("type") == "audio":
+        incr("inbound_ws_audio")
+
     poll = float(os.getenv("AI_GATEWAY_CONFIG_POLL_SEC", "10"))
     if poll > 0:
         now = time.monotonic()

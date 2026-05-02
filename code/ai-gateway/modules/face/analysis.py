@@ -13,6 +13,7 @@ from feature_store import get_feature_store
 from gateway_config import get_gateway_config
 from modules.face.frame_quality import should_skip_blurry_frame
 from modules.face.params import FaceRuntimeParams
+from modules.face.region_util import clamp_face_region, ema_bbox
 from modules.face.schema import (
     build_face_features_guard,
     build_face_features_positive,
@@ -51,6 +52,7 @@ class FaceAnalysisPlugin:
 
     def __init__(self) -> None:
         self._last_inference_ts: dict[str, float] = {}
+        self._last_debug_bbox: dict[str, tuple[int, int, int, int]] = {}
 
     def metadata(self) -> dict[str, str]:
         cfg = get_gateway_config()
@@ -276,6 +278,21 @@ class FaceAnalysisPlugin:
             rw_i = region_w if isinstance(region_w, int) else None
             rh_i = region_h if isinstance(region_h, int) else None
 
+            fh, fw = int(img_bgr.shape[0]), int(img_bgr.shape[1])
+            clamp_plain: tuple[int, int, int, int] | None = None
+            if rx_i is not None and ry_i is not None and rw_i is not None and rh_i is not None:
+                clamp_plain = clamp_face_region(
+                    rx_i,
+                    ry_i,
+                    rw_i,
+                    rh_i,
+                    fw,
+                    fh,
+                    max_area_frac=fp.debug_max_face_area_frac,
+                )
+            rv_w = clamp_plain[2] if clamp_plain else None
+            rv_h = clamp_plain[3] if clamp_plain else None
+
             skip_reason: str | None = None
             face_features = None
             if confidence_val < fp.min_confidence:
@@ -285,8 +302,8 @@ class FaceAnalysisPlugin:
                     dominant=str(dominant),
                     probs=probs,
                     confidence=confidence_val,
-                    region_w=rw_i,
-                    region_h=rh_i,
+                    region_w=rv_w,
+                    region_h=rv_h,
                     min_face_side_px=fp.min_face_side_px,
                 )
                 if face_features is None:
@@ -295,23 +312,33 @@ class FaceAnalysisPlugin:
             gate_passed = face_features is not None
 
             if fp.emit_debug_face:
+                dx = dy = dw = dh = None
+                if clamp_plain:
+                    bx = clamp_plain
+                    alpha = fp.debug_bbox_smooth_alpha
+                    if alpha > 0:
+                        bx = ema_bbox(self._last_debug_bbox.get(key), clamp_plain, alpha)
+                        self._last_debug_bbox[key] = bx
+                    else:
+                        self._last_debug_bbox[key] = bx
+                    dx, dy, dw, dh = bx
                 await self._emit_face_debug(
                     ws=ws,
                     session_id=session_id,
                     participant_id=participant_id,
                     ts=ts,
                     trace_id=trace_id,
-                    frame_w=int(img_bgr.shape[1]),
-                    frame_h=int(img_bgr.shape[0]),
+                    frame_w=fw,
+                    frame_h=fh,
                     dominant=str(dominant),
                     model_confidence=confidence_val,
                     gate_passed=gate_passed,
                     skip_reason=skip_reason,
                     min_confidence=fp.min_confidence,
-                    region_x=rx_i,
-                    region_y=ry_i,
-                    region_w=rw_i,
-                    region_h=rh_i,
+                    region_x=dx,
+                    region_y=dy,
+                    region_w=dw,
+                    region_h=dh,
                 )
 
             if skip_reason == "low_confidence":

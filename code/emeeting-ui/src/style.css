@@ -756,26 +756,22 @@ footer {
     background: #000;
 }
 
-/* Face debug overlay (?faceDebug=1): align bbox with decoded JPEG frame (contain). */
-.tile-media--face-debug .tile-media__video {
-    object-fit: contain;
-}
-
 .face-debug-box {
     position: absolute;
-    border: 2px solid rgba(46, 230, 140, 0.95);
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+    border: 1.5px solid rgba(46, 230, 140, 0.92);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
     pointer-events: none;
     z-index: 3;
     box-sizing: border-box;
+    border-radius: 2px;
 }
 
 .face-debug-hud {
     position: absolute;
-    left: 8px;
-    top: 36px;
+    left: 6px;
+    top: 32px;
     z-index: 4;
-    font-size: 10px;
+    font-size: 9px;
     font-family: ui-monospace, monospace;
     color: #c8ffd8;
     background: rgba(0, 0, 0, 0.58);

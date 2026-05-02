@@ -47,15 +47,27 @@ export const useMediaStream = () => {
     const video = videoRef.current;
     if (!video || video.videoWidth === 0) return null;
 
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    /** Downscale for WS → faster DeepFace + tighter realtime bbox overlay */
+    const maxDim = 640;
+    let dw = vw;
+    let dh = vh;
+    if (vw > maxDim || vh > maxDim) {
+      const s = maxDim / Math.max(vw, vh);
+      dw = Math.max(1, Math.round(vw * s));
+      dh = Math.max(1, Math.round(vh * s));
+    }
+
     const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = dw;
+    canvas.height = dh;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    ctx.drawImage(video, 0, 0);
-    return canvas.toDataURL("image/jpeg", 0.6);
+    ctx.drawImage(video, 0, 0, dw, dh);
+    return canvas.toDataURL("image/jpeg", 0.52);
   };
 
   const toggleMic = () => {

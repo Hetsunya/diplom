@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { CSSProperties } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useMediaStream } from "../hooks/useMediaStream";
 import { useMeetingWebSocket } from "../features/meeting/useMeetingWebSocket";
 import { useMeetingStore } from "../features/meeting/useMeetingStore";
@@ -159,35 +159,36 @@ function parseFaceDebugPayload(p: Record<string, unknown>): FaceDebugPayload | n
   };
 }
 
-/** Map frame pixels → CSS box inside `.tile-media` (16:9, video `object-fit: contain`). */
-function faceDebugOverlayStyle(
+/**
+ * `.tile-media` is 16:9; `<video>` uses `object-fit: cover` → map JPEG frame pixels to tile %.
+ */
+function faceDebugOverlayStyleCover(
   region: { x: number; y: number; w: number; h: number },
   frameW: number,
   frameH: number
 ): CSSProperties {
-  const boxW = 1;
-  const boxH = 9 / 16;
-  const s = Math.min(boxW / frameW, boxH / frameH);
-  const dispW = frameW * s;
-  const dispH = frameH * s;
-  const ox = (boxW - dispW) / 2;
-  const oy = (boxH - dispH) / 2;
-  const left = ox + region.x * s;
-  const top = oy + region.y * s;
-  const w = region.w * s;
-  const h = region.h * s;
+  const cw = 1;
+  const ch = 9 / 16;
+  const scale = Math.max(cw / frameW, ch / frameH);
+  const dispW = frameW * scale;
+  const dispH = frameH * scale;
+  const ox = (cw - dispW) / 2;
+  const oy = (ch - dispH) / 2;
+  const left = ox + region.x * scale;
+  const top = oy + region.y * scale;
+  const w = region.w * scale;
+  const h = region.h * scale;
   return {
     left: `${left * 100}%`,
-    top: `${(top / boxH) * 100}%`,
+    top: `${(top / ch) * 100}%`,
     width: `${w * 100}%`,
-    height: `${(h / boxH) * 100}%`,
+    height: `${(h / ch) * 100}%`,
   };
 }
 
 const VideoMeet = () => {
   const { id = "" } = useParams(); // session ID
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const getOrCreateParticipant = () => {
     const existingId = sessionStorage.getItem("participant_id") || localStorage.getItem("participant_id");
     if (existingId) return existingId;
@@ -240,10 +241,6 @@ const VideoMeet = () => {
   const [faceDebugByParticipant, setFaceDebugByParticipant] = useState<
     Record<string, FaceDebugPayload>
   >({});
-
-  const faceDebugUi =
-    searchParams.get("faceDebug") === "1" ||
-    (typeof localStorage !== "undefined" && localStorage.getItem("emeeting_face_debug") === "1");
 
   useEffect(() => {
     resetMeetingStore();
@@ -467,17 +464,20 @@ const VideoMeet = () => {
     ])
   );
 
-  // Отправка кадра каждые 2 секунды
+  /** Трекинг лица/эмоций: чем реже кадры — тем «деревяннее» рамка (раньше было 2000 ms). */
+  const FRAME_CAPTURE_MS = 320;
+
   useEffect(() => {
-    const timer = setInterval(() => {
+    if (!id || !mediaReady || !camEnabled) return;
+
+    const timer = window.setInterval(() => {
       const frame = captureFrame();
       if (!frame) return;
-
       send("frame", { frame });
-    }, 2000);
+    }, FRAME_CAPTURE_MS);
 
-    return () => clearInterval(timer);
-  }, [captureFrame, send]);
+    return () => window.clearInterval(timer);
+  }, [id, mediaReady, camEnabled, captureFrame, send]);
 
   const emotionToClass = (emotion: Emotion) => {
     switch (emotion) {
@@ -558,12 +558,11 @@ const VideoMeet = () => {
               const isSelf = p.id === participantId;
               const showMicOff = isSelf && !micEnabled;
               const showCamOff = isSelf && !camEnabled;
-              const faceDbg = faceDebugUi ? faceDebugByParticipant[p.id] : undefined;
+              const faceDbg = faceDebugByParticipant[p.id];
+              const showFaceDebugHud = Boolean(faceDbg && isSelf);
               return (
                 <div key={p.id} className="video-tile">
-                  <div
-                    className={`tile-media ${faceDebugUi && isSelf ? "tile-media--face-debug" : ""}`}
-                  >
+                  <div className="tile-media">
                     {isSelf ? (
                       <>
                         <video
@@ -580,12 +579,12 @@ const VideoMeet = () => {
                       </div>
                     )}
 
-                    {faceDbg && (
+                    {showFaceDebugHud && faceDbg && (
                       <>
                         {faceDbg.region && (
                           <div
                             className="face-debug-box"
-                            style={faceDebugOverlayStyle(
+                            style={faceDebugOverlayStyleCover(
                               faceDbg.region,
                               faceDbg.frameW,
                               faceDbg.frameH

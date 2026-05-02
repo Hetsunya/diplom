@@ -23,16 +23,18 @@
       "provider": "deepface",
       "model": "emotion-v1",
       "params": {
-        "min_interval_sec": 0.2,
+        "min_interval_sec": 0.05,
         "min_confidence": 5.0,
         "enforce_detection": false,
-        "detector_backend": "opencv",
+        "detector_backend": "ssd",
         "align": false,
         "min_laplacian_var": 0,
         "min_face_side_px": 0,
         "emit_no_face_face_analysis": false,
-        "max_concurrent_inferences": 2,
-        "emit_debug_face": true
+        "max_concurrent_inferences": 1,
+        "emit_debug_face": true,
+        "debug_bbox_smooth_alpha": 0.92,
+        "debug_max_face_area_frac": 0.42
       }
     },
     "report": {

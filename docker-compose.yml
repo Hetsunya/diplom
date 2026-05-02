@@ -60,10 +60,15 @@ services:
     profiles: ["ai"]
     environment:
       BACKEND_WS_BASE_URL: ws://backend:8080
+      # Must match numeric id in `/sessions/:id` that the browser joins; otherwise gateway never sees mic/frames.
       SESSION_ID: ${AI_GATEWAY_SESSION_ID:-1}
       AI_GATEWAY_EMAIL: demo1@example.com
       AI_GATEWAY_PASSWORD: demo1pass
       AI_GATEWAY_MODULES_CONFIG: /app/modules.docker.json
+      # Incoming WS JSON (`audio` with base64 WebM) can exceed defaults; see ws_client.SessionWSClient.
+      AI_GATEWAY_WS_MAX_MSG_BYTES: "${AI_GATEWAY_WS_MAX_MSG_BYTES:-54525952}"
+      AI_GATEWAY_WS_PING_INTERVAL: "${AI_GATEWAY_WS_PING_INTERVAL:-25}"
+      AI_GATEWAY_WS_PING_TIMEOUT: "${AI_GATEWAY_WS_PING_TIMEOUT:-300}"
       CUDA_VISIBLE_DEVICES: "-1"
       TF_CPP_MIN_LOG_LEVEL: "2"
     depends_on:
