@@ -15,15 +15,17 @@ def generate_report(
     features: list[dict[str, Any]],
     config_snapshot: dict[str, Any],
     stage: str,
+    fusion: dict[str, Any] | None = None,
     timeout_sec: float = 60.0,
 ) -> dict[str, Any] | None:
     if not own_nn_url or not own_nn_url.startswith("http"):
         return None
-    body = {
+    body: dict[str, Any] = {
         "session_id": session_id,
         "stage": stage,
         "features": features,
         "config_snapshot": config_snapshot,
+        "fusion": fusion if isinstance(fusion, dict) else {},
     }
     data = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(

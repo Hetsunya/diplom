@@ -38,7 +38,8 @@
       "model": "report-v1",
       "params": {
         "interval_sec": 30,
-        "own_nn_url": ""
+        "own_nn_url": "",
+        "report_bucket_sec": 30
       }
     }
   }

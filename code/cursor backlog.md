@@ -308,7 +308,7 @@ P0 — AI modules implementation (единая папка модулей)
 | BL-031 | **сделано (v1)** | `normalize.py` + `features.py` + `transcription.py`; `speech_service.py` (retry/CB); юнит-тесты `tests/test_text_*.py`; тяжёлый NLP — вне v1 |
 | BL-032 | **частично** | `modules/audio/signal.py`: energy/zcr/pause/jitter/shimmer + `modules.audio.params`; `pipeline.py`: интервалы между чанками; WebM/Opus без demux — эвристика по сырым байтам |
 | BL-033 | **сделано (v2 baseline)** | `modules/face/schema.py`, `frame_quality.py`, `params.py`, `analysis.py`; `report_loop` читает `data.face_features`; UI игнор `face_detected=false` |
-| BL-034 | **частично** | `ai-gateway/report_loop.py` + `feature_store.py`; полноценный fusion/windowing — впереди |
+| BL-034 | **сделано (v1 orchestrator)** | `modules/report/*` + `report_loop.py` (partial + **final** on cancel); `fusion` + `report_bucket_sec`; `own_nn_client` POST с `fusion` |
 | BL-035 | **частично** | фильтры `module`/`participant_id`/`from`/`to`/`limit` + доступ: организатор vs гость (`participant_id` обязателен); отчёт только организатору; audit-лог `[ANALYSIS_ACCESS]`; роли host/co-host из meeting-сервиса без отдельной таблицы — не делали |
 | BL-036 | **частично** | `smoke_ws_emotion_test.py` (face+emotion), `e2e_analysis_readpath_check.py`; полный hybrid smoke — впереди |
 | BL-037 | не сделано | prod readiness AI |
@@ -361,7 +361,7 @@ BL-033 [x]: Face module v2 (emotion alias + quality guards)
 DoD: UI совместим с legacy `emotion`, а новый канал `face_analysis` используется для агрегаторов/отчетов.
 Статус (2026-05): конфиг `enforce_detection`, `detector_backend`, `align`, `min_laplacian_var`, `min_face_side_px`, `emit_no_face_face_analysis`; blur/small-region/low-confidence — фильтры; опционально `face_analysis` без legacy при `no_face` (если включён emit); `_stub_report` учитывает `data.face_features` как в gateway; `VideoMeet` не парсит эмоцию при `face_detected=false`.
 
-BL-034 [ ]: Report orchestrator v1 (fusion text+audio+face -> own NN)
+BL-034 [x]: Report orchestrator v1 (fusion text+audio+face -> own NN)
 
 Цель: собрать 3 канала в единый отчетный пайплайн.
 Файлы: `ai-gateway/modules/report/**`, `ai-gateway/feature_store.py`, `ai-gateway/own_nn_client.py`, `docs/ANALYSIS_WS_CONTRACTS.md`
@@ -371,6 +371,7 @@ BL-034 [ ]: Report orchestrator v1 (fusion text+audio+face -> own NN)
 - вызов собственной нейронки (`own_nn_url`) + fallback stub
 Оценка: 2–3 дн
 DoD: по завершении сессии есть финальный `analysis_report`, структура совпадает с контрактом, конфиг-снимок сохранен.
+Статус (2026-05): `compute_fusion_meta` + `build_stub_report` (`fusion` в теле `report`); `resolve_report_body` / `build_report_ws_message`; при **отмене** `report_loop` (закрытие WS) отправляется `analysis_report` с `stage=final`; параметр `report_bucket_sec`; тесты `tests/test_report_windowing.py`. Полный NN fusion внешнего сервиса — по контракту POST `/v1/report` + поле `fusion`.
 
 BL-035 [~]: Backend RBAC + API фильтры для аналитики
 

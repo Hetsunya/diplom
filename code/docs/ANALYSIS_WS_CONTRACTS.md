@@ -69,6 +69,7 @@ Current stub orchestrator may include inside `report` (optional):
 - `speech_ratio` (number, 0..1 proxy)
 - `participants[]` entries with fields such as
   `audio_chunks`, `avg_speech_activity_proxy`, `avg_bitrate_kbps`, `last_emotion`, `last_transcript`
+- `fusion` (object, optional): `bucket_sec`, `trace_ids_by_participant`, `buckets[]` (per-window kind counts + trace_ids) — produced by the gateway stub / merged from stub when the remote NN omits it
 
 ## trace_id
 
