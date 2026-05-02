@@ -6,6 +6,7 @@ Versioned migrations are stored in:
 
 Current version (see `migrations/up`):
 - through `007_analysis` (`analysis_event`, `analysis_report` tables for WS analytics persistence)
+- `008_session_chat` (`session_chat_message` for meeting text chat history)
 
 ## Auto-apply on fresh DB
 

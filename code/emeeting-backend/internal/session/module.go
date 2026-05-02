@@ -6,10 +6,12 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"emeeting/internal/analysis"
+	"emeeting/internal/chat"
 )
 
 type Module struct {
-	handler *Handler
+	handler   *Handler
+	chatHTTP  *chat.HTTPHandler
 }
 
 func NewModule(database *sql.DB) *Module {
@@ -17,8 +19,10 @@ func NewModule(database *sql.DB) *Module {
 	service := NewService(repo)
 	hub := NewSessionHub()
 	analysisSvc := analysis.NewService(database)
+	chatRepo := chat.NewRepository(database)
 	return &Module{
-		handler: NewHandler(service, hub, analysisSvc),
+		handler:  NewHandler(service, hub, analysisSvc, chatRepo),
+		chatHTTP: chat.NewHTTPHandler(chatRepo),
 	}
 }
 
@@ -26,5 +30,6 @@ func (m *Module) RegisterRoutes(router *gin.Engine) {
 	router.POST("/sessions", m.handler.Create)
 	router.GET("/sessions", m.handler.List)
 	router.GET("/sessions/:id", m.handler.Get)
+	router.GET("/sessions/:id/chat/messages", m.chatHTTP.ListMessages)
 	router.GET("/ws/sessions/:id", m.handler.WS)
 }

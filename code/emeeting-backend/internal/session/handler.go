@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"emeeting/internal/analysis"
+	"emeeting/internal/chat"
 	"emeeting/internal/models"
 )
 
@@ -18,6 +19,7 @@ type Handler struct {
 	service     Service
 	hub         Bus
 	analysisSvc *analysis.Service
+	chatRepo    *chat.Repository
 	wsMu        sync.RWMutex
 	wsMap       map[string]WSMessageHandler
 
@@ -25,11 +27,12 @@ type Handler struct {
 	connRoles map[int]map[*websocket.Conn]string
 }
 
-func NewHandler(service Service, hub Bus, analysisSvc *analysis.Service) *Handler {
+func NewHandler(service Service, hub Bus, analysisSvc *analysis.Service, chatRepo *chat.Repository) *Handler {
 	h := &Handler{
 		service:     service,
 		hub:         hub,
 		analysisSvc: analysisSvc,
+		chatRepo:    chatRepo,
 		wsMap:       make(map[string]WSMessageHandler),
 		connRoles: make(map[int]map[*websocket.Conn]string),
 	}

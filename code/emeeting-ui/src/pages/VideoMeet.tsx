@@ -10,6 +10,7 @@ import {
   type TranscriptLine,
 } from "../features/meeting/MeetingTranscriptRail";
 import { useMeetingAudioChunks } from "../features/meeting/useMeetingAudioChunks";
+import { getSessionChatMessages } from "../api/sessions";
 
 export type Emotion = "Happy" | "Neutral" | "Engaged" | "Focused" | "Surprised" | "Thoughtful";
 
@@ -166,6 +167,39 @@ const VideoMeet = () => {
     });
   }, [participantId, participantName, upsert]);
 
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await getSessionChatMessages(id, 150);
+        if (cancelled) return;
+        const mapped: ChatLine[] = rows.map((r) => ({
+          id: String(r.chat_message_id),
+          participantId: r.participant_id,
+          name: r.sender_name?.trim() || `Participant ${r.participant_id}`,
+          text: r.body,
+          at: r.created_at,
+        }));
+        setChatMessages((prev) => {
+          const byId = new Map<string, ChatLine>();
+          for (const m of mapped) byId.set(m.id, m);
+          for (const m of prev) {
+            if (!byId.has(m.id)) byId.set(m.id, m);
+          }
+          return Array.from(byId.values())
+            .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+            .slice(-200);
+        });
+      } catch {
+        // History is optional; live chat still works over WS.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
   const onAnalysisMessage = useCallback(
     (msg: unknown) => {
       if (typeof msg !== "object" || msg === null) return;
@@ -185,10 +219,16 @@ const VideoMeet = () => {
         const clientId = typeof p.client_id === "string" ? p.client_id : "";
         const tsRaw = (m as { timestamp?: unknown }).timestamp;
         const at = typeof tsRaw === "string" ? tsRaw : new Date().toISOString();
-        const id = clientId ? `${pid}:${clientId}` : `${pid}-${at}-${text.slice(0, 48)}`;
+        const mid = p.chat_message_id;
+        const id =
+          typeof mid === "number" && Number.isFinite(mid)
+            ? String(mid)
+            : clientId
+              ? `${pid}:${clientId}`
+              : `${pid}-${at}-${text.slice(0, 48)}`;
         setChatMessages((prev) => {
           if (prev.some((x) => x.id === id)) return prev;
-          return [...prev, { id, participantId: pid, name: dispName, text, at }].slice(-120);
+          return [...prev, { id, participantId: pid, name: dispName, text, at }].slice(-200);
         });
         return;
       }

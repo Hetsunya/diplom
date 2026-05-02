@@ -3,9 +3,11 @@ package session
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"emeeting/internal/analysis"
@@ -131,8 +133,70 @@ func (h *Handler) registerDefaultWSHandlers() {
 	h.RegisterWSHandler("join", joinHandler)
 	h.RegisterWSHandler("leave", leaveHandler)
 	h.RegisterWSHandler("end_meeting", endMeetingHandler)
-	// Participant text chat (UI); broadcast only — not persisted as analysis events.
-	h.RegisterWSHandler("chat_message", broadcastHandler)
+	h.RegisterWSHandler("chat_message", h.chatMessageHandler())
+}
+
+func wsPayloadString(m map[string]any, key string) string {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return ""
+	}
+	switch t := v.(type) {
+	case string:
+		return strings.TrimSpace(t)
+	case float64:
+		return strconv.FormatInt(int64(t), 10)
+	default:
+		return strings.TrimSpace(fmt.Sprintf("%v", v))
+	}
+}
+
+func parseChatInbound(payload any) (text, name, clientID string, ok bool) {
+	m, ok := payload.(map[string]any)
+	if !ok {
+		return "", "", "", false
+	}
+	text = wsPayloadString(m, "text")
+	if text == "" {
+		return "", "", "", false
+	}
+	name = wsPayloadString(m, "name")
+	clientID = wsPayloadString(m, "client_id")
+	return text, name, clientID, true
+}
+
+func (h *Handler) chatMessageHandler() WSMessageHandler {
+	return func(sessionID int, msg WSMessage) {
+		if h.chatRepo == nil {
+			return
+		}
+		text, name, clientID, ok := parseChatInbound(msg.Payload)
+		if !ok {
+			return
+		}
+		pid := strings.TrimSpace(msg.Participant)
+		if pid == "" {
+			return
+		}
+		res, err := h.chatRepo.AppendMessage(context.Background(), sessionID, pid, clientID, name, text)
+		if err != nil {
+			log.Printf("[WS] chat_message persist session=%d err=%v", sessionID, err)
+			return
+		}
+		if !res.Inserted {
+			return
+		}
+		out := map[string]any{
+			"text":            text,
+			"name":            name,
+			"chat_message_id": res.ChatMessageID,
+		}
+		if clientID != "" {
+			out["client_id"] = clientID
+		}
+		msg.Payload = out
+		h.hub.Broadcast(sessionID, msg)
+	}
 }
 
 func (h *Handler) dispatchWSMessage(sessionID int, msg WSMessage) {
