@@ -1,0 +1,99 @@
+"""Build `text_analysis` WS payloads from speech-service responses."""
+
+from __future__ import annotations
+
+import json
+from typing import Any, Literal, cast
+
+from adapters.speech_service import transcribe_audio_chunk
+from contracts import analysis_envelope, has_required_envelope_fields
+from feature_store import get_feature_store
+from gateway_config import ModuleCfg
+from observability import incr, log_event
+
+
+async def transcribe_and_emit_text_analysis(
+    *,
+    msg: dict[str, Any],
+    ws: Any,
+    text_mod: ModuleCfg,
+    trace_id: str,
+) -> None:
+    """POST audio to speech-service and emit `text_analysis` + feature_store push."""
+    session_id = msg.get("session_id")
+    participant_id = msg.get("participant_id")
+    ts = msg.get("timestamp")
+    payload = msg.get("payload") if isinstance(msg.get("payload"), dict) else {}
+
+    base_url = str(text_mod.params.get("speech_service_url") or "").strip()
+    if not base_url:
+        log_event("speech_skip", module="text", extra={"reason": "no speech_service_url"})
+        return
+
+    timeout_sec = float(text_mod.params.get("timeout_sec", 15))
+    retries = int(text_mod.params.get("retries", 2))
+    backoff_sec = float(text_mod.params.get("backoff_sec", 0.5))
+    cb_failures = int(text_mod.params.get("circuit_failure_threshold", 5))
+    cb_open_sec = float(text_mod.params.get("circuit_open_sec", 30.0))
+    text_ver = text_mod.model or "stub-v1"
+
+    result = transcribe_audio_chunk(
+        base_url,
+        session_id=int(session_id),
+        participant_id=str(participant_id),
+        trace_id=trace_id,
+        audio_payload=payload,
+        timeout_sec=timeout_sec,
+        retries=retries,
+        backoff_sec=backoff_sec,
+        circuit_failure_threshold=cb_failures,
+        circuit_open_sec=cb_open_sec,
+    )
+    if not isinstance(result, dict):
+        incr("text_analysis_errors")
+        return
+
+    if result.get("_error"):
+        log_event("speech_error", trace_id=trace_id, module="text", extra={"err": result["_error"]})
+        incr("text_analysis_errors")
+        return
+
+    transcript_partial = result.get("transcript_partial")
+    transcript_final = result.get("transcript_final")
+    stage_name = cast(
+        Literal["partial", "final"],
+        "final" if transcript_final else "partial",
+    )
+    text_out = {
+        "type": "text_analysis",
+        "session_id": session_id,
+        "participant_id": participant_id,
+        "payload": {
+            **analysis_envelope(
+                module="text",
+                version=text_ver,
+                stage=stage_name,
+                trace_id=trace_id,
+                extra={
+                    "transcript_partial": transcript_partial,
+                    "transcript_final": transcript_final,
+                    "language": result.get("language"),
+                    "text_features": result.get("text_features") or {},
+                },
+            ),
+        },
+        "timestamp": ts,
+    }
+    if not has_required_envelope_fields(text_out["payload"]):
+        incr("text_contract_invalid")
+        return
+    await ws.send(json.dumps(text_out))
+    get_feature_store().push(
+        int(session_id),
+        kind="text",
+        participant_id=str(participant_id),
+        trace_id=trace_id,
+        data={"payload": text_out["payload"]},
+    )
+    incr("text_analysis_sent")
+    log_event("text_analysis", trace_id=trace_id, module="text")

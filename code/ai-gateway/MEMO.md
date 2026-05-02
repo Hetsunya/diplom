@@ -17,6 +17,9 @@ Current source entrypoint: `main.py`.
   - `modules.text.params.timeout_sec`
   - `modules.text.params.retries`
   - `modules.text.params.backoff_sec`
+- ASR circuit breaker (see `adapters/speech_service.py`):
+  - `modules.text.params.circuit_failure_threshold` (default 5)
+  - `modules.text.params.circuit_open_sec` (default 30)
 - Report: `modules.report.params.interval_sec` (min 5s enforced in code), `own_nn_url` optional (`POST {url}/v1/report`).
 - Face quality/performance controls:
   - `modules.face.params.min_interval_sec` (throttling per participant)
@@ -29,17 +32,17 @@ Loader: [`gateway_config.py`](gateway_config.py). Snapshot for reports: `config_
 1. `main.py` loads config (`load_gateway_config` / `set_gateway_config`), builds WS URL from `BACKEND_WS_BASE_URL` + `SESSION_ID`.
 2. `SessionWSClient` (`ws_client.py`): token via `POST /auth/token`, `Authorization` on WS, reconnect backoff.
 3. If `report` module enabled: background `report_loop` sends periodic `analysis_report_partial` on the same socket.
-4. `handle_message` (`handlers.py`): runs **all** plugins whose `can_handle` matches, sorted by `priority` (lower runs first).
+4. `handle_message` (`handlers.py`): runs **all** analyzers from `modules/registry.py` whose `can_handle` matches, sorted by `priority` (lower runs first). Legacy `plugins/*.py` re-export the same instances for compatibility.
 5. Plugins send results with `ws.send(...)`; see v1 contracts in [`../docs/ANALYSIS_WS_CONTRACTS.md`](../docs/ANALYSIS_WS_CONTRACTS.md) and [`CONTRACTS.md`](CONTRACTS.md).
 6. Before sending `face_analysis` / `audio_analysis` / `text_analysis`, gateway validates required v1 envelope fields: `module`, `version`, `stage`, `trace_id`.
 
-## Implemented Plugins
+## Implemented analyzers (`modules/`)
 
-| Plugin | Priority | Behavior |
+| Module | Priority | Behavior |
 |--------|----------|----------|
-| `ping.py` | 50 | Metrics + log for backend heartbeats |
-| `frame.py` | 100 | DeepFace → `face_analysis` (v1 envelope) + legacy `emotion` |
-| `audio.py` | 150 | Optional `audio_analysis` stub; optional speech HTTP → `text_analysis` |
+| `modules/ping/handler.py` | 50 | Metrics + log for backend heartbeats |
+| `modules/face/analysis.py` | 100 | DeepFace → `face_analysis` (v1 envelope) + legacy `emotion` |
+| `modules/audio/pipeline.py` | 150 | Optional `audio_analysis` stub; optional speech HTTP → `text_analysis` (`modules/text/transcription.py`) |
 
 ## Observability
 
@@ -64,8 +67,10 @@ Loader: [`gateway_config.py`](gateway_config.py). Snapshot for reports: `config_
      - `GET /sessions/:id/analysis/events`
      - `GET /sessions/:id/analysis/report`
 
-## How To Add a New Plugin
+## How To Add a New Analyzer
 
-1. Add `plugins/<name>.py` exporting `plugin = ...` with `name`, `priority`, `can_handle`, `async process`.
-2. Follow v1 envelope in outbound `payload` (`module`, `stage`, `trace_id`, `version`) — document in `docs/ANALYSIS_WS_CONTRACTS.md`.
-3. Register new `type` on backend in `internal/session/ws_handler.go` + `internal/analysis` if it should be persisted.
+1. Add a package under `modules/<domain>/` exporting `plugin = ...` with `name`, `priority`, `can_handle`, `async process`, optional `metadata()`.
+2. Register it in `modules/registry.py` (`iter_plugins`).
+3. Optionally add `plugins/<name>.py` shim re-exporting `plugin` if external docs still reference `plugins/`.
+4. Follow v1 envelope in outbound `payload` (`module`, `stage`, `trace_id`, `version`) — document in `docs/ANALYSIS_WS_CONTRACTS.md`.
+5. Register new `type` on backend in `internal/session/ws_handler.go` + `internal/analysis` if it should be persisted.

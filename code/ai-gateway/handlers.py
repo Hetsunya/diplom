@@ -1,6 +1,3 @@
-from pathlib import Path
-import pkgutil
-from importlib import import_module
 from typing import Any, Protocol
 
 
@@ -14,23 +11,13 @@ class Plugin(Protocol):
 
 def _load_plugins() -> list[Plugin]:
     """
-    Auto-discover modules in `plugins/*` and collect plugin instances.
+    Load analyzers from `modules/` (see `modules/registry.py`).
 
-    A new plugin should be added as a single file into `plugins/`.
+    Legacy `plugins/*` files are thin shims for compatibility only.
     """
-    plugins: list[Plugin] = []
+    from modules.registry import iter_plugins
 
-    package = "plugins"
-    plugins_dir = Path(__file__).resolve().parent / "plugins"
-    for mod in pkgutil.iter_modules([str(plugins_dir)]):
-        module_name = f"{package}.{mod.name}"
-        imported = import_module(module_name)
-
-        instance = getattr(imported, "plugin", None)
-        if instance is not None:
-            plugins.append(instance)
-
-    return plugins
+    return list(iter_plugins())
 
 
 _PLUGINS: list[Plugin] = []

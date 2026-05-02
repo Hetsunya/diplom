@@ -298,16 +298,16 @@ P0 — AI modules implementation (единая папка модулей)
 
 | ID | Фактический статус | Куда смотреть в репо |
 |----|--------------------|----------------------|
-| BL-030 | не сделано | Плагины всё ещё в `ai-gateway/plugins/`, папки `ai-gateway/modules/` нет |
-| BL-031 | **частично** | `ai-gateway/adapters/speech_service.py` (retry), `plugins/audio.py` → `text_analysis`; полный вынос в `modules/text` + circuit-breaker — впереди |
-| BL-032 | не сделано | `audio_analysis` пока baseline stub в `plugins/audio.py` |
-| BL-033 | **частично** | `plugins/frame.py`: `face_analysis` + legacy `emotion`, throttling `min_interval_sec`, порог `min_confidence`; вынос в `modules/face` — впереди |
+| BL-030 | **сделано** | `ai-gateway/modules/**` (face/audio/text/ping/report), `handlers` грузит `modules.registry`; `plugins/*` — тонкие shims |
+| BL-031 | **частично** | `modules/text/transcription.py` + `adapters/speech_service.py` (retry + **circuit-breaker** по `speech_service_url`); полноценные `text_features`/NLP — впереди |
+| BL-032 | не сделано | `audio_analysis` baseline proxy в `modules/audio/signal.py` + `pipeline.py` |
+| BL-033 | **частично** | `modules/face/analysis.py`: `face_analysis` + legacy `emotion`, throttling, `min_confidence`; quality guards/alias-контракт в DoD — впереди |
 | BL-034 | **частично** | `ai-gateway/report_loop.py` + `feature_store.py`; полноценный fusion/windowing — впереди |
 | BL-035 | не сделано | REST есть, RBAC/фильтры `from/to/module` — нет |
 | BL-036 | **частично** | `smoke_ws_emotion_test.py` (face+emotion), `e2e_analysis_readpath_check.py`; полный hybrid smoke — впереди |
 | BL-037 | не сделано | prod readiness AI |
 
-BL-030 [ ]: Единый layout для AI-модулей в одной папке
+BL-030 [x]: Единый layout для AI-модулей в одной папке
 
 Цель: стандартизовать структуру и убрать размазывание логики по разным местам.
 Файлы: `ai-gateway/modules/**` (новые), `ai-gateway/handlers.py`, `ai-gateway/gateway_config.py`, `ai-gateway/MEMO.md`
@@ -317,6 +317,7 @@ BL-030 [ ]: Единый layout для AI-модулей в одной папк�
 - общий интерфейс модуля (`can_handle/process` + metadata: module/provider/model/version)
 Оценка: 1 дн
 DoD: все активные анализаторы грузятся из `ai-gateway/modules/**`, старые `plugins/*` либо проксируют, либо удалены без потери функционала.
+Статус: `handlers` → `modules.registry.iter_plugins()`; `plugins/*.py` — shims.
 
 BL-031 [ ]: Text module v1 (ASR + NLP поверх транскрибации)
 

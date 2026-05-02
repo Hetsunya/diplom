@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 import urllib.error
 import urllib.request
 from typing import Any
+
+_lock = threading.Lock()
+# Per speech-service base URL: consecutive failures and circuit-open deadline (monotonic sec).
+_circuit: dict[str, tuple[int, float]] = {}
 
 
 def transcribe_audio_chunk(
@@ -19,9 +24,14 @@ def transcribe_audio_chunk(
     timeout_sec: float = 15.0,
     retries: int = 2,
     backoff_sec: float = 0.5,
+    circuit_failure_threshold: int = 5,
+    circuit_open_sec: float = 30.0,
 ) -> dict[str, Any] | None:
     """
     POST {base_url}/v1/transcribe
+
+    Optional circuit breaker: after `circuit_failure_threshold` consecutive failures,
+    returns fast with `_error` / `_circuit_open` for `circuit_open_sec` seconds.
 
     Expected JSON body:
       { "session_id", "participant_id", "trace_id", "audio": { ... same as WS audio payload ... } }
@@ -34,7 +44,18 @@ def transcribe_audio_chunk(
         "text_features": { ... }
       }
     """
-    url = base_url.rstrip("/") + "/v1/transcribe"
+    key = base_url.rstrip("/")
+    now = time.monotonic()
+    with _lock:
+        fails, open_until = _circuit.get(key, (0, 0.0))
+        if now < open_until:
+            return {
+                "_error": "circuit_open",
+                "_circuit_open": True,
+                "_open_until": open_until,
+            }
+
+    url = key + "/v1/transcribe"
     body = {
         "session_id": session_id,
         "participant_id": participant_id,
@@ -53,10 +74,23 @@ def transcribe_audio_chunk(
         try:
             with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
                 raw = resp.read().decode("utf-8")
-                return json.loads(raw)
+                out = json.loads(raw)
+                with _lock:
+                    _circuit[key] = (0, 0.0)
+                return out
         except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as e:
             if attempt >= retries:
-                return {"_error": str(e), "_attempts": attempt + 1}
+                err = {"_error": str(e), "_attempts": attempt + 1}
+                with _lock:
+                    prev = _circuit.get(key, (0, 0.0))
+                    nfails = prev[0] + 1
+                    open_until = prev[1]
+                    thr = max(1, int(circuit_failure_threshold))
+                    if nfails >= thr:
+                        open_until = time.monotonic() + max(1.0, float(circuit_open_sec))
+                        nfails = 0
+                    _circuit[key] = (nfails, open_until)
+                return err
             sleep_for = backoff_sec * (2**attempt)
             time.sleep(sleep_for)
             attempt += 1
