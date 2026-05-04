@@ -1,6 +1,8 @@
 # Материалы для отчёта по практике: система EMeeting
 
-Документ сжимает **техническую базу**, **алгоритмы**, **схему взаимодействия сервисов** и **ориентиры по коду** монорепозитория. Пути файлов указаны **от каталога `code/`**, если не сказано иное. Полные контракты и планы — в `docs/`, runbook — в `README.md` в корне репозитория `diplom/`.
+Документ сжимает **техническую базу**, **алгоритмы**, **схему взаимодействия сервисов** и **ориентиры по коду** монорепозитория. **Корень репозитория:** `diplom/` (этот файл — `diplom/practice.md`); **исходный код** — в `diplom/code/`. Пути к файлам в таблицах ниже — **от `code/`**, если не указано иначе. Полные контракты и планы — в `code/docs/`, runbook — в `diplom/README.md`.
+
+Ранний прототип интерфейса (до текущей реализации) можно сопоставить с материалами в каталоге **`вкр/`** (например, `вкр/ui/схема ui.drawio`). Нижеследующие схемы отражают **актуальную** архитектуру стека EMeeting.
 
 ---
 
@@ -416,4 +418,240 @@ def _stub_response(req: TranscribeRequest) -> dict[str, Any]:
 
 ---
 
-*Файл подготовлен как консолидированная шпаргалка; при изменении кода обновляйте разделы 5–8 по актуальным коммитам.*
+## 12. Схемы моделирования (BPMN, IDEF0, DFD, ER, логическая БД)
+
+Диаграммы ниже в формате **Mermaid** (рендер в GitHub, GitLab, VS Code / Cursor с предпросмотром Markdown) и **ASCII** для IDEF0. При требовании кафедры к «родным» BPMN/DFD в **draw.io / Visio** — импортируйте как подложку или перерисуйте по этим моделям.
+
+### 12.1. BPMN (основной сценарий: от входа до встречи и аналитики)
+
+Упрощённая модель с дорожками **Участник**, **emeeting-backend**, **Внешние сервисы** (профиль `ai`). Шлюз XOR: опциональное подключение ASR/gateway.
+
+```mermaid
+flowchart TB
+  subgraph LaneU["Дорожка: Участник / организатор"]
+    A([Старт]) --> B[Открыть приложение]
+    B --> C{Есть валидный JWT?}
+    C -->|Нет| D[POST /auth/login]
+    D --> E[Получить access + refresh]
+    E --> C
+    C -->|Да| F[REST: сессии / открыть встречу]
+    F --> G[WebSocket /ws/sessions/:id]
+    G --> H[join + медиа / чат]
+    H --> I[leave или end_meeting]
+    I --> K([Конец])
+  end
+
+  subgraph LaneB["Дорожка: emeeting-backend"]
+    HB[join → user_joined +\nparticipants_snapshot]
+    IB[broadcast + опционально\nзапись analysis_event]
+    JB[meeting_ended / disconnect]
+  end
+
+  subgraph LaneX["Дорожка: ai-gateway + speech-service\n(compose profile ai)"]
+    IX[Приём audio / frame]
+    IY[ASR HTTP + плагины]
+  end
+
+  H -.-> HB
+  H -.-> IB
+  H -.-> IX
+  IX --> IY
+  IY -.->|события аналитики в комнату| IB
+  I -.-> JB
+```
+
+**События и артефакты:** JWT; сообщения WS (`join`, `frame`, `audio`, `chat_message`); при включённом AI — HTTP в `speech-service`, обратные WS-сообщения по контракту `docs/ANALYSIS_WS_CONTRACTS.md`.
+
+---
+
+### 12.2. IDEF0, контекстная диаграмма A-0 (без декомпозиции)
+
+Одна функция верхнего уровня — **«Обеспечить проведение веб-конференции и сбор аналитики в системе EMeeting»**. Стрелки ICOM:
+
+| Тип | Содержание (по смыслу реализации) |
+|-----|-----------------------------------|
+| **Входы (Input)** | Учётные данные пользователя; команды и медиаданные (кадры, аудиочанки, текст чата); параметры сессии (название, время, тип). |
+| **Выходы (Output)** | Отображение встречи и списков в UI; сохранённые записи аналитики и чата; агрегированные отчёты; уведомления участникам по WS. |
+| **Управление (Control)** | Политики безопасности (JWT, rate limit логина); контракты REST/WS; настройки CORS и окружения Docker. |
+| **Механизмы (Mechanism)** | Браузер (React); сервер `emeeting-backend` (Go); СУБД PostgreSQL; при включении — `ai-gateway` (Python), `speech-service` (FastAPI). |
+
+ASCII-вид (для вставки в отчёт, если Markdown не рендерится):
+
+```
+                    ┌── Управление (Control) ──────────────────────────────┐
+                    │ JWT, rate limit, контракты API/WS, CORS, compose    │
+                    └──────────────────────────┬──────────────────────────┘
+                                               │
+  Входы (Input)                                ▼
+  креды, медиа,          ┌─────────────────────────────────────────┐
+  команды WS,      ───►  │  A-0: EMeeting — веб-конференция       │
+  данные сессии          │      и аналитика                        │
+                         └─────────────────┬───────────────────────┘
+                                           │
+                    ┌──────────────────────┴──────────────────────┐
+                    ▼                                             ▼
+           Выходы (Output)                               Механизмы (Mechanism)
+           UI, отчёты, записи БД, WS-события              React, Gin, PostgreSQL,
+                                                          ai-gateway, speech-service
+```
+
+---
+
+### 12.3. DFD (потоки данных)
+
+#### Уровень 0 (контекст)
+
+```mermaid
+flowchart LR
+  U([Пользователь\nбраузер])
+  SYS[[П0: Система\nEMeeting]]
+  DB[(D1: PostgreSQL)]
+  AI[[Внешний контур AI\n gateway + ASR]]
+
+  U -->|запросы REST, WS,\nмедиа| SYS
+  SYS -->|ответы, события WS| U
+  SYS <-->|SQL| DB
+  SYS <-->|опционально:\nHTTP / WS события| AI
+```
+
+#### Уровень 1 (основные процессы и хранилища)
+
+```mermaid
+flowchart TB
+  U([Пользователь])
+
+  subgraph Stores["Хранилища данных"]
+    D_AUTH[(D2: auth_user,\nrefresh_tokens,\nauth_events)]
+    D_SESS[(D3: session,\nmeeting_events,\nmeeting_participant)]
+    D_ANA[(D4: analysis_event,\nanalysis_report)]
+    D_CHAT[(D5: session_chat_message)]
+  end
+
+  P1[[P1:\nАутентификация]]
+  P2[[P2:\nУправление сессиями]]
+  P3[[P3:\nКомната встречи WS]]
+  P4[[P4:\nПерсистенция аналитики]]
+  P5[[P5:\nЧат сессии]]
+  P6[[P6:\nОтчёты / выдача]]
+
+  U -->|логин| P1
+  P1 <-->|чтение/запись| D_AUTH
+  U -->|CRUD сессий| P2
+  P2 <-->|SQL| D_SESS
+  U -->|WS медиа/чат| P3
+  P3 <-->|участники, статус| D_SESS
+  P3 -->|сохранить события| P4
+  P4 <-->|вставка/выборка| D_ANA
+  P3 -->|сообщения чата| P5
+  P5 <-->|SQL| D_CHAT
+  U -->|запрос отчёта| P6
+  P6 <-->|SQL| D_ANA
+  P6 -->|JSON отчёта| U
+```
+
+*Примечание:* внешний контур `ai-gateway` на DFD уровня 1 можно показать отдельным процессом **P7 «Обогащение аналитики»** между P3 и P4; здесь он свёрнут в поток «WS → gateway → обратно в комнату» для краткости.
+
+---
+
+### 12.4. ER-диаграмма (сущности и связи по миграциям)
+
+```mermaid
+erDiagram
+  auth_user {
+    int auth_user_id PK
+    string email UK
+    string password_hash
+    boolean is_active
+    timestamptz created_at
+    int failed_login_attempts
+    timestamptz locked_until
+  }
+  refresh_tokens {
+    bigint refresh_token_id PK
+    string token_hash UK
+    int user_id FK
+    timestamptz expires_at
+    timestamptz revoked_at
+  }
+  auth_events {
+    bigint auth_event_id PK
+    int auth_user_id FK
+    string event_type
+    timestamptz created_at
+  }
+  session {
+    int session_id PK
+    string title
+    string session_type
+    timestamp start_datetime
+    int created_by FK
+    string meeting_status
+  }
+  meeting_events {
+    bigint meeting_event_id PK
+    int session_id FK
+    string event_type
+    jsonb payload
+  }
+  meeting_participant {
+    int meeting_participant_id PK
+    int session_id FK
+    int auth_user_id FK
+    string role_code
+    boolean is_active
+  }
+  analysis_event {
+    bigint analysis_event_id PK
+    int session_id FK
+    string event_type
+    string participant_id
+    jsonb payload
+  }
+  analysis_report {
+    bigint analysis_report_id PK
+    int session_id FK
+    string stage
+    jsonb report
+  }
+  session_chat_message {
+    bigint chat_message_id PK
+    int session_id FK
+    string participant_id
+    text body
+  }
+
+  auth_user ||--o{ refresh_tokens : "user_id"
+  auth_user ||--o{ auth_events : "auth_user_id"
+  auth_user ||--o{ session : "created_by"
+  session ||--o{ meeting_events : "session_id"
+  session ||--o{ meeting_participant : "session_id"
+  auth_user |o--o{ meeting_participant : "auth_user_id"
+  session ||--o{ analysis_event : "session_id"
+  session ||--o{ analysis_report : "session_id"
+  session ||--o{ session_chat_message : "session_id"
+```
+
+---
+
+### 12.5. Логическая модель данных (атрибуты по таблицам)
+
+Краткое описание таблиц PostgreSQL (логический уровень «сущность — атрибуты — ключи»). Источник истины — файлы `code/emeeting-backend/migrations/up/*.sql`.
+
+| Таблица | Назначение | Ключ / важные атрибуты |
+|---------|------------|-------------------------|
+| **schema_migrations** | учёт применённых миграций | `version` PK |
+| **auth_user** | пользователь | `auth_user_id` PK; `email` UK; `password_hash`; `is_active`; защита: `failed_login_attempts`, `locked_until` |
+| **refresh_tokens** | refresh JWT | `refresh_token_id` PK; `token_hash` UK; `user_id` → auth_user; `expires_at`, `revoked_at`, ротация `replaced_by_token_hash` |
+| **auth_events** | аудит auth | `auth_event_id` PK; `event_type`; `auth_user_id` FK nullable; `ip`, `payload` JSONB |
+| **session** | планируемая сессия / встреча | `session_id` PK; `title`, `session_type`, `start_datetime`, `end_datetime`; `created_by` → auth_user; `meeting_status`, `meeting_started_at`, `meeting_ended_at` |
+| **meeting_events** | журнал событий митинга | PK; `session_id` FK; `event_type`; `payload` JSONB |
+| **meeting_participant** | роль в сессии | PK; `session_id` FK; `auth_user_id` FK nullable (гость); `role_code`; `joined_at`, `left_at`, `is_active` |
+| **analysis_event** | событие аналитики (WS) | PK; `session_id` FK; `event_type`, `participant_id`, `trace_id`, `module`, `stage`, `payload` JSONB |
+| **analysis_report** | снимок отчёта | PK; `session_id` FK; `stage`, `trace_id`, `report` JSONB, `config_snapshot` JSONB |
+| **session_chat_message** | чат встречи | PK; `session_id` FK; `participant_id`, `client_message_id`, `sender_name`, `body` (1…2000 символов) |
+
+**Целостность:** каскадное удаление дочерних записей при удалении `session` для событий митинга, аналитики и чата; `refresh_tokens` и связанные данные — при удалении пользователя (см. `ON DELETE` в SQL).
+
+---
+
+*Файл подготовлен как консолидированная шпаргалка; при изменении кода обновляйте разделы 5–8 и §12 по актуальным коммитам и миграциям.*
