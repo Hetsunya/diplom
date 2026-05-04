@@ -284,6 +284,45 @@ footer {
     min-width: 0;
 }
 
+.meeting-rail-toolbar {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    padding-bottom: 10px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid #ecf0f1;
+}
+
+.meeting-rail-toolbtn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid #dfe6e9;
+    background: #f8f9fa;
+    color: #5f6b72;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.meeting-rail-toolbtn:hover {
+    background: #eef2f7;
+    border-color: #bdc3c7;
+}
+
+.meeting-rail-toolbtn--on {
+    background: #3498db;
+    border-color: #3498db;
+    color: #fff;
+}
+
+.meeting-rail-toolbtn:focus-visible {
+    outline: 2px solid #3498db;
+    outline-offset: 2px;
+}
+
 .meeting-transcript-rail {
     width: min(340px, 100%);
     flex-shrink: 0;
@@ -370,6 +409,26 @@ footer {
     padding-right: 4px;
 }
 
+.meeting-transcript-rail__scroll--chrono {
+    scroll-behavior: smooth;
+}
+
+.meeting-transcript-rail__line--draft {
+    border-left-color: #95a5a6;
+    opacity: 0.92;
+}
+
+.meeting-transcript-rail__line--draft .meeting-transcript-rail__line-text {
+    font-style: italic;
+}
+
+.meeting-transcript-rail__time {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #95a5a6;
+    margin-left: auto;
+}
+
 .meeting-transcript-rail__line {
     border-left: 3px solid #3498db;
     padding-left: 10px;
@@ -380,6 +439,7 @@ footer {
     align-items: center;
     gap: 8px;
     margin-bottom: 4px;
+    flex-wrap: wrap;
 }
 
 .meeting-transcript-rail__speaker {
@@ -455,7 +515,6 @@ footer {
 .meeting-transcript-rail__chat {
     border-top: 1px solid #ecf0f1;
     padding-top: 10px;
-    margin-top: auto;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
@@ -591,6 +650,273 @@ footer {
 .meeting-transcript-rail__chat-send:disabled {
     opacity: 0.45;
     cursor: not-allowed;
+}
+
+.meeting-transcript-rail__people {
+    border-top: 1px solid #ecf0f1;
+    padding-top: 10px;
+}
+
+.meeting-transcript-rail__people-count {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #5f6b72;
+    background: #ecf0f1;
+    border-radius: 999px;
+    padding: 2px 8px;
+}
+
+.meeting-people-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: min(200px, 24vh);
+    overflow-y: auto;
+}
+
+.meeting-people-list__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 6px;
+    border-radius: 8px;
+    background: #f8f9fa;
+}
+
+.meeting-people-list__avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #3498db;
+    color: #fff;
+    font-weight: 800;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.meeting-people-list__main {
+    flex: 1;
+    min-width: 0;
+}
+
+.meeting-people-list__name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #2c3e50;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.meeting-people-list__you {
+    font-weight: 500;
+    color: #7f8c8d;
+    text-transform: lowercase;
+}
+
+.meeting-people-list__meta {
+    font-size: 0.72rem;
+    color: #7f8c8d;
+    margin-top: 2px;
+}
+
+.meeting-people-list__devices {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    color: #5f6b72;
+}
+
+.meeting-people-list__dev {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.meeting-people-list__dev--on {
+    color: #27ae60;
+}
+
+.meeting-people-list__dev--off {
+    color: #e67e22;
+}
+
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    background: linear-gradient(160deg, #e8f4fc 0%, #f0f2f5 45%, #e8f0f8 100%);
+}
+
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(44, 62, 80, 0.12);
+    padding: 32px 28px 28px;
+    text-align: left;
+}
+
+.login-card__brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+.login-card__logo {
+    flex-shrink: 0;
+}
+
+.login-card__title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #2c3e50;
+    margin: 0 0 4px;
+    line-height: 1.2;
+}
+
+.login-card__subtitle {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #7f8c8d;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.login-form__field label {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #34495e;
+    margin-bottom: 6px;
+}
+
+.login-form__field input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 14px;
+    border: 1px solid #dfe6e9;
+    border-radius: 10px;
+    font-size: 1rem;
+}
+
+.login-form__field input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+}
+
+.login-form__error {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #fdecea;
+    color: #c0392b;
+    font-size: 0.88rem;
+}
+
+.login-form__submit {
+    width: 100%;
+    margin-top: 4px;
+    padding: 14px;
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.login-form__submit:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.video-placeholder--cam-off {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(160deg, #1a252f 0%, #2c3e50 100%) !important;
+}
+
+.video-placeholder__cam-icon {
+    color: rgba(255, 255, 255, 0.45);
+    flex-shrink: 0;
+}
+
+.participant-chip__devices {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.participant-chip__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+}
+
+.participant-chip__icon--on {
+    color: #2ecc71;
+}
+
+.participant-chip__icon--off {
+    color: #f39c12;
+}
+
+.controls--meet {
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.control-btn--round {
+    flex-direction: column;
+    min-width: 64px;
+    min-height: 64px;
+    border-radius: 50%;
+    padding: 10px 8px;
+    font-size: 0.7rem;
+    line-height: 1.1;
+    justify-content: center;
+    gap: 4px;
+}
+
+.control-btn--round .control-btn__label {
+    display: block;
+    max-width: 72px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+}
+
+.control-btn--leave {
+    background: #5d6d7e !important;
+    color: #fff !important;
+}
+
+@media (max-width: 520px) {
+    .control-btn--round .control-btn__label {
+        display: none;
+    }
+    .control-btn--round {
+        min-width: 52px;
+        min-height: 52px;
+    }
 }
 
 .emotion-indicator--pending {
@@ -815,15 +1141,16 @@ footer {
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
     backdrop-filter: blur(8px);
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
     pointer-events: none;
 }
 
 .participant-chip__name {
     display: block;
-    max-width: 100%;
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -869,20 +1196,22 @@ footer {
 
 .mic-btn {
     background: #118ab2;
-    color: white;
+    color: #fff;
 }
 
 .mic-btn.active {
     background: #075a72;
+    color: #fff;
 }
 
 .cam-btn {
     background: #06d6a0;
-    color: white;
+    color: #fff;
 }
 
 .cam-btn.active {
     background: #03a87c;
+    color: #fff;
 }
 
 .share-btn {

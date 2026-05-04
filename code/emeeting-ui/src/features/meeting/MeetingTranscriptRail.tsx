@@ -1,5 +1,14 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MeetingChatSection, type ChatLine } from "./MeetingChatSection";
+import {
+  IconCamOff,
+  IconCamOn,
+  IconChat,
+  IconMicOff,
+  IconMicOn,
+  IconPeople,
+  IconTranscript,
+} from "../../components/MeetingUiIcons";
 
 export type TranscriptLine = {
   traceId: string;
@@ -10,120 +19,176 @@ export type TranscriptLine = {
   at: string;
 };
 
+export type MeetingParticipantRow = {
+  id: string;
+  name: string;
+  isSelf: boolean;
+  micOn?: boolean;
+  camOn?: boolean;
+  emotionLabel?: string;
+};
+
 export type { ChatLine };
 
 type MeetingTranscriptRailProps = {
   lines: TranscriptLine[];
   asrStatus: string;
-  verdictSummary: string | null;
-  verdictDetail: unknown | null;
-  verdictSource: string | null;
-  verdictExpanded: boolean;
-  onToggleVerdict: () => void;
   chatMessages: ChatLine[];
   currentParticipantId: string;
   onSendChat: (text: string) => void;
   chatConnected?: boolean;
+  participants: MeetingParticipantRow[];
 };
 
 export function MeetingTranscriptRail({
   lines,
   asrStatus,
-  verdictSummary,
-  verdictDetail,
-  verdictSource,
-  verdictExpanded,
-  onToggleVerdict,
   chatMessages,
   currentParticipantId,
   onSendChat,
   chatConnected = true,
+  participants,
 }: MeetingTranscriptRailProps) {
-  const linesShown = useMemo(() => [...lines].reverse(), [lines]);
-  const sourceClass =
-    verdictSource === "remote" || verdictSource === "local_fallback" || verdictSource === "local_stub"
-      ? verdictSource
-      : "local_stub";
-  const sourceLabel =
-    verdictSource === "remote"
-      ? "NN"
-      : verdictSource === "local_fallback"
-        ? "fallback"
-        : verdictSource === "local_stub"
-          ? "stub"
-          : null;
+  const [showTranscript, setShowTranscript] = useState(true);
+  const [showChat, setShowChat] = useState(true);
+  const [showPeople, setShowPeople] = useState(true);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const linesChrono = useMemo(() => [...lines], [lines]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [lines]);
 
   return (
-    <aside className="meeting-transcript-rail" aria-label="Транскрибация речи, вердикт AI и чат">
-      <div className="meeting-transcript-rail__section meeting-transcript-rail__verdict">
-        <div className="meeting-transcript-rail__section-title-row">
-          <div className="meeting-transcript-rail__section-title">Вердикт AI</div>
-          {sourceLabel && (
-            <span
-              className={`meeting-transcript-rail__source-badge meeting-transcript-rail__source-badge--${sourceClass}`}
-              title={`source: ${verdictSource}`}
-            >
-              {sourceLabel}
-            </span>
-          )}
-        </div>
-        {verdictSummary ? (
-          <>
-            <button type="button" className="meeting-transcript-rail__verdict-btn" onClick={onToggleVerdict}>
-              {verdictSummary}
-              <span className="meeting-transcript-rail__chevron">{verdictExpanded ? " ▲" : " ▼"}</span>
-            </button>
-            {verdictExpanded && verdictDetail != null && (
-              <pre className="meeting-transcript-rail__verdict-detail">
-                {JSON.stringify(verdictDetail, null, 2)}
-              </pre>
-            )}
-          </>
-        ) : (
-          <p className="meeting-transcript-rail__muted">Пока нет данных отчёта. Дождитесь частичного отчёта.</p>
-        )}
+    <aside className="meeting-transcript-rail" aria-label="Панель встречи">
+      <div className="meeting-rail-toolbar" role="toolbar" aria-label="Разделы панели">
+        <button
+          type="button"
+          className={`meeting-rail-toolbtn ${showTranscript ? "meeting-rail-toolbtn--on" : ""}`}
+          onClick={() => setShowTranscript((v) => !v)}
+          aria-pressed={showTranscript}
+          title={showTranscript ? "Скрыть транскрипт" : "Показать транскрипт"}
+        >
+          <IconTranscript size={22} title="Транскрипт" />
+        </button>
+        <button
+          type="button"
+          className={`meeting-rail-toolbtn ${showChat ? "meeting-rail-toolbtn--on" : ""}`}
+          onClick={() => setShowChat((v) => !v)}
+          aria-pressed={showChat}
+          title={showChat ? "Скрыть чат" : "Показать чат"}
+        >
+          <IconChat size={22} title="Чат" />
+        </button>
+        <button
+          type="button"
+          className={`meeting-rail-toolbtn ${showPeople ? "meeting-rail-toolbtn--on" : ""}`}
+          onClick={() => setShowPeople((v) => !v)}
+          aria-pressed={showPeople}
+          title={showPeople ? "Скрыть участников" : "Показать участников"}
+        >
+          <IconPeople size={22} title="Участники" />
+        </button>
       </div>
 
-      <div className="meeting-transcript-rail__section">
-        <div className="meeting-transcript-rail__section-title-row">
-          <div className="meeting-transcript-rail__section-title">Транскрибация (ASR)</div>
-          <span className="meeting-transcript-rail__asr-status" title="Состояние live-транскрибации речи">
-            {asrStatus}
-          </span>
-        </div>
-        <div className="meeting-transcript-rail__scroll" role="log" aria-live="polite">
-          {linesShown.length === 0 ? (
-            <p className="meeting-transcript-rail__muted">
-              Здесь появляется распознанная речь (события text_analysis), когда включён ai-gateway и
-              speech-service.
-            </p>
-          ) : (
-            linesShown.map((line) => (
-              <div key={`${line.traceId}-${line.participantId}`} className="meeting-transcript-rail__line">
-                <div className="meeting-transcript-rail__line-meta">
-                  <span className="meeting-transcript-rail__speaker">{line.speakerLabel}</span>
-                  <span className="meeting-transcript-rail__meta-sep" aria-hidden="true">
-                    ·
-                  </span>
-                  {line.final ? (
-                    <span className="meeting-transcript-rail__badge meeting-transcript-rail__badge--final">финал</span>
-                  ) : (
-                    <span className="meeting-transcript-rail__badge">черновик</span>
-                  )}
+      {showTranscript && (
+        <div className="meeting-transcript-rail__section">
+          <div className="meeting-transcript-rail__section-title-row">
+            <div className="meeting-transcript-rail__section-title">Транскрипт</div>
+            <span className="meeting-transcript-rail__asr-status">{asrStatus}</span>
+          </div>
+          <div
+            ref={scrollRef}
+            className="meeting-transcript-rail__scroll meeting-transcript-rail__scroll--chrono"
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions text"
+          >
+            {linesChrono.length === 0 ? (
+              <p className="meeting-transcript-rail__muted">Здесь будет распознанная речь по мере поступления.</p>
+            ) : (
+              linesChrono.map((line, idx) => (
+                <div
+                  key={`${line.traceId}-${line.participantId}-${line.at}-${idx}`}
+                  className={`meeting-transcript-rail__line ${line.final ? "" : "meeting-transcript-rail__line--draft"}`}
+                >
+                  <div className="meeting-transcript-rail__line-meta">
+                    <span className="meeting-transcript-rail__speaker">{line.speakerLabel}</span>
+                    <time className="meeting-transcript-rail__time" dateTime={line.at}>
+                      {new Date(line.at).toLocaleTimeString(undefined, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })}
+                    </time>
+                    {line.final ? (
+                      <span className="meeting-transcript-rail__badge meeting-transcript-rail__badge--final">готово</span>
+                    ) : (
+                      <span className="meeting-transcript-rail__badge">набирается…</span>
+                    )}
+                  </div>
+                  <div className="meeting-transcript-rail__line-text">{line.text || "…"}</div>
                 </div>
-                <div className="meeting-transcript-rail__line-text">{line.text || "…"}</div>
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      <MeetingChatSection
-        messages={chatMessages}
-        currentParticipantId={currentParticipantId}
-        onSend={onSendChat}
-        canSend={chatConnected}
-      />
+      {showChat && (
+        <MeetingChatSection
+          messages={chatMessages}
+          currentParticipantId={currentParticipantId}
+          onSend={onSendChat}
+          canSend={chatConnected}
+        />
+      )}
+
+      {showPeople && (
+        <div className="meeting-transcript-rail__section meeting-transcript-rail__people">
+          <div className="meeting-transcript-rail__section-title-row">
+            <div className="meeting-transcript-rail__section-title">Участники</div>
+            <span className="meeting-transcript-rail__people-count">{participants.length}</span>
+          </div>
+          <ul className="meeting-people-list">
+            {participants.map((p) => (
+              <li key={p.id} className="meeting-people-list__row">
+                <div className="meeting-people-list__avatar" aria-hidden>
+                  {p.name.trim().charAt(0).toUpperCase() || "?"}
+                </div>
+                <div className="meeting-people-list__main">
+                  <div className="meeting-people-list__name">
+                    {p.name}
+                    {p.isSelf ? <span className="meeting-people-list__you"> вы</span> : null}
+                  </div>
+                  {p.emotionLabel ? (
+                    <div className="meeting-people-list__meta">{p.emotionLabel}</div>
+                  ) : null}
+                </div>
+                {p.isSelf && (
+                  <div className="meeting-people-list__devices" aria-label="Ваши устройства">
+                    <span
+                      className={`meeting-people-list__dev ${p.micOn ? "meeting-people-list__dev--on" : "meeting-people-list__dev--off"}`}
+                      title={p.micOn ? "Микрофон включён" : "Микрофон выключен"}
+                    >
+                      {p.micOn ? <IconMicOn size={18} /> : <IconMicOff size={18} />}
+                    </span>
+                    <span
+                      className={`meeting-people-list__dev ${p.camOn ? "meeting-people-list__dev--on" : "meeting-people-list__dev--off"}`}
+                      title={p.camOn ? "Камера включена" : "Камера выключена"}
+                    >
+                      {p.camOn ? <IconCamOn size={18} /> : <IconCamOff size={18} />}
+                    </span>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </aside>
   );
 }

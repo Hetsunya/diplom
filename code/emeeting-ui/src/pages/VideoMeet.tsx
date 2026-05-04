@@ -10,6 +10,14 @@ import {
   type ChatLine,
   type TranscriptLine,
 } from "../features/meeting/MeetingTranscriptRail";
+import {
+  IconCallEnd,
+  IconCamOff,
+  IconMicOff,
+  IconMicOn,
+  IconCamOn,
+  IconScreenShare,
+} from "../components/MeetingUiIcons";
 import { useMeetingAudioChunks } from "../features/meeting/useMeetingAudioChunks";
 import { getSessionChatMessages } from "../api/sessions";
 
@@ -235,10 +243,6 @@ const VideoMeet = () => {
   const [transcriptLines, setTranscriptLines] = useState<TranscriptLine[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatLine[]>([]);
   const [lastTextAt, setLastTextAt] = useState<number | null>(null);
-  const [verdictSummary, setVerdictSummary] = useState<string | null>(null);
-  const [verdictDetail, setVerdictDetail] = useState<unknown | null>(null);
-  const [verdictSource, setVerdictSource] = useState<string | null>(null);
-  const [verdictExpanded, setVerdictExpanded] = useState(false);
   const [faceDebugByParticipant, setFaceDebugByParticipant] = useState<
     Record<string, FaceDebugPayload>
   >({});
@@ -247,7 +251,6 @@ const VideoMeet = () => {
     resetMeetingStore();
   }, [id, resetMeetingStore]);
 
-  // Ensure "self" exists in store immediately (snapshot с сервера затем дополнит список).
   useEffect(() => {
     upsert({
       id: participantId,
@@ -375,8 +378,6 @@ const VideoMeet = () => {
           stage === "final" ||
           (typeof stage === "string" && stage.toLowerCase().includes("final"));
 
-        // ai-gateway issues a new trace_id per audio chunk; merging only by trace_id would
-        // append a new "черновик" row on every ASR tick. Keep one rolling draft per speaker.
         const draftTraceId = `asr-draft:${pid}`;
 
         setTranscriptLines((prev) => {
@@ -411,23 +412,6 @@ const VideoMeet = () => {
         setLastTextAt(Date.now());
         return;
       }
-
-      if ((type === "analysis_report_partial" || type === "analysis_report") && m.payload && typeof m.payload === "object") {
-        const p = m.payload as Record<string, unknown>;
-        const report = p["report"];
-        const srcRaw = p["report_source"];
-        const source = typeof srcRaw === "string" ? srcRaw : null;
-        let summary: string | null = null;
-        if (report && typeof report === "object") {
-          const r = report as Record<string, unknown>;
-          if (typeof r.summary === "string") summary = r.summary;
-          else if (typeof r.headline === "string") summary = r.headline;
-        }
-        setVerdictDetail(report ?? p);
-        setVerdictSummary(summary ?? (type === "analysis_report" ? "Итоговый отчёт" : "Частичный отчёт"));
-        setVerdictSource(source);
-        setVerdictExpanded(false);
-      }
     },
     [upsert]
   );
@@ -457,7 +441,6 @@ const VideoMeet = () => {
     [send, participantName]
   );
 
-  // Не запускать MediaRecorder до OPEN WebSocket иначе send("audio") — no-op и чанки теряются.
   useMeetingAudioChunks(streamRef, send, {
     enabled: micEnabled && connected,
     mediaReady,
@@ -484,7 +467,6 @@ const VideoMeet = () => {
     ])
   );
 
-  /** Трекинг лица/эмоций: чем реже кадры — тем «деревяннее» рамка (раньше было 2000 ms). */
   const FRAME_CAPTURE_MS = 320;
 
   useEffect(() => {
@@ -576,7 +558,6 @@ const VideoMeet = () => {
           <div className="video-grid">
             {Object.values(participants).map((p) => {
               const isSelf = p.id === participantId;
-              const showMicOff = isSelf && !micEnabled;
               const showCamOff = isSelf && !camEnabled;
               const faceDbg = faceDebugByParticipant[p.id];
               const showFaceDebugHud = Boolean(faceDbg && isSelf);
@@ -591,7 +572,14 @@ const VideoMeet = () => {
                           playsInline
                           className={`tile-media__video ${showCamOff ? "video-hidden" : ""}`}
                         />
-                        {showCamOff && <div className="video-placeholder video-placeholder--overlay" />}
+                        {showCamOff && (
+                          <div
+                            className="video-placeholder video-placeholder--overlay video-placeholder--cam-off"
+                            aria-hidden
+                          >
+                            <IconCamOff size={56} className="video-placeholder__cam-icon" />
+                          </div>
+                        )}
                       </>
                     ) : (
                       <div className="fake-video fake-video--remote">
@@ -643,11 +631,20 @@ const VideoMeet = () => {
 
                     <div className="participant-chip">
                       <span className="participant-chip__name">{p.name}</span>
-                      {(showMicOff || showCamOff) && (
-                        <span className="participant-chip__status">
-                          {showMicOff ? "Mic off" : ""}
-                          {showMicOff && showCamOff ? " · " : ""}
-                          {showCamOff ? "Cam off" : ""}
+                      {isSelf && (
+                        <span className="participant-chip__devices">
+                          <span
+                            className={`participant-chip__icon ${micEnabled ? "participant-chip__icon--on" : "participant-chip__icon--off"}`}
+                            title={micEnabled ? "Микрофон включён" : "Микрофон выключен"}
+                          >
+                            {micEnabled ? <IconMicOn size={14} /> : <IconMicOff size={14} />}
+                          </span>
+                          <span
+                            className={`participant-chip__icon ${camEnabled ? "participant-chip__icon--on" : "participant-chip__icon--off"}`}
+                            title={camEnabled ? "Камера включена" : "Камера выключена"}
+                          >
+                            {camEnabled ? <IconCamOn size={14} /> : <IconCamOff size={14} />}
+                          </span>
                         </span>
                       )}
                     </div>
@@ -657,49 +654,72 @@ const VideoMeet = () => {
             })}
           </div>
 
-          <div className="controls">
+          <div className="controls controls--meet">
             <button
-              className={`control-btn mic-btn ${micEnabled ? "active" : ""}`}
+              className={`control-btn control-btn--round mic-btn ${micEnabled ? "active" : ""}`}
               onClick={toggleMic}
               type="button"
+              title={micEnabled ? "Выключить микрофон" : "Включить микрофон"}
+              aria-pressed={micEnabled}
             >
-              🎤 {micEnabled ? "Микрофон: вкл" : "Микрофон: выкл"}
+              {micEnabled ? <IconMicOn size={22} /> : <IconMicOff size={22} />}
+              <span className="control-btn__label">{micEnabled ? "Микрофон" : "Вкл. микрофон"}</span>
             </button>
 
             <button
-              className={`control-btn cam-btn ${camEnabled ? "active" : ""}`}
+              className={`control-btn control-btn--round cam-btn ${camEnabled ? "active" : ""}`}
               onClick={toggleCam}
               type="button"
+              title={camEnabled ? "Выключить камеру" : "Включить камеру"}
+              aria-pressed={camEnabled}
             >
-              📹 {camEnabled ? "Камера: вкл" : "Камера: выкл"}
+              {camEnabled ? <IconCamOn size={22} /> : <IconCamOff size={22} />}
+              <span className="control-btn__label">{camEnabled ? "Камера" : "Вкл. камеру"}</span>
             </button>
 
-            <button className="control-btn share-btn" onClick={startShare} type="button">
-              🖥️ Поделиться экраном
+            <button
+              className="control-btn control-btn--round share-btn"
+              onClick={startShare}
+              type="button"
+              title="Демонстрация экрана"
+            >
+              <IconScreenShare size={22} />
+              <span className="control-btn__label">Экран</span>
             </button>
 
-            <button className="control-btn" onClick={leaveMeeting} type="button">
-              Выйти
+            <button
+              className="control-btn control-btn--round control-btn--leave"
+              onClick={leaveMeeting}
+              type="button"
+              title="Покинуть встречу"
+            >
+              <IconCallEnd size={22} />
+              <span className="control-btn__label">Покинуть</span>
             </button>
 
-            <button className="control-btn end-btn" onClick={endMeeting} type="button">
-              Завершить
-            </button>
+            {participantRole === "host" && (
+              <button className="control-btn control-btn--round end-btn" onClick={endMeeting} type="button" title="Завершить встречу для всех">
+                <span className="control-btn__label">Завершить</span>
+              </button>
+            )}
           </div>
         </div>
 
         <MeetingTranscriptRail
           lines={transcriptLines}
-          asrStatus={lastTextAt ? "идёт распознавание…" : "ожидание…"}
-          verdictSummary={verdictSummary}
-          verdictDetail={verdictDetail}
-          verdictSource={verdictSource}
-          verdictExpanded={verdictExpanded}
-          onToggleVerdict={() => setVerdictExpanded((e) => !e)}
+          asrStatus={lastTextAt ? "Слушаю…" : "Нет речи"}
           chatMessages={chatMessages}
           currentParticipantId={participantId}
           onSendChat={sendChatMessage}
           chatConnected={connected}
+          participants={Object.values(participants).map((p) => ({
+            id: p.id,
+            name: p.name,
+            isSelf: p.id === participantId,
+            micOn: p.id === participantId ? micEnabled : undefined,
+            camOn: p.id === participantId ? camEnabled : undefined,
+            emotionLabel: p.faceSignalReceived ? `${p.emotion} · ${p.emotionConfidence}%` : undefined,
+          }))}
         />
       </div>
     </div>
