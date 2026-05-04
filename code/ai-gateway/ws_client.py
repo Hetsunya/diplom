@@ -106,7 +106,7 @@ class SessionWSClient:
                     backoff = 1
 
                     bg_tasks: list[asyncio.Task[Any]] = []
-                    if self.enable_report_loop and self.session_id > 0:
+                    if self.enable_report_loop:
                         from report_loop import report_loop
 
                         holder: list[Any] = [ws]

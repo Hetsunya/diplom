@@ -18,6 +18,7 @@ class FaceRuntimeParams:
     emit_no_face_face_analysis: bool
     max_concurrent_inferences: int
     emit_debug_face: bool
+    log_face_inference: bool
     debug_bbox_smooth_alpha: float
     debug_max_face_area_frac: float
 
@@ -34,6 +35,7 @@ class FaceRuntimeParams:
             emit_no_face_face_analysis=bool(p.get("emit_no_face_face_analysis", False)),
             max_concurrent_inferences=max(1, int(p.get("max_concurrent_inferences", 2))),
             emit_debug_face=bool(p.get("emit_debug_face", False)),
+            log_face_inference=bool(p.get("log_face_inference", False)),
             debug_bbox_smooth_alpha=float(p.get("debug_bbox_smooth_alpha", 0.35)),
             debug_max_face_area_frac=float(p.get("debug_max_face_area_frac", 0.45)),
         )

@@ -307,3 +307,57 @@ func TestWS_AnalysisInboundBroadcast(t *testing.T) {
 	}
 }
 
+func TestAnalysisWS_FanoutsAudioFromAnySession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil, nil)
+	r := gin.New()
+	r.GET("/ws/sessions/:id", handler.WS)
+	r.GET("/ws/analysis", handler.AnalysisWS)
+
+	server := httptest.NewServer(r)
+	defer server.Close()
+	baseWS := "ws" + strings.TrimPrefix(server.URL, "http")
+
+	partURL := baseWS + "/ws/sessions/42"
+	analysisURL := baseWS + "/ws/analysis"
+
+	part, _, err := websocket.DefaultDialer.Dial(partURL, nil)
+	if err != nil {
+		t.Fatalf("dial participant: %v", err)
+	}
+	defer part.Close()
+
+	analysis, _, err := websocket.DefaultDialer.Dial(analysisURL, nil)
+	if err != nil {
+		t.Fatalf("dial analysis: %v", err)
+	}
+	defer analysis.Close()
+
+	audio := WSMessage{
+		Type:        "audio",
+		SessionID:   999,
+		Participant: "p1",
+		Payload: map[string]any{
+			"chunk_base64": "e30=",
+			"mime":         "audio/webm",
+		},
+		Timestamp: time.Now().UTC(),
+	}
+	if err := part.WriteJSON(audio); err != nil {
+		t.Fatalf("write audio: %v", err)
+	}
+
+	_ = analysis.SetReadDeadline(time.Now().Add(4 * time.Second))
+	var got WSMessage
+	if err := analysis.ReadJSON(&got); err != nil {
+		t.Fatalf("analysis read: %v", err)
+	}
+	if got.Type != "audio" {
+		t.Fatalf("expected type audio, got %q", got.Type)
+	}
+	if got.SessionID != 42 {
+		t.Fatalf("expected canonical session_id 42 from URL-bound broadcast, got %d", got.SessionID)
+	}
+}
+

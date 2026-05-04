@@ -54,7 +54,7 @@ export function MeetingTranscriptRail({
           : null;
 
   return (
-    <aside className="meeting-transcript-rail" aria-label="Транскрипт, вердикт AI и чат">
+    <aside className="meeting-transcript-rail" aria-label="Транскрибация речи, вердикт AI и чат">
       <div className="meeting-transcript-rail__section meeting-transcript-rail__verdict">
         <div className="meeting-transcript-rail__section-title-row">
           <div className="meeting-transcript-rail__section-title">Вердикт AI</div>
@@ -86,19 +86,25 @@ export function MeetingTranscriptRail({
 
       <div className="meeting-transcript-rail__section">
         <div className="meeting-transcript-rail__section-title-row">
-          <div className="meeting-transcript-rail__section-title">Транскрипт (ASR)</div>
-          <span className="meeting-transcript-rail__asr-status" title="Состояние live-транскрипции">
+          <div className="meeting-transcript-rail__section-title">Транскрибация (ASR)</div>
+          <span className="meeting-transcript-rail__asr-status" title="Состояние live-транскрибации речи">
             {asrStatus}
           </span>
         </div>
         <div className="meeting-transcript-rail__scroll" role="log" aria-live="polite">
           {linesShown.length === 0 ? (
-            <p className="meeting-transcript-rail__muted">Сюда попадают события text_analysis, когда включён speech-service.</p>
+            <p className="meeting-transcript-rail__muted">
+              Здесь появляется распознанная речь (события text_analysis), когда включён ai-gateway и
+              speech-service.
+            </p>
           ) : (
             linesShown.map((line) => (
               <div key={`${line.traceId}-${line.participantId}`} className="meeting-transcript-rail__line">
                 <div className="meeting-transcript-rail__line-meta">
                   <span className="meeting-transcript-rail__speaker">{line.speakerLabel}</span>
+                  <span className="meeting-transcript-rail__meta-sep" aria-hidden="true">
+                    ·
+                  </span>
                   {line.final ? (
                     <span className="meeting-transcript-rail__badge meeting-transcript-rail__badge--final">финал</span>
                   ) : (

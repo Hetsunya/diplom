@@ -22,7 +22,7 @@ Request JSON:
 }
 ```
 
-`language` в `audio` опционален: если не указан, Whisper может автоопределить язык.
+`language` в `audio` опционален: если не указан, по умолчанию используется **`ru`** (и переменная `WHISPER_LANGUAGE`, по умолчанию тоже `ru`). Значения `auto` / `detect` / `none` включают автоопределение faster-whisper.
 
 Response JSON (пример):
 
@@ -42,6 +42,7 @@ Response JSON (пример):
 | `SPEECH_ASR_ENGINE` | `stub` (по умолчанию) | Мгновенный ответ без распознавания |
 | `SPEECH_ASR_ENGINE` | `whisper` | Распознавание через **faster-whisper** (нужен **ffmpeg**) |
 | `WHISPER_MODEL_SIZE` | `tiny`, `base`, `small`, … | Размер модели (по умолчанию `base`) |
+| `WHISPER_LANGUAGE` | `ru` (по умолчанию), `en`, … или `auto` | Язык распознавания; `auto` = автоопределение |
 | `WHISPER_DEVICE` | `cpu` / `cuda` | Устройство |
 | `WHISPER_COMPUTE_TYPE` | `int8`, `float16`, … | Тип вычислений |
 | `WHISPER_LANGUAGE` | ISO-код или пусто | Фиксированный язык; если пусто — авто |

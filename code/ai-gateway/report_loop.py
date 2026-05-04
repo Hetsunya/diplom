@@ -242,28 +242,34 @@ async def report_loop(ws_holder: list[Any], session_id: int) -> None:
         while True:
             await asyncio.sleep(max(interval, wake_floor))
             ws = ws_holder[0] if ws_holder else None
-            feats = get_feature_store().snapshot_session(session_id)
+            store = get_feature_store()
+            targets = [session_id] if session_id > 0 else store.session_ids()
+            for sid in targets:
+                feats = store.snapshot_session(sid)
+                await _send_report(
+                    ws,
+                    session_id=sid,
+                    feats=feats,
+                    own_url=own_url,
+                    model_ver=model_ver,
+                    bucket_sec=bucket_sec,
+                    msg_type="analysis_report_partial",
+                    envelope_stage="partial",
+                )
+    except asyncio.CancelledError:
+        ws = ws_holder[0] if ws_holder else None
+        store = get_feature_store()
+        targets = [session_id] if session_id > 0 else store.session_ids()
+        for sid in targets:
+            feats = store.snapshot_session(sid)
             await _send_report(
                 ws,
-                session_id=session_id,
+                session_id=sid,
                 feats=feats,
                 own_url=own_url,
                 model_ver=model_ver,
                 bucket_sec=bucket_sec,
-                msg_type="analysis_report_partial",
-                envelope_stage="partial",
+                msg_type="analysis_report",
+                envelope_stage="final",
             )
-    except asyncio.CancelledError:
-        ws = ws_holder[0] if ws_holder else None
-        feats = get_feature_store().snapshot_session(session_id)
-        await _send_report(
-            ws,
-            session_id=session_id,
-            feats=feats,
-            own_url=own_url,
-            model_ver=model_ver,
-            bucket_sec=bucket_sec,
-            msg_type="analysis_report",
-            envelope_stage="final",
-        )
         raise

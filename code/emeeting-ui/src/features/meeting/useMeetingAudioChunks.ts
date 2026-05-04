@@ -25,13 +25,33 @@ function concatUint8Arrays(partials: Uint8Array[]): Uint8Array {
   return out;
 }
 
-function pickRecorderMime(): string {
-  if (typeof MediaRecorder === "undefined") return "";
-  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+/** Preferred mime for payload labelling; recorder may omit codec in `mimeType` after create. */
+function createMediaRecorder(stream: MediaStream): { recorder: MediaRecorder; mimeHint: string } | null {
+  if (typeof MediaRecorder === "undefined") return null;
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/mp4",
+    "audio/ogg;codecs=opus",
+    "audio/ogg",
+  ];
+  const supported = typeof MediaRecorder.isTypeSupported === "function";
   for (const m of candidates) {
-    if (MediaRecorder.isTypeSupported(m)) return m;
+    if (supported && !MediaRecorder.isTypeSupported(m)) continue;
+    try {
+      const recorder = new MediaRecorder(stream, { mimeType: m });
+      return { recorder, mimeHint: recorder.mimeType || m };
+    } catch {
+      continue;
+    }
   }
-  return "";
+  try {
+    const recorder = new MediaRecorder(stream);
+    const mimeHint = recorder.mimeType || "audio/webm";
+    return { recorder, mimeHint };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -44,30 +64,37 @@ function pickRecorderMime(): string {
 export function useMeetingAudioChunks(
   streamRef: React.RefObject<MediaStream | null>,
   send: (type: string, payload?: unknown) => void,
-  opts: { enabled: boolean; mediaReady: boolean; timesliceMs?: number }
+  opts: { enabled: boolean; mediaReady: boolean; streamEpoch?: number; timesliceMs?: number }
 ) {
-  const { enabled, mediaReady, timesliceMs = 3500 } = opts;
+  const { enabled, mediaReady, streamEpoch = 0, timesliceMs = 3500 } = opts;
 
   useEffect(() => {
     if (!enabled || !mediaReady || !streamRef.current) return;
-    const audioTracks = streamRef.current.getAudioTracks().filter((t) => t.readyState === "live");
-    if (audioTracks.length === 0) return;
+    const base = streamRef.current;
+    // Mic on/off is `enabled`; do not require `track.enabled` here (avoids UI vs track mismatch).
+    const audioTracks = base.getAudioTracks().filter((t) => t.readyState === "live");
+    if (audioTracks.length === 0) {
+      console.warn("[emeeting-audio] skip MediaRecorder: no live audio tracks", {
+        total: base.getAudioTracks().length,
+        states: base.getAudioTracks().map((t) => t.readyState),
+      });
+      return;
+    }
 
-    const mime = pickRecorderMime();
-    if (!mime) return;
+    // Some browsers record mic more reliably on an audio-only MediaStream than video+audio.
+    const recordStream = new MediaStream(audioTracks);
+    const created = createMediaRecorder(recordStream);
+    if (!created) {
+      console.warn("[emeeting-audio] MediaRecorder unsupported for this stream/mime");
+      return;
+    }
 
     let cancelled = false;
-    let mr: MediaRecorder;
+    let { recorder: mr, mimeHint: mime } = created;
     let chunkSeq = 0;
     const parts: Uint8Array[] = [];
     let segmentStarted = Date.now();
     let segmentClosing = false;
-
-    try {
-      mr = new MediaRecorder(streamRef.current, { mimeType: mime });
-    } catch {
-      return;
-    }
 
     const flushSegment = () => {
       parts.length = 0;
@@ -86,13 +113,19 @@ export function useMeetingAudioChunks(
     };
 
     mr.ondataavailable = async (ev: BlobEvent) => {
-      if (cancelled || !ev.data || ev.data.size < 64) return;
+      if (cancelled || !ev.data || ev.data.size === 0) return;
       try {
         const buf = new Uint8Array(await ev.data.arrayBuffer());
-        if (buf.byteLength < 64) return;
+        if (buf.byteLength === 0) return;
         parts.push(buf);
         const merged = concatUint8Arrays(parts);
-        if (merged.byteLength < 256) return;
+        // Первый кластер WebM часто <256 B; иначе можем годами не вызвать send и ASR «мёртв».
+        const elapsedWall = Date.now() - segmentStarted;
+        const stalled =
+          parts.length >= 2 ||
+          (parts.length >= 1 && elapsedWall >= timesliceMs + 400) ||
+          elapsedWall > 8000;
+        if (merged.byteLength < 256 && !stalled) return;
 
         const elapsed = Date.now() - segmentStarted;
         const overBytes = merged.byteLength >= SEGMENT_MAX_BYTES;
@@ -103,6 +136,8 @@ export function useMeetingAudioChunks(
           chunk_base64: bytesToBase64(merged),
           mime,
           encoding: "base64",
+          /** Passed through to speech-service / faster-whisper (default ru in service if omitted). */
+          language: "ru",
           timeslice_ms: timesliceMs,
           sent_at_ms: Date.now(),
           chunk_seq: ++chunkSeq,
@@ -121,7 +156,8 @@ export function useMeetingAudioChunks(
 
     try {
       mr.start(timesliceMs);
-    } catch {
+    } catch (e) {
+      console.warn("[emeeting-audio] MediaRecorder.start failed", e);
       return;
     }
 
@@ -133,5 +169,5 @@ export function useMeetingAudioChunks(
         /* noop */
       }
     };
-  }, [enabled, mediaReady, streamRef, send, timesliceMs]);
+  }, [enabled, mediaReady, streamEpoch, streamRef, send, timesliceMs]);
 }

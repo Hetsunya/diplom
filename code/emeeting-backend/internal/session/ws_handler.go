@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"emeeting/internal/analysis"
@@ -21,6 +22,15 @@ var upgrader = websocket.Upgrader{
 		return true // для разработки
 	},
 }
+
+// Confirms mic JSON reached the WS read loop at least once per session (debug path for missing ASR).
+var (
+	firstInboundAudioMu   sync.Mutex
+	firstInboundAudioSeen = map[int]struct{}{}
+)
+
+// Large JSON mic payloads (base64 WebM) exceed many defaults if ever set elsewhere.
+const wsMaxMessageBytes = int64(64 << 20)
 
 func (h *Handler) RegisterWSHandler(messageType string, handler WSMessageHandler) {
 	h.wsMu.Lock()
@@ -244,6 +254,7 @@ func (h *Handler) WS(c *gin.Context) {
 		log.Println("[WS] upgrade failed:", err)
 		return
 	}
+	conn.SetReadLimit(wsMaxMessageBytes)
 	defer conn.Close()
 
 	log.Printf("[WS] CONNECTED session=%d remote=%s", sessionID, conn.RemoteAddr())
@@ -386,7 +397,51 @@ func (h *Handler) WS(c *gin.Context) {
 			participantName = ""
 		}
 
+		if msg.Type == "join" {
+			log.Printf("[WS] join received session=%d participant=%q", sessionID, strings.TrimSpace(msg.Participant))
+		}
+
+		if msg.Type == "audio" {
+			firstInboundAudioMu.Lock()
+			if _, ok := firstInboundAudioSeen[sessionID]; !ok {
+				firstInboundAudioSeen[sessionID] = struct{}{}
+				log.Printf("[WS] first inbound mic audio chunk (session=%d) — hub will fan-out to ai-gateway",
+					sessionID)
+			}
+			firstInboundAudioMu.Unlock()
+		}
+
 		h.dispatchWSMessage(sessionID, conn, msg)
 	}
 
+}
+
+// AnalysisWS is for ai-gateway: receives multiplexed inbound `audio` / `frame` from all meetings
+// (via hub fan-out) and processes outbound analysis messages keyed by WSMessage.session_id.
+func (h *Handler) AnalysisWS(c *gin.Context) {
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		log.Println("[WS analysis] upgrade failed:", err)
+		return
+	}
+	conn.SetReadLimit(wsMaxMessageBytes)
+	defer conn.Close()
+
+	log.Printf("[WS analysis] CONNECTED remote=%s", conn.RemoteAddr())
+	h.hub.AddAnalysisSubscriber(conn)
+	defer h.hub.RemoveAnalysisSubscriber(conn)
+
+	for {
+		var msg WSMessage
+		if err := conn.ReadJSON(&msg); err != nil {
+			log.Printf("[WS analysis] DISCONNECT err=%v", err)
+			break
+		}
+		sid := msg.SessionID
+		if sid <= 0 {
+			log.Printf("[WS analysis] skip message type=%q invalid session_id=%d", msg.Type, sid)
+			continue
+		}
+		h.dispatchWSMessage(sid, conn, msg)
+	}
 }

@@ -42,6 +42,9 @@ services:
     image: diplom-ui:latest
     build:
       context: ./code/emeeting-ui
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_WS_URL: ${VITE_WS_URL:-/ws}
     container_name: emeeting-ui
     restart: unless-stopped
     environment:
@@ -70,6 +73,7 @@ services:
     environment:
       SPEECH_ASR_ENGINE: ${SPEECH_ASR_ENGINE:-whisper}
       WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-base}
+      WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-ru}
       WHISPER_VAD_FILTER: ${WHISPER_VAD_FILTER:-false}
     expose:
       - "8090"
@@ -89,7 +93,8 @@ services:
     restart: unless-stopped
     environment:
       BACKEND_WS_BASE_URL: ${BACKEND_WS_BASE_URL:-ws://backend:8080}
-      SESSION_ID: ${AI_GATEWAY_SESSION_ID:-1}
+      # 0 = `/ws/analysis` (all meetings). Set positive only for pinned single-session workers.
+      SESSION_ID: ${AI_GATEWAY_SESSION_ID:-0}
       AI_GATEWAY_EMAIL: ${AI_GATEWAY_EMAIL:-demo1@example.com}
       AI_GATEWAY_PASSWORD: ${AI_GATEWAY_PASSWORD:-demo1pass}
       AI_GATEWAY_MODULES_CONFIG: /app/modules.docker.json

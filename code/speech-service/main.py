@@ -16,9 +16,29 @@ from asr_whisper import suffix_from_mime, transcribe_media_bytes
 
 app = FastAPI(title="emeeting-speech-service", version="0.2.0")
 
-_engine = os.getenv("SPEECH_ASR_ENGINE", "stub").strip().lower()
+def _canonical_asr_engine(raw: str | None) -> str:
+    """Normalize env values: `faster_whisper`, `FAST-WHISPER` → whisper (faster-whisper path)."""
+    if raw is None or not str(raw).strip():
+        return "stub"
+    e = str(raw).strip().lower().replace("_", "-")
+    if e in ("", "none"):
+        return "stub"
+    if e in ("faster-whisper", "fast-whisper"):
+        return "whisper"
+    return e
+
+
+_ENGINE_RAW = os.getenv("SPEECH_ASR_ENGINE", "stub")
+_engine = _canonical_asr_engine(_ENGINE_RAW)
 _executor = ThreadPoolExecutor(max_workers=int(os.getenv("SPEECH_ASR_WORKERS", "1")))
 _logger = logging.getLogger("speech_service")
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=logging.INFO)
+_logger.info(
+    "speech_service engine=%r (raw SPEECH_ASR_ENGINE=%r)",
+    _engine,
+    _ENGINE_RAW,
+)
 
 
 class TranscribeRequest(BaseModel):
@@ -98,15 +118,16 @@ def _whisper_sync(req: TranscribeRequest) -> dict[str, Any]:
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "engine": _engine}
+def health() -> dict[str, Any]:
+    return {"status": "ok", "engine": _engine, "engine_env": _ENGINE_RAW}
 
 
 @app.post("/v1/transcribe")
 async def transcribe(req: TranscribeRequest) -> dict[str, Any]:
     if _engine in ("stub", "", "none"):
         return _stub_response(req)
-    if _engine in ("whisper", "faster-whisper"):
+    if _engine == "whisper":
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(_executor, _whisper_sync, req)
+    _logger.warning("unknown SPEECH_ASR_ENGINE=%r → stub", _ENGINE_RAW)
     return _stub_response(req)

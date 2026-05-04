@@ -11,9 +11,14 @@ async def main():
     cfg = get_gateway_config()
     report_on = bool(cfg.module("report") and cfg.module("report").enabled)
 
-    session_id = int(os.getenv("SESSION_ID", "2"))
-    ws_base_url = os.getenv("BACKEND_WS_BASE_URL", "ws://localhost:8080")
-    ws_url = f"{ws_base_url}/ws/sessions/{session_id}"
+    # SESSION_ID<=0 attaches to multiplex /ws/analysis (all meetings). Positive ID keeps the
+    # legacy single-room URL for labs/smoke scripts.
+    session_id = int(os.getenv("SESSION_ID") or "0")
+    ws_base_url = os.getenv("BACKEND_WS_BASE_URL", "ws://localhost:8080").rstrip("/")
+    if session_id > 0:
+        ws_url = f"{ws_base_url}/ws/sessions/{session_id}"
+    else:
+        ws_url = f"{ws_base_url}/ws/analysis"
 
     client = SessionWSClient(
         url=ws_url,

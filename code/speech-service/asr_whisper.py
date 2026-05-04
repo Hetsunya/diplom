@@ -10,6 +10,25 @@ from typing import Any
 _model_cache: dict[str, Any] = {}
 
 
+def _effective_asr_language(explicit: str | None) -> str | None:
+    """
+    ISO 639-1 code passed to faster-whisper, or None for auto-detect.
+    Default is Russian (diploma UI); set WHISPER_LANGUAGE=auto to restore detection.
+    """
+    if explicit and str(explicit).strip():
+        v = str(explicit).strip().lower()
+        if v in ("auto", "detect", "none"):
+            return None
+        return v
+    raw = os.getenv("WHISPER_LANGUAGE")
+    if raw is None or not str(raw).strip():
+        return "ru"
+    v = str(raw).strip().lower()
+    if v in ("auto", "detect", "none"):
+        return None
+    return v
+
+
 def _get_model(model_size: str):
     """Lazy singleton per model size."""
     from faster_whisper import WhisperModel
@@ -37,7 +56,7 @@ def transcribe_media_bytes(data: bytes, suffix: str, *, language: str | None) ->
         tmp.close()
 
         kwargs: dict[str, Any] = {"beam_size": int(os.getenv("WHISPER_BEAM_SIZE", "5"))}
-        lang = language or os.getenv("WHISPER_LANGUAGE") or None
+        lang = _effective_asr_language(language)
         if lang:
             kwargs["language"] = lang
 

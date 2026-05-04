@@ -10,6 +10,8 @@ export const useMediaStream = () => {
   const [micEnabled, setMicEnabled] = useState(() => canUseMedia);
   const [camEnabled, setCamEnabled] = useState(() => canUseMedia);
   const [mediaReady, setMediaReady] = useState(false);
+  /** Bumps whenever a new MediaStream is attached (StrictMode remount / re-acquire) so audio hook re-binds. */
+  const [streamEpoch, setStreamEpoch] = useState(0);
   const [error, setError] = useState<string | null>(() => {
     const md = globalThis.navigator?.mediaDevices;
     if (!md?.getUserMedia) {
@@ -28,6 +30,7 @@ export const useMediaStream = () => {
       .then((stream) => {
         streamRef.current = stream;
         setMediaReady(true);
+        setStreamEpoch((e) => e + 1);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
@@ -88,6 +91,7 @@ export const useMediaStream = () => {
     videoRef,
     streamRef,
     mediaReady,
+    streamEpoch,
     captureFrame,
     toggleMic,
     toggleCam,

@@ -18,6 +18,9 @@ type SessionHub struct {
 	sessions  map[int]map[*websocket.Conn]bool
 	connLocks map[*websocket.Conn]*sync.Mutex
 	joinMeta  map[int]map[*websocket.Conn]connJoinMeta
+
+	analysisMu    sync.RWMutex
+	analysisConns map[*websocket.Conn]struct{}
 }
 
 func NewSessionHub() *SessionHub {
@@ -25,6 +28,8 @@ func NewSessionHub() *SessionHub {
 		sessions:  make(map[int]map[*websocket.Conn]bool),
 		connLocks: make(map[*websocket.Conn]*sync.Mutex),
 		joinMeta:  make(map[int]map[*websocket.Conn]connJoinMeta),
+
+		analysisConns: make(map[*websocket.Conn]struct{}),
 	}
 }
 
@@ -108,6 +113,55 @@ func (h *SessionHub) ParticipantSnapshot(sessionID int) []map[string]any {
 	return out
 }
 
+// AddAnalysisSubscriber receives session-wide copies of inbound media messages (audio, frame),
+// keyed by canonical session ID, for ai-gateway pipelines that attach once for all meetings.
+func (h *SessionHub) AddAnalysisSubscriber(conn *websocket.Conn) {
+	if conn == nil {
+		return
+	}
+	h.mu.Lock()
+	if _, ok := h.connLocks[conn]; !ok {
+		h.connLocks[conn] = &sync.Mutex{}
+	}
+	h.mu.Unlock()
+
+	h.analysisMu.Lock()
+	defer h.analysisMu.Unlock()
+	h.analysisConns[conn] = struct{}{}
+	log.Printf("[HUB] ai analysis subscriber attached total=%d", len(h.analysisConns))
+}
+
+func (h *SessionHub) RemoveAnalysisSubscriber(conn *websocket.Conn) {
+	if conn == nil {
+		return
+	}
+	h.analysisMu.Lock()
+	delete(h.analysisConns, conn)
+	n := len(h.analysisConns)
+	h.analysisMu.Unlock()
+	log.Printf("[HUB] ai analysis subscriber detached remaining=%d", n)
+
+	h.mu.Lock()
+	delete(h.connLocks, conn)
+	h.mu.Unlock()
+}
+
+func analysisFanoutType(t string) bool {
+	return t == "audio" || t == "frame"
+}
+
+func (h *SessionHub) fanoutToAnalysisSubs(msg WSMessage) {
+	h.analysisMu.RLock()
+	dest := make([]*websocket.Conn, 0, len(h.analysisConns))
+	for c := range h.analysisConns {
+		dest = append(dest, c)
+	}
+	h.analysisMu.RUnlock()
+	for _, c := range dest {
+		h.writeJSON(c, msg)
+	}
+}
+
 func (h *SessionHub) Remove(sessionID int, conn *websocket.Conn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -142,6 +196,12 @@ func (h *SessionHub) Broadcast(sessionID int, message any) {
 
 	for _, conn := range conns {
 		h.writeJSON(conn, message)
+	}
+
+	if wm, ok := message.(WSMessage); ok && analysisFanoutType(wm.Type) {
+		dup := wm
+		dup.SessionID = sessionID
+		h.fanoutToAnalysisSubs(dup)
 	}
 }
 

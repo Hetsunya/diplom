@@ -36,6 +36,7 @@
         "emit_no_face_face_analysis": false,
         "max_concurrent_inferences": 2,
         "emit_debug_face": false,
+        "log_face_inference": false,
         "debug_bbox_smooth_alpha": 0.35,
         "debug_max_face_area_frac": 0.45
       }

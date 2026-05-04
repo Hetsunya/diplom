@@ -95,17 +95,17 @@ class AudioPipelinePlugin:
             }
             if not has_required_envelope_fields(audio_out["payload"]):
                 incr("audio_contract_invalid")
-                return
-            await ws.send(json.dumps(audio_out))
-            get_feature_store().push(
-                int(session_id),
-                kind="audio",
-                participant_id=str(participant_id),
-                trace_id=trace_id,
-                data={"audio_features": audio_features},
-            )
-            incr("audio_analysis_sent")
-            observe_module_latency("audio", monotonic_ms() - t_audio)
+            else:
+                await ws.send(json.dumps(audio_out))
+                get_feature_store().push(
+                    int(session_id),
+                    kind="audio",
+                    participant_id=str(participant_id),
+                    trace_id=trace_id,
+                    data={"audio_features": audio_features},
+                )
+                incr("audio_analysis_sent")
+                observe_module_latency("audio", monotonic_ms() - t_audio)
 
         if not text_mod or not text_mod.enabled:
             return

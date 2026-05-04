@@ -215,6 +215,7 @@ const VideoMeet = () => {
     videoRef,
     streamRef,
     mediaReady,
+    streamEpoch,
     captureFrame,
     toggleMic,
     toggleCam,
@@ -439,10 +440,12 @@ const VideoMeet = () => {
     [send, participantName]
   );
 
+  // Не запускать MediaRecorder до OPEN WebSocket иначе send("audio") — no-op и чанки теряются.
   useMeetingAudioChunks(streamRef, send, {
-    enabled: micEnabled,
+    enabled: micEnabled && connected,
     mediaReady,
-    timesliceMs: 3500,
+    streamEpoch,
+    timesliceMs: 2000,
   });
 
   useEffect(() => {
@@ -670,7 +673,7 @@ const VideoMeet = () => {
 
         <MeetingTranscriptRail
           lines={transcriptLines}
-          asrStatus={lastTextAt ? "receiving" : "waiting…"}
+          asrStatus={lastTextAt ? "идёт распознавание…" : "ожидание…"}
           verdictSummary={verdictSummary}
           verdictDetail={verdictDetail}
           verdictSource={verdictSource}

@@ -375,7 +375,8 @@ class FaceAnalysisPlugin:
                 confidence_val=confidence_val,
                 probs=probs,
             )
-            log_event("face_inference", trace_id=trace_id, module="face")
+            if fp.log_face_inference:
+                log_event("face_inference", trace_id=trace_id, module="face")
         except Exception as e:
             incr("face_inference_errors")
             log_event("face_pipeline_failed", trace_id=trace_id, module="face", extra={"err": str(e)[:200]})

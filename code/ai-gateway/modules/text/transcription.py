@@ -40,20 +40,21 @@ async def transcribe_and_emit_text_analysis(
     participant_id = msg.get("participant_id")
     ts = msg.get("timestamp")
     payload = msg.get("payload") if isinstance(msg.get("payload"), dict) else {}
+    params = text_mod.params if isinstance(text_mod.params, dict) else {}
 
-    base_url = str(text_mod.params.get("speech_service_url") or "").strip()
+    base_url = str(params.get("speech_service_url") or "").strip()
     if not base_url:
         log_event("speech_skip", module="text", extra={"reason": "no speech_service_url"})
         return
 
-    timeout_sec = float(text_mod.params.get("timeout_sec", 15))
-    retries = int(text_mod.params.get("retries", 2))
-    backoff_sec = float(text_mod.params.get("backoff_sec", 0.5))
-    cb_failures = int(text_mod.params.get("circuit_failure_threshold", 5))
-    cb_open_sec = float(text_mod.params.get("circuit_open_sec", 30.0))
+    timeout_sec = float(params.get("timeout_sec", 15))
+    retries = int(params.get("retries", 2))
+    backoff_sec = float(params.get("backoff_sec", 0.5))
+    cb_failures = int(params.get("circuit_failure_threshold", 5))
+    cb_open_sec = float(params.get("circuit_open_sec", 30.0))
     text_ver = text_mod.model or "stub-v1"
 
-    if bool(text_mod.params.get("debug_log_transcribe")):
+    if bool(params.get("debug_log_transcribe")):
         log_event(
             "speech_transcribe_attempt",
             trace_id=trace_id,
@@ -64,6 +65,17 @@ async def transcribe_and_emit_text_analysis(
                 "final_chunk": payload.get("final_chunk"),
             },
         )
+
+    log_event(
+        "speech_transcribe_enqueue",
+        trace_id=trace_id,
+        module="text",
+        extra={
+            "session_id": session_id,
+            "approx_raw_bytes": _approx_raw_audio_bytes(payload),
+            "speech_host": base_url.split("://", 1)[-1].split("/")[0],
+        },
+    )
 
     result = await asyncio.to_thread(
         functools.partial(
@@ -85,15 +97,31 @@ async def transcribe_and_emit_text_analysis(
         return
 
     if result.get("_error"):
-        log_event("speech_error", trace_id=trace_id, module="text", extra={"err": result["_error"]})
+        err_ex: dict[str, Any] = {"err": result["_error"]}
+        prev = result.get("_http_body_preview")
+        if isinstance(prev, str) and prev.strip():
+            err_ex["http_body_preview"] = prev.strip()[:200]
+        att = result.get("_attempts")
+        if att is not None:
+            err_ex["attempts"] = att
+        log_event("speech_error", trace_id=trace_id, module="text", extra=err_ex)
         incr("text_analysis_errors")
+        incr("speech_transcribe_failed")
         if result.get("_circuit_open"):
             incr("speech_service_circuit_open")
         return
 
     norm = normalize_asr_response(result)
     if not has_transcript_content(norm):
-        log_event("speech_skip", module="text", trace_id=trace_id, extra={"reason": "empty_transcript"})
+        incr("speech_asr_empty_transcript")
+        tf = norm.get("text_features") if isinstance(norm.get("text_features"), dict) else {}
+        hint = tf.get("error") or tf.get("message") or tf.get("note")
+        hint_s = hint.strip()[:200] if isinstance(hint, str) else None
+        if bool(params.get("debug_log_transcribe")):
+            skip_x: dict[str, Any] = {"reason": "empty_transcript"}
+            if hint_s:
+                skip_x["asr_hint"] = hint_s
+            log_event("speech_skip", module="text", trace_id=trace_id, extra=skip_x)
         return
 
     transcript_partial = norm.get("transcript_partial")
@@ -139,4 +167,5 @@ async def transcribe_and_emit_text_analysis(
         data={"payload": text_out["payload"]},
     )
     incr("text_analysis_sent")
+    incr("speech_transcribe_ok")
     log_event("text_analysis", trace_id=trace_id, module="text")

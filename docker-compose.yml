@@ -42,6 +42,8 @@ services:
     environment:
       SPEECH_ASR_ENGINE: ${SPEECH_ASR_ENGINE:-whisper}
       WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-base}
+      # ru = стабильнее для русской речи; auto = автоопределение faster-whisper
+      WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-ru}
       # false = less aggressive silence trimming (fewer empty transcripts on quiet speech)
       WHISPER_VAD_FILTER: ${WHISPER_VAD_FILTER:-false}
     expose:
@@ -60,8 +62,8 @@ services:
     profiles: ["ai"]
     environment:
       BACKEND_WS_BASE_URL: ws://backend:8080
-      # Must match numeric id in `/sessions/:id` that the browser joins; otherwise gateway never sees mic/frames.
-      SESSION_ID: ${AI_GATEWAY_SESSION_ID:-1}
+      # 0 = multiplex `/ws/analysis` (any meeting id). Positive = legacy single-room `/ws/sessions/:id`.
+      SESSION_ID: ${AI_GATEWAY_SESSION_ID:-0}
       AI_GATEWAY_EMAIL: demo1@example.com
       AI_GATEWAY_PASSWORD: demo1pass
       AI_GATEWAY_MODULES_CONFIG: /app/modules.docker.json
@@ -80,6 +82,9 @@ services:
   ui:
     build:
       context: ./code/emeeting-ui
+      args:
+        VITE_API_URL: /api
+        VITE_WS_URL: /ws
     container_name: emeeting-ui
     environment:
       VITE_API_URL: /api

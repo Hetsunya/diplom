@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const DEFAULT_WS_URL = "ws://localhost:8080";
 const WS_URL = import.meta.env.VITE_WS_URL || DEFAULT_WS_URL;
@@ -31,6 +31,18 @@ export const useSessionWS = (
   };
 
   const ws = useRef<WebSocket | null>(null);
+  /** Keep latest ids without changing `send` identity (MediaRecorder deps must stay stable). */
+  const sessionIdRef = useRef(sessionId);
+  const participantIdRef = useRef(participantId);
+
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  useEffect(() => {
+    participantIdRef.current = participantId;
+  }, [participantId]);
+
   const [connected, setConnected] = useState(false);
   const onMessageRef = useRef(onMessage);
   const reconnectAttempt = useRef(0);
@@ -64,8 +76,8 @@ export const useSessionWS = (
       ws.current?.send(
         JSON.stringify({
           type: "join",
-          session_id: Number(sessionId),
-          participant_id: participantId,
+          session_id: Number(sessionIdRef.current),
+          participant_id: participantIdRef.current,
           payload: { name, role },
           timestamp: new Date().toISOString(),
         })
@@ -114,25 +126,26 @@ export const useSessionWS = (
     };
   }, [sessionId, participantId, options.reconnect, options.maxReconnectDelayMs]);
 
-  const send = (type: string, payload?: unknown) => {
+  const send = useCallback((type: string, payload?: unknown) => {
     const sock = ws.current;
     if (!sock || sock.readyState !== WebSocket.OPEN) return;
     try {
       sock.send(
         JSON.stringify({
           type,
-          session_id: Number(sessionId),
-          participant_id: participantId,
+          session_id: Number(sessionIdRef.current),
+          participant_id: participantIdRef.current,
           payload,
           timestamp: new Date().toISOString(),
         })
       );
-    } catch {
-      // Ignore transient close races during reconnect.
+    } catch (e) {
+      // Stringify/WebSocket can throw on oversized payloads; log so mic pipeline isn't a silent black hole.
+      console.error("[meeting-ws] send failed", type, e);
     }
-  };
+  }, []);
 
-  const close = () => ws.current?.close();
+  const close = useCallback(() => ws.current?.close(), []);
 
   return { send, close, connected };
 };

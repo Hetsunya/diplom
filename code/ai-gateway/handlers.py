@@ -26,6 +26,7 @@ def _load_plugins() -> list[Plugin]:
 
 _PLUGINS: list[Plugin] = []
 _LAST_CFG_POLL_MONO: float = 0.0
+_logged_first_ws_audio: bool = False
 
 
 def _get_plugins() -> list[Plugin]:
@@ -41,9 +42,22 @@ def _plugin_sort_key(p: Plugin) -> int:
 
 async def handle_message(msg: dict[str, Any], ws: Any) -> None:
     """Dispatch to all plugins that can handle the message (sorted by priority)."""
-    global _LAST_CFG_POLL_MONO
+    global _LAST_CFG_POLL_MONO, _logged_first_ws_audio
     if msg.get("type") == "audio":
         incr("inbound_ws_audio")
+        if not _logged_first_ws_audio:
+            _logged_first_ws_audio = True
+            pl = msg.get("payload") if isinstance(msg.get("payload"), dict) else {}
+            b64 = pl.get("chunk_base64") if isinstance(pl.get("chunk_base64"), str) else ""
+            log_event(
+                "first_inbound_ws_audio",
+                module="gateway",
+                extra={
+                    "session_id": msg.get("session_id"),
+                    "participant_id": msg.get("participant_id"),
+                    "b64_chars": len(b64),
+                },
+            )
 
     poll = float(os.getenv("AI_GATEWAY_CONFIG_POLL_SEC", "10"))
     if poll > 0:

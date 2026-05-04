@@ -9,6 +9,8 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+from observability import incr
+
 _lock = threading.Lock()
 # Per speech-service base URL: consecutive failures and circuit-open deadline (monotonic sec).
 _circuit: dict[str, tuple[int, float]] = {}
@@ -77,9 +79,37 @@ def transcribe_audio_chunk(
                 out = json.loads(raw)
                 with _lock:
                     _circuit[key] = (0, 0.0)
+                incr("speech_adapter_http_ok")
                 return out
+        except urllib.error.HTTPError as e:
+            snippet = ""
+            try:
+                snippet = e.read().decode("utf-8", errors="replace")[:500]
+            except Exception:
+                pass
+            if attempt >= retries:
+                incr("speech_adapter_http_error")
+                err: dict[str, Any] = {
+                    "_error": f"HTTPError {e.code}",
+                    "_http_body_preview": snippet,
+                    "_attempts": attempt + 1,
+                }
+                with _lock:
+                    prev = _circuit.get(key, (0, 0.0))
+                    nfails = prev[0] + 1
+                    open_until = prev[1]
+                    thr = max(1, int(circuit_failure_threshold))
+                    if nfails >= thr:
+                        open_until = time.monotonic() + max(1.0, float(circuit_open_sec))
+                        nfails = 0
+                    _circuit[key] = (nfails, open_until)
+                return err
+            sleep_for = backoff_sec * (2**attempt)
+            time.sleep(sleep_for)
+            attempt += 1
         except (urllib.error.URLError, json.JSONDecodeError, TimeoutError) as e:
             if attempt >= retries:
+                incr("speech_adapter_transport_error")
                 err = {"_error": str(e), "_attempts": attempt + 1}
                 with _lock:
                     prev = _circuit.get(key, (0, 0.0))

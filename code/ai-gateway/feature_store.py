@@ -44,6 +44,10 @@ class FeatureStore:
                 return []
             return list(dq)[-_MAX_PER_KIND * 8 :]
 
+    def session_ids(self) -> list[int]:
+        with self._lock:
+            return sorted(self._by_session.keys())
+
 
 _store = FeatureStore()
 

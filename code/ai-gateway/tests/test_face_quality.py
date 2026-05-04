@@ -31,6 +31,7 @@ class TestFaceRuntimeParams(unittest.TestCase):
         self.assertEqual(p.min_face_side_px, 0)
         self.assertEqual(p.max_concurrent_inferences, 2)
         self.assertFalse(p.emit_debug_face)
+        self.assertFalse(p.log_face_inference)
         self.assertEqual(p.debug_bbox_smooth_alpha, 0.35)
         self.assertEqual(p.debug_max_face_area_frac, 0.45)
 

@@ -32,4 +32,5 @@ func (m *Module) RegisterRoutes(router *gin.Engine) {
 	router.GET("/sessions/:id", m.handler.Get)
 	router.GET("/sessions/:id/chat/messages", m.chatHTTP.ListMessages)
 	router.GET("/ws/sessions/:id", m.handler.WS)
+	router.GET("/ws/analysis", m.handler.AnalysisWS)
 }

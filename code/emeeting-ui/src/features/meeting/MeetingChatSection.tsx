@@ -47,7 +47,7 @@ export function MeetingChatSection({
       <div className="meeting-transcript-rail__section-title-row">
         <div className="meeting-transcript-rail__section-title">Чат</div>
         <span className="meeting-transcript-rail__muted meeting-transcript-rail__chat-hint">
-          Отдельно от ASR-транскрипта выше
+          Отдельно от ASR-транскрибации выше
         </span>
       </div>
       <div
