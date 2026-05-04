@@ -90,7 +90,7 @@ export function useMeetingAudioChunks(
     }
 
     let cancelled = false;
-    let { recorder: mr, mimeHint: mime } = created;
+    const { recorder: mr, mimeHint: mime } = created;
     let chunkSeq = 0;
     const parts: Uint8Array[] = [];
     let segmentStarted = Date.now();

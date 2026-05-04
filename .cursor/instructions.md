@@ -1,72 +1,40 @@
-# eMeeting Monorepo — Project Context
+# eMeeting Monorepo — контекст для агентов
 
-## Architecture
-- Monorepo с 3 сервисами:
-  - `code/emeeting-ui`: React 18 + TypeScript + Vite, frontend
-  - `code/emeeting-backend`: Go 1.21 + Gin + gorilla/websocket, REST API + WS
-  - `code/ai-gateway`: Python 3.11, прокси для AI/WS обработчиков
-- Оркестрация: Docker Compose (Postgres 15, все сервисы в одной сети)
-- Auth: пока демо-пользователи в БД (password_hash = SHA-256 hex), планируется cookie-based auth с HttpOnly сессиями
+Рабочая область Cursor часто открыта на каталоге **`code/`** внутри репозитория; пути ниже указаны **от корня монорепозитория** (`diplom/`), как в CI и Docker.
 
-## Ключевые эндпоинты
-- Backend: `GET /ws/health`, `POST /auth/login`, `GET /sessions`, `GET /reports/:id`
-- WebSocket: `/ws/sessions/:id` (upgrade, JWT в query-параметре пока)
-- UI: Vite dev server на 5173, проксирует API на 8080
+## Архитектура
 
-## Текущее состояние
-✅ Базовая инфраструктура: Docker Compose, миграции SQL, health checks
-⚠️ Meeting service: минимальная реализация, нет:
-  - управления участниками (join/leave, роли: host/participant)
-  - real-time синхронизации состояния митинга
-  - обработки отключений/реконнектов
-⚠️ Auth system:
-  - пароли хранятся как SHA-256 (небезопасно для prod)
-  - нет refresh tokens, rate limiting, validation middleware
-  - frontend хранит isAuthenticated в state (уязвимо)
+| Компонент | Путь | Стек |
+|-----------|------|------|
+| Frontend | `code/emeeting-ui` | React 19, TypeScript, Vite, TanStack Query, Zustand |
+| Backend | `code/emeeting-backend` | Go, Gin, gorilla/websocket, PostgreSQL |
+| AI Gateway | `code/ai-gateway` | Python 3.11, WebSocket-пайплайн аналитики (face, audio, text, отчёты) |
+| ASR | `code/speech-service` | HTTP `/v1/transcribe`: режимы `stub` и `whisper` (faster-whisper) |
 
-## Цели доработки (приоритет)
-1. **Meeting Service**:
-   - Реализовать состояние митинга: `created` → `active` → `ended`
-   - Добавить роли участников: `host`, `co-host`, `participant`, `guest`
-   - WebSocket события: `user_joined`, `user_left`, `host_started`, `meeting_ended`
-   - Обработка реконнекта: восстановление сессии по session_id + token
-   - Хранение метаданных митинга в БД: participants[], start_time, duration, settings
+Оркестрация: `docker-compose.yml` / `docker-compose.prod.yml` в корне репозитория.
 
-2. **Auth System**:
-   - Перейти на bcrypt для хеширования паролей
-   - Реализовать JWT access + refresh tokens (access: 15min, refresh: 7d)
-   - Добавить middleware: `RequireAuth`, `RequireRole`, `RateLimit`
-   - Backend: HttpOnly secure cookie с session token (не localStorage!)
-   - Frontend: AuthContext с retry-логикой при 401, автоматический рефреш токена
+## Текущее состояние (актуально)
 
-## Технические требования
-- Go: использовать context для отмены, graceful shutdown для WS
-- React: TypeScript strict mode, React Query для server state, Zod для валидации форм
-- БД: миграции только через SQL в `migrations/up`, rollback в `migrations/down`
-- Безопасность: CSP headers, CORS только с `CORS_ALLOW_ORIGIN`, sanitization входных данных
-- Тесты:
-  - Backend: `go test ./...` с coverage >80%, тесты на конкурентность через `t.Parallel()`
-  - Frontend: Vitest + React Testing Library, e2e через Playwright (опционально)
+- **Аутентификация:** bcrypt для паролей, JWT access + refresh, ротация refresh-токенов, часть эндпоинтов публичная (`/auth/login`, `/auth/refresh`, health). Подробности — код в `code/emeeting-backend/internal/auth/`.
+- **Встречи / сессии:** WebSocket по сессиям, состояние митинга и участники — см. `code/emeeting-backend/internal/session/`, UI — `code/emeeting-ui/src/features/meeting/`.
+- **Документация:** индекс — `code/docs/README.md`; контракты WS — `code/docs/ANALYSIS_WS_CONTRACTS.md`. Каталог **`code/AI/`** (черновики исследований) **не входит в репозиторий** — удалён для уменьшения размера клона.
+- **Правила по подсистемам:** `.cursor/rules/meeting-service.mdc`, `.cursor/rules/auth-system.mdc` (globs относительно корня workspace — при открытом `code/` без префикса `code/`).
 
-## Конвенции кода
-- Go: effective go, golint, имена в camelCase для экспортируемых, snake_case для БД
-- React: functional components + hooks, file-per-component, `*.test.tsx` рядом с компонентом
-- Ошибки: Go — wrap с `%w`, React — ErrorBoundary + user-friendly messages
-- Логирование: structured logging (zap в Go, pino в Node если понадобится)
+## Команды
 
-## Команды разработки
 ```bash
-# Запуск всего стека
+# Корень репозитория (diplom/)
 docker compose up --build
 
-# Backend dev
-cd code/emeeting-backend && go run ./cmd/server
+# Backend
+cd code/emeeting-backend && go test ./... && go vet ./... && go build ./...
 
-# Frontend dev
-cd code/emeeting-ui && npm run dev
-
-# Тесты
-cd code/emeeting-backend && go test ./... -cover
-cd code/emeeting-ui && npm run test && npm run lint
+# Frontend
+cd code/emeeting-ui && npm ci && npm run lint && npm run test && npm run build
 ```
 
+## Соглашения
+
+- Миграции БД: SQL в `code/emeeting-backend/migrations/up` и `down`.
+- Новые документы продуктового уровня — в `code/docs/`, ссылка из `docs/README.md`.
+- Не добавлять в git тяжёлые бинарники и полные клоны сторонних ML-проектов; достаточно ссылок и описания в документации.

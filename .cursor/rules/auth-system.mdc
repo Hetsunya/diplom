@@ -1,9 +1,9 @@
 ---
 description: Authentication & Authorization rules
 globs:
-  - code/emeeting-backend/internal/auth/**
-  - code/emeeting-backend/middleware/**
-  - code/emeeting-ui/src/features/auth/**
+  - emeeting-backend/internal/auth/**
+  - emeeting-backend/middleware/**
+  - emeeting-ui/src/features/auth/**
 alwaysApply: false
 ---
 
