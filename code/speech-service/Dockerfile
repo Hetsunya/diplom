@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY main.py asr_whisper.py ./
 
 ENV SPEECH_ASR_ENGINE=whisper \
-    WHISPER_MODEL_SIZE=base \
+    WHISPER_MODEL_SIZE=small \
     WHISPER_DEVICE=cpu \
     WHISPER_COMPUTE_TYPE=int8
 

@@ -1,4 +1,11 @@
-"""Optional faster-whisper backend for speech-service."""
+"""Optional faster-whisper backend for speech-service.
+
+Live ASR from ai-gateway sends **growing** WebM chunks (re-decode full buffer each tick).
+For that pattern, OpenAI recommends turning off ``condition_on_previous_text`` to avoid
+feedback loops / repeated phrases, and using VAD to strip silence (fewer "phantom" words).
+
+See also: https://github.com/davabase/whisper_real_time (cumulative buffer idea).
+"""
 
 from __future__ import annotations
 
@@ -8,6 +15,28 @@ from pathlib import Path
 from typing import Any
 
 _model_cache: dict[str, Any] = {}
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None or not str(raw).strip():
+        return default
+    v = str(raw).strip().lower()
+    if v in ("0", "false", "no", "off", "n"):
+        return False
+    if v in ("1", "true", "yes", "on", "y"):
+        return True
+    return default
+
+
+def _env_float_optional(name: str) -> float | None:
+    raw = os.getenv(name)
+    if raw is None or not str(raw).strip():
+        return None
+    try:
+        return float(str(raw).strip())
+    except ValueError:
+        return None
 
 
 def _effective_asr_language(explicit: str | None) -> str | None:
@@ -60,8 +89,22 @@ def transcribe_media_bytes(data: bytes, suffix: str, *, language: str | None) ->
         if lang:
             kwargs["language"] = lang
 
-        vad_env = os.getenv("WHISPER_VAD_FILTER", "false").strip().lower()
-        kwargs["vad_filter"] = vad_env in ("1", "true", "yes", "on")
+        # Streaming-ish chunks: defaults tuned vs original faster-whisper (vad off, condition on).
+        kwargs["vad_filter"] = _env_bool("WHISPER_VAD_FILTER", True)
+        kwargs["condition_on_previous_text"] = _env_bool("WHISPER_CONDITION_ON_PREVIOUS_TEXT", False)
+
+        nst = _env_float_optional("WHISPER_NO_SPEECH_THRESHOLD")
+        if nst is not None:
+            kwargs["no_speech_threshold"] = nst
+        crt = _env_float_optional("WHISPER_COMPRESSION_RATIO_THRESHOLD")
+        if crt is not None:
+            kwargs["compression_ratio_threshold"] = crt
+        lpt = _env_float_optional("WHISPER_LOG_PROB_THRESHOLD")
+        if lpt is not None:
+            kwargs["log_prob_threshold"] = lpt
+        hst = _env_float_optional("WHISPER_HALLUCINATION_SILENCE_THRESHOLD")
+        if hst is not None:
+            kwargs["hallucination_silence_threshold"] = hst
 
         try:
             segments, info = model.transcribe(str(path), **kwargs)

@@ -44,8 +44,10 @@ services:
       WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-base}
       # ru = стабильнее для русской речи; auto = автоопределение faster-whisper
       WHISPER_LANGUAGE: ${WHISPER_LANGUAGE:-ru}
-      # false = less aggressive silence trimming (fewer empty transcripts on quiet speech)
-      WHISPER_VAD_FILTER: ${WHISPER_VAD_FILTER:-false}
+      # true = меньше «галлюцинаций» на тишине (VAD в faster-whisper); false если очень тихий микрофон
+      WHISPER_VAD_FILTER: ${WHISPER_VAD_FILTER:-true}
+      # false = меньше повторов при стриминге нарастающего буфера (см. whisper_real_time)
+      WHISPER_CONDITION_ON_PREVIOUS_TEXT: ${WHISPER_CONDITION_ON_PREVIOUS_TEXT:-false}
     expose:
       - "8090"
     healthcheck:

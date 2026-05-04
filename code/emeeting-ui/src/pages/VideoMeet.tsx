@@ -363,7 +363,8 @@ const VideoMeet = () => {
       if (type === "text_analysis" && pid && m.payload && typeof m.payload === "object") {
         const p = m.payload as Record<string, unknown>;
         const traceRaw = p["trace_id"];
-        const traceId = typeof traceRaw === "string" ? traceRaw : `local-${Date.now()}-${pid}`;
+        const serverTraceId =
+          typeof traceRaw === "string" && traceRaw.trim() ? traceRaw : `local-${Date.now()}-${pid}`;
         const partial = p["transcript_partial"];
         const final = p["transcript_final"];
         const text =
@@ -374,19 +375,35 @@ const VideoMeet = () => {
           stage === "final" ||
           (typeof stage === "string" && stage.toLowerCase().includes("final"));
 
+        // ai-gateway issues a new trace_id per audio chunk; merging only by trace_id would
+        // append a new "черновик" row on every ASR tick. Keep one rolling draft per speaker.
+        const draftTraceId = `asr-draft:${pid}`;
+
         setTranscriptLines((prev) => {
-          const idx = prev.findIndex((l) => l.traceId === traceId && l.participantId === pid);
+          if (isFinal) {
+            const withoutOpenDraft = prev.filter((l) => !(l.participantId === pid && !l.final));
+            const line: TranscriptLine = {
+              traceId: serverTraceId,
+              participantId: pid,
+              speakerLabel: nameFor(pid),
+              text,
+              final: true,
+              at: new Date().toISOString(),
+            };
+            return [...withoutOpenDraft, line].slice(-80);
+          }
           const line: TranscriptLine = {
-            traceId,
+            traceId: draftTraceId,
             participantId: pid,
             speakerLabel: nameFor(pid),
             text,
-            final: isFinal,
+            final: false,
             at: new Date().toISOString(),
           };
-          if (idx >= 0) {
+          const draftIdx = prev.findIndex((l) => l.traceId === draftTraceId && l.participantId === pid);
+          if (draftIdx >= 0) {
             const next = [...prev];
-            next[idx] = { ...next[idx], ...line };
+            next[draftIdx] = { ...next[draftIdx], ...line };
             return next;
           }
           return [...prev, line].slice(-80);
