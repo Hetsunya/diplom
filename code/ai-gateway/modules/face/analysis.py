@@ -14,8 +14,10 @@ from gateway_config import get_gateway_config
 from modules.face.frame_quality import should_skip_blurry_frame
 from modules.face.params import FaceRuntimeParams
 from modules.face.region_util import clamp_face_region, ema_bbox
+from modules.shared.session_modules import is_module_enabled_for_session
 from modules.face.schema import (
     build_face_features_guard,
+    build_face_behavior_v1,
     build_face_features_positive,
     is_no_face_deepface_error,
     normalize_deepface_result,
@@ -77,20 +79,24 @@ class FaceAnalysisPlugin:
         model_ver: str,
         trace_id: str,
         face_features: dict[str, Any],
+        face_behavior: dict[str, Any] | None = None,
     ) -> None:
+        payload: dict[str, Any] = {
+            **analysis_envelope(
+                module="face",
+                version=model_ver,
+                stage="partial",
+                trace_id=trace_id,
+            ),
+            "face_features": face_features,
+        }
+        if face_behavior is not None:
+            payload["face_behavior"] = face_behavior
         face_out = {
             "type": "face_analysis",
             "session_id": session_id,
             "participant_id": participant_id,
-            "payload": {
-                **analysis_envelope(
-                    module="face",
-                    version=model_ver,
-                    stage="partial",
-                    trace_id=trace_id,
-                ),
-                "face_features": face_features,
-            },
+            "payload": payload,
             "timestamp": ts,
         }
         if not has_required_envelope_fields(face_out["payload"]):
@@ -103,7 +109,10 @@ class FaceAnalysisPlugin:
             kind="face",
             participant_id=str(participant_id),
             trace_id=trace_id,
-            data={"face_features": face_features},
+            data={
+                "face_features": face_features,
+                **({"face_behavior": face_behavior} if face_behavior is not None else {}),
+            },
         )
 
     async def _emit_legacy_emotion(
@@ -152,6 +161,7 @@ class FaceAnalysisPlugin:
         region_h: int | None,
     ) -> None:
         region = None
+        landmarks: list[dict[str, int]] = []
         if (
             region_x is not None
             and region_y is not None
@@ -161,6 +171,14 @@ class FaceAnalysisPlugin:
             and region_h > 0
         ):
             region = {"x": region_x, "y": region_y, "w": region_w, "h": region_h}
+            # DeepFace does not return dense landmarks; expose stable anchor points for UI overlay.
+            landmarks = [
+                {"x": region_x, "y": region_y},
+                {"x": region_x + region_w, "y": region_y},
+                {"x": region_x, "y": region_y + region_h},
+                {"x": region_x + region_w, "y": region_y + region_h},
+                {"x": region_x + region_w // 2, "y": region_y + region_h // 2},
+            ]
         dbg = {
             "type": "face_debug",
             "session_id": session_id,
@@ -170,6 +188,7 @@ class FaceAnalysisPlugin:
                 "frame_width": frame_w,
                 "frame_height": frame_h,
                 "region": region,
+                "landmarks": landmarks,
                 "dominant_emotion": dominant,
                 "model_confidence": round(float(model_confidence), 4),
                 "gate_passed": gate_passed,
@@ -199,6 +218,8 @@ class FaceAnalysisPlugin:
         session_id = msg.get("session_id")
         participant_id = msg.get("participant_id")
         if session_id is None or participant_id is None:
+            return
+        if not is_module_enabled_for_session(int(session_id), "face"):
             return
 
         key = f"{session_id}:{participant_id}"
@@ -310,6 +331,18 @@ class FaceAnalysisPlugin:
                     skip_reason = "small_region"
 
             gate_passed = face_features is not None
+            face_behavior: dict[str, Any] | None = None
+            if fp.emit_face_behavior:
+                provider_name = mod.provider or "deepface"
+                face_behavior = build_face_behavior_v1(
+                    provider=provider_name,
+                    schema_version=fp.face_behavior_schema_version,
+                    confidence=confidence_val,
+                    probs=probs,
+                    face_detected=gate_passed,
+                    guard_reason=skip_reason,
+                    min_face_side_px=fp.min_face_side_px if fp.min_face_side_px > 0 else None,
+                )
 
             if fp.emit_debug_face:
                 dx = dy = dw = dh = None
@@ -364,6 +397,7 @@ class FaceAnalysisPlugin:
                 model_ver=model_ver,
                 trace_id=trace_id,
                 face_features=face_features,
+                face_behavior=face_behavior,
             )
 
             await self._emit_legacy_emotion(

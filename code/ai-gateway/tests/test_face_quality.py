@@ -6,6 +6,7 @@ import unittest
 
 from modules.face.params import FaceRuntimeParams
 from modules.face.schema import (
+    build_face_behavior_v1,
     build_face_features_guard,
     build_face_features_positive,
     is_no_face_deepface_error,
@@ -114,6 +115,21 @@ class TestFaceSchema(unittest.TestCase):
     def test_no_face_error_heuristic(self) -> None:
         self.assertTrue(is_no_face_deepface_error(ValueError("Face could not be detected")))
         self.assertFalse(is_no_face_deepface_error(RuntimeError("CUDA OOM")))
+
+    def test_face_behavior_payload(self) -> None:
+        fb = build_face_behavior_v1(
+            provider="deepface",
+            schema_version="face_behavior.v1",
+            confidence=0.88,
+            probs={"happy": 70.0, "neutral": 20.0},
+            face_detected=True,
+            guard_reason=None,
+            min_face_side_px=56,
+        )
+        self.assertEqual(fb["schema_version"], "face_behavior.v1")
+        self.assertEqual(fb["provider"], "deepface")
+        self.assertEqual(fb["face_count"], 1)
+        self.assertTrue(fb["quality"]["trackable"])
 
 
 class TestReportFaceFeaturePath(unittest.TestCase):

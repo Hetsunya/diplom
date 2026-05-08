@@ -2,6 +2,30 @@
 
 **Где что лежит (монорепо):** каталог `code/` — основной код; **прод docker-compose и `.env.prod.example`** — в **корне репозитория** на уровень выше `code/` (`docker-compose.prod.yml`, `.env.prod.example`, `Caddyfile`). Локальный стек: `docker-compose.yml` там же.
 
+---
+
+Новая группировка задач (единая для планирования релиза)
+
+Чтобы не смешивать “must-have до прод” и R&D после релиза, использовать следующую структуру:
+
+**Track A — Release Gate (обязательно до прод)**
+- BL-025 (HTTPS/reverse proxy), BL-027 (auth hardening), BL-029 (observability release-уровня)
+- BL-110 (Report UI v2 без моков), BL-111 (контракт отчетов single/team/trends)
+- BL-BE-113 (история транскрибации API уровня, стабильный endpoint)
+
+**Track B — Prod Stabilization (первые 2–4 недели после запуска)**
+- BL-AI-101 (ASR quality/latency baseline), BL-AI-112 (стабильный realtime flow без артефактов)
+- BL-AI-109 (nightly smoke/CI для AI), BL-AI-107 (метрики/дашборды)
+
+**Track C — Post-Prod R&D (не блокирует релиз)**
+- BL-AI-102/103/104/105/106 (audio v2, face provider v3, own NN report, NLP, diarization)
+- Новые face behavior задачи BL-AI-114..117 (ниже)
+
+Правило приоритизации:
+- пока не закрыт Track A — задачи Track C не поднимаются в активный спринт;
+- Track B можно вести параллельно с bugfix после go-live;
+- Track C — только отдельным roadmap-потоком.
+
 Backlog (приоритетный)
 P0 — Стабильный базовый контур (блокеры)
 BL-001 [x]: Зафиксировать API-контракт v1 (UI ↔ Backend)
@@ -548,6 +572,7 @@ BL-AI-112 [ ]: Транскрибация realtime без накопительн
 Файлы: `ai-gateway/adapters/speech_service.py`, `speech-service/main.py`, `ai-gateway/modules/text/transcription.py`
 Оценка: 2–5 дн
 DoD: ASR принимает короткие независимые чанки, итоговый текст стабильнее на длинной речи.
+Статус: **в работе** — внедрено окно/шаг (`test.py` approach) и анти-дубли в `speech-service`, осталось стабилизировать edge-кейсы WebM на длинных сессиях и добавить метрики подавления/ошибок.
 
 BL-BE-113 [ ]: История транскрибации в БД + REST endpoint
 
@@ -555,3 +580,32 @@ BL-BE-113 [ ]: История транскрибации в БД + REST endpoint
 Файлы: `emeeting-backend/internal/session/**`, `emeeting-backend/migrations/*`, `emeeting-ui/src/pages/VideoMeet.tsx`
 Оценка: 2–4 дн
 DoD: `GET /sessions/:id/transcription` возвращает историю, UI подгружает ее перед live-обновлениями.
+Статус: **частично** — UI подгружает историю через `/sessions/:id/analysis/events?module=text`; отдельный “чистый” endpoint транскрибации еще не выделен.
+
+BL-AI-114 [ ]: Face Behavior submodule (landmarks/blendshapes/head pose)
+
+Цель: выделить продвинутый трекинг поведения как отдельный подмодуль `face.behavior` без ломки текущего `face_analysis`.
+Файлы: `ai-gateway/modules/face/**`, `docs/ANALYSIS_WS_CONTRACTS.md`, `ai-gateway/modules/registry.py`
+Оценка: 3–6 дн
+DoD: в конфиге можно включить/выключить `face.emotion` и `face.behavior` независимо; WS payload совместим с текущим фронтом.
+
+BL-AI-115 [ ]: Контракт `face.behavior` v1 + quality flags
+
+Цель: стандартизировать поля для отчетов и дальнейшего fusion.
+Файлы: `docs/ANALYSIS_WS_CONTRACTS.md`, `ai-gateway/contracts.py`, `ai-gateway/modules/face/schema.py`
+Оценка: 2–4 дн
+DoD: описаны поля `blendshapes`, `head_pose`, `eye_state`, `smile`, `quality`; есть валидация и fallback при неполных данных.
+
+BL-AI-116 [ ]: Report fusion — использовать behavior-сигналы в отчете
+
+Цель: добавить в отчеты метрики вовлеченности/усталости/внимания на основе face behavior.
+Файлы: `ai-gateway/modules/report/**`, `ai-gateway/feature_store.py`, `emeeting-ui/src/pages/Report.tsx`
+Оценка: 4–8 дн
+DoD: в `analysis_report` появляется блок `face_behavior_summary` (trend + participant breakdown), UI отображает его без debug режима.
+
+BL-AI-117 [ ]: Конфигуратор модулей — provider layer (speech-service как backend text-module)
+
+Цель: отразить в конфигураторе, что `speech-service` — провайдер модуля `text.transcription`, а не отдельная UI-фича.
+Файлы: `ai-gateway/modules.default.json`, `ai-gateway/modules.docker.json`, `docs/UI_AI_ANALYSIS_PLAN.md`, `docs/README.md`
+Оценка: 2–5 дн
+DoD: в конфиге явно задаются `module` + `provider` + `provider params`; переключение провайдера не меняет внешний контракт `text_analysis`.

@@ -35,7 +35,9 @@
         "emit_debug_face": true,
         "log_face_inference": false,
         "debug_bbox_smooth_alpha": 0.92,
-        "debug_max_face_area_frac": 0.42
+        "debug_max_face_area_frac": 0.42,
+        "emit_face_behavior": true,
+        "face_behavior_schema_version": "face_behavior.v1"
       }
     },
     "report": {

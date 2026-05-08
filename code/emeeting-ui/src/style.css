@@ -1099,6 +1099,18 @@ footer {
     border-radius: 2px;
 }
 
+.face-debug-point {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: rgba(46, 230, 140, 0.95);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 4;
+}
+
 .face-debug-hud {
     position: absolute;
     left: 6px;

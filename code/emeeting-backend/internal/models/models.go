@@ -74,6 +74,8 @@ type Session struct {
 	LocationType     *LocationType `json:"locationType,omitempty"`
 	PhysicalLocation *string       `json:"physicalLocation,omitempty"`
 	CreatedBy        *int          `json:"createdBy,omitempty"`
+	AnalysisConfigID *int          `json:"analysisConfigId,omitempty"`
+	AnalysisConfigJSON any         `json:"analysisConfigJson,omitempty"`
 }
 
 type SessionParticipant struct {

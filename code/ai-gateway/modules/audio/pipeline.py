@@ -11,6 +11,7 @@ from contracts import analysis_envelope, build_trace_id, has_required_envelope_f
 from feature_store import get_feature_store
 from gateway_config import get_gateway_config
 from modules.audio.signal import extract_audio_features_safe
+from modules.shared.session_modules import is_module_enabled_for_session
 from modules.text.transcription import transcribe_and_emit_text_analysis
 from observability import incr, monotonic_ms, observe_module_latency
 
@@ -51,7 +52,7 @@ class AudioPipelinePlugin:
         ts = msg.get("timestamp")
         payload = msg.get("payload") if isinstance(msg.get("payload"), dict) else {}
 
-        if audio_mod and audio_mod.enabled:
+        if audio_mod and audio_mod.enabled and is_module_enabled_for_session(int(session_id), "audio"):
             t_audio = monotonic_ms()
             audio_ver = audio_mod.model or "audio-features-v2"
             params = audio_mod.params or {}
@@ -108,6 +109,8 @@ class AudioPipelinePlugin:
                 observe_module_latency("audio", monotonic_ms() - t_audio)
 
         if not text_mod or not text_mod.enabled:
+            return
+        if not is_module_enabled_for_session(int(session_id), "text"):
             return
 
         await transcribe_and_emit_text_analysis(

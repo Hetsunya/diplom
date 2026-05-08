@@ -125,3 +125,60 @@ def build_face_features_guard(*, reason: str) -> dict[str, Any]:
         "confidence": 0.0,
         "guard_reason": reason,
     }
+
+
+def _clamp01(v: float) -> float:
+    return max(0.0, min(1.0, float(v)))
+
+
+def build_face_behavior_v1(
+    *,
+    provider: str,
+    schema_version: str,
+    confidence: float,
+    probs: dict[str, Any],
+    face_detected: bool,
+    guard_reason: str | None,
+    frame_laplacian_var: float | None = None,
+    min_face_side_px: int | None = None,
+) -> dict[str, Any]:
+    """
+    Build a minimal behavior payload compatible with docs/ANALYSIS_WS_CONTRACTS.md.
+
+    We intentionally keep this model-agnostic: DeepFace currently gives emotion probabilities,
+    so v1 behavior proxies are derived from those scores and quality gates.
+    """
+    happy = _clamp01(float(probs.get("happy", 0.0)) / 100.0 if probs else 0.0)
+    surprise = _clamp01(float(probs.get("surprise", 0.0)) / 100.0 if probs else 0.0)
+    neutral = _clamp01(float(probs.get("neutral", 0.0)) / 100.0 if probs else 0.0)
+    sad = _clamp01(float(probs.get("sad", 0.0)) / 100.0 if probs else 0.0)
+    fear = _clamp01(float(probs.get("fear", 0.0)) / 100.0 if probs else 0.0)
+    angry = _clamp01(float(probs.get("angry", 0.0)) / 100.0 if probs else 0.0)
+
+    engagement_proxy = _clamp01((happy * 0.55) + (surprise * 0.15) + (neutral * 0.2) - (sad * 0.05) - (fear * 0.025) - (angry * 0.025))
+    trackable = bool(face_detected) and guard_reason is None
+
+    quality: dict[str, Any] = {
+        "trackable": trackable,
+        "confidence": float(confidence),
+    }
+    if guard_reason:
+        quality["guard_reason"] = guard_reason
+    if frame_laplacian_var is not None:
+        quality["frame_laplacian_var"] = float(frame_laplacian_var)
+    if min_face_side_px is not None:
+        quality["min_face_side_px"] = int(min_face_side_px)
+
+    return {
+        "schema_version": schema_version,
+        "provider": provider,
+        "face_count": 1 if face_detected else 0,
+        "blendshapes": {
+            "smile": happy,
+            "jaw_open": surprise,
+            "eye_closed_left": 1.0 - neutral,
+            "eye_closed_right": 1.0 - neutral,
+        },
+        "engagement_proxy": engagement_proxy,
+        "quality": quality,
+    }

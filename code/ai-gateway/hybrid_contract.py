@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from contracts import is_valid_face_behavior_v1
+
 
 class HybridContractError(Exception):
     pass
@@ -26,6 +28,9 @@ def validate_face_analysis(msg: dict[str, Any]) -> None:
     ff = p.get("face_features")
     if not isinstance(ff, dict):
         raise HybridContractError("face_analysis.face_features must be object")
+    fb = p.get("face_behavior")
+    if fb is not None and not is_valid_face_behavior_v1(fb):
+        raise HybridContractError("face_analysis.face_behavior is invalid for face_behavior.v1")
 
 
 def validate_audio_analysis(msg: dict[str, Any]) -> None:

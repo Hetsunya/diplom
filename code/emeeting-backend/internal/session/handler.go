@@ -50,6 +50,7 @@ type CreateSessionDTO struct {
 	Description      *string              `json:"description,omitempty"`
 	LocationType     *models.LocationType `json:"locationType,omitempty"`
 	PhysicalLocation *string              `json:"physicalLocation,omitempty"`
+	AnalysisConfigID *int                 `json:"analysisConfigId,omitempty"`
 }
 
 // Create создает новую сессию
@@ -95,6 +96,15 @@ func (h *Handler) Create(c *gin.Context) {
 		PhysicalLocation: input.PhysicalLocation,
 		CreatedBy:        &uid,
 	}
+	if input.AnalysisConfigID != nil {
+		cfg, err := h.service.GetAnalysisConfigForUser(uid, *input.AnalysisConfigID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "analysis config not found for current user"})
+			return
+		}
+		session.AnalysisConfigID = &cfg.AnalysisConfigID
+		session.AnalysisConfigJSON = cfg.ModulesJSON
+	}
 
 	log.Printf("DEBUG: creating session %+v", session)
 	id, err := h.service.Create(session)
@@ -106,6 +116,64 @@ func (h *Handler) Create(c *gin.Context) {
 
 	session.SessionID = id
 	c.JSON(http.StatusCreated, session)
+}
+
+type CreateAnalysisConfigDTO struct {
+	Name       string `json:"name" binding:"required"`
+	ModulesJSON any   `json:"modulesJson" binding:"required"`
+	IsDefault  bool   `json:"isDefault"`
+}
+
+func (h *Handler) ListAnalysisConfigs(c *gin.Context) {
+	uid, ok := middleware.AuthUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	out, err := h.service.ListAnalysisConfigs(uid)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func (h *Handler) CreateAnalysisConfig(c *gin.Context) {
+	uid, ok := middleware.AuthUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	var input CreateAnalysisConfigDTO
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	cfg, err := h.service.CreateAnalysisConfig(uid, input.Name, input.ModulesJSON, input.IsDefault)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, cfg)
+}
+
+func (h *Handler) DeleteAnalysisConfig(c *gin.Context) {
+	uid, ok := middleware.AuthUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	idParam := c.Param("id")
+	var id int
+	if _, err := fmt.Sscanf(idParam, "%d", &id); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	if err := h.service.DeleteAnalysisConfig(uid, id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func (h *Handler) List(c *gin.Context) {

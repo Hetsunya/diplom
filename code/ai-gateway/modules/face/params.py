@@ -21,6 +21,8 @@ class FaceRuntimeParams:
     log_face_inference: bool
     debug_bbox_smooth_alpha: float
     debug_max_face_area_frac: float
+    emit_face_behavior: bool
+    face_behavior_schema_version: str
 
     @staticmethod
     def from_dict(p: dict[str, Any]) -> FaceRuntimeParams:
@@ -38,4 +40,6 @@ class FaceRuntimeParams:
             log_face_inference=bool(p.get("log_face_inference", False)),
             debug_bbox_smooth_alpha=float(p.get("debug_bbox_smooth_alpha", 0.35)),
             debug_max_face_area_frac=float(p.get("debug_max_face_area_frac", 0.45)),
+            emit_face_behavior=bool(p.get("emit_face_behavior", False)),
+            face_behavior_schema_version=str(p.get("face_behavior_schema_version", "face_behavior.v1")),
         )

@@ -19,7 +19,7 @@ import {
   IconScreenShare,
 } from "../components/MeetingUiIcons";
 import { useMeetingAudioChunks } from "../features/meeting/useMeetingAudioChunks";
-import { getSessionChatMessages } from "../api/sessions";
+import { getSession, getSessionChatMessages } from "../api/sessions";
 import { getSessionAnalysisEvents } from "../api/analysis";
 
 export type Emotion = "Happy" | "Neutral" | "Engaged" | "Focused" | "Surprised" | "Thoughtful";
@@ -120,6 +120,7 @@ type FaceDebugPayload = {
   frameW: number;
   frameH: number;
   region: { x: number; y: number; w: number; h: number } | null;
+  landmarks: Array<{ x: number; y: number }>;
   gatePassed: boolean;
   skipReason: string | null;
   dominant: string;
@@ -134,6 +135,7 @@ function parseFaceDebugPayload(p: Record<string, unknown>): FaceDebugPayload | n
   if (typeof fw !== "number" || typeof fh !== "number" || fw <= 0 || fh <= 0) return null;
   const regionRaw = p["region"];
   let region: FaceDebugPayload["region"] = null;
+  const landmarks: FaceDebugPayload["landmarks"] = [];
   if (regionRaw && typeof regionRaw === "object") {
     const r = regionRaw as Record<string, unknown>;
     const x = r["x"];
@@ -149,6 +151,18 @@ function parseFaceDebugPayload(p: Record<string, unknown>): FaceDebugPayload | n
       region = { x, y, w, h };
     }
   }
+  const landmarksRaw = p["landmarks"];
+  if (Array.isArray(landmarksRaw)) {
+    for (const item of landmarksRaw) {
+      if (!item || typeof item !== "object") continue;
+      const m = item as Record<string, unknown>;
+      const x = m["x"];
+      const y = m["y"];
+      if (typeof x === "number" && typeof y === "number") {
+        landmarks.push({ x, y });
+      }
+    }
+  }
   const dom = p["dominant_emotion"];
   const mc = p["model_confidence"];
   const gp = p["gate_passed"];
@@ -159,6 +173,7 @@ function parseFaceDebugPayload(p: Record<string, unknown>): FaceDebugPayload | n
     frameW: fw,
     frameH: fh,
     region,
+    landmarks,
     gatePassed: gp === true,
     skipReason: sr == null ? null : String(sr),
     dominant: typeof dom === "string" ? dom : "?",
@@ -192,6 +207,26 @@ function faceDebugOverlayStyleCover(
     top: `${(top / ch) * 100}%`,
     width: `${w * 100}%`,
     height: `${(h / ch) * 100}%`,
+  };
+}
+
+function faceDebugPointStyleCover(
+  point: { x: number; y: number },
+  frameW: number,
+  frameH: number
+): CSSProperties {
+  const cw = 1;
+  const ch = 9 / 16;
+  const scale = Math.max(cw / frameW, ch / frameH);
+  const dispW = frameW * scale;
+  const dispH = frameH * scale;
+  const ox = (cw - dispW) / 2;
+  const oy = (ch - dispH) / 2;
+  const left = ox + point.x * scale;
+  const top = oy + point.y * scale;
+  return {
+    left: `${left * 100}%`,
+    top: `${(top / ch) * 100}%`,
   };
 }
 
@@ -272,6 +307,21 @@ const VideoMeet = () => {
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
+    (async () => {
+      try {
+        const s = await getSession(id);
+        if (cancelled) return;
+        const cfg = s.analysisConfigJson;
+        if (cfg && typeof cfg === "object") {
+          const maybeModules = (cfg as { modules?: unknown }).modules;
+          const modulesPayload =
+            maybeModules && typeof maybeModules === "object" ? maybeModules : cfg;
+          sessionStorage.setItem(`session_analysis_modules:${id}`, JSON.stringify(modulesPayload));
+        }
+      } catch {
+        // optional
+      }
+    })();
     (async () => {
       try {
         const rows = await getSessionChatMessages(id, 150);
@@ -656,6 +706,13 @@ const VideoMeet = () => {
                             )}
                           />
                         )}
+                        {faceDbg.landmarks.map((lm, idx) => (
+                          <div
+                            key={`lm-${idx}`}
+                            className="face-debug-point"
+                            style={faceDebugPointStyleCover(lm, faceDbg.frameW, faceDbg.frameH)}
+                          />
+                        ))}
                         <div className="face-debug-hud">
                           <div>
                             {faceDbg.dominant} model={faceDbg.modelConfidence.toFixed(1)} minThr=

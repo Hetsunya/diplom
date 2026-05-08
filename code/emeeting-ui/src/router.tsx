@@ -5,7 +5,14 @@ import { featureRoutes, publicRoutes } from "./config/features";
 import { AuthGate } from "./components/AuthGate";
 import AppError from "./components/AppError";
 
-const protectedKeys = new Set(["sessions", "sessions_new", "video_meet", "report", "report_details"]);
+const protectedKeys = new Set([
+  "sessions",
+  "sessions_new",
+  "analysis_configurator",
+  "video_meet",
+  "report",
+  "report_details",
+]);
 
 const router = createBrowserRouter([
   {

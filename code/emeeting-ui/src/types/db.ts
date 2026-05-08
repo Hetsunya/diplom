@@ -54,11 +54,30 @@ export interface CreateSessionDTO {
   sessionType: SessionType;
   locationType?: LocationType;
   physicalLocation?: string;
+  analysisConfigId?: number;
 }
 
 export interface Session extends CreateSessionDTO {
   sessionId: number;
   createdBy?: number;
+  createdAt: string;
+  updatedAt: string;
+  analysisConfigJson?: unknown;
+}
+
+export type AnalysisModules = {
+  audio?: boolean;
+  text?: boolean;
+  face?: boolean;
+  report?: boolean;
+};
+
+export interface UserAnalysisConfig {
+  analysisConfigId: number;
+  authUserId: number;
+  name: string;
+  modulesJson: AnalysisModules;
+  isDefault: boolean;
   createdAt: string;
   updatedAt: string;
 }

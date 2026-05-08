@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
+from modules.report.face_behavior import build_face_behavior_summary
 from modules.report.windowing import compute_fusion_meta
 
 
@@ -104,5 +105,8 @@ def build_stub_report(session_id: int, features: list[dict[str, Any]], *, bucket
             for pid, pdata in sorted(participants.items(), key=lambda kv: kv[1]["audio_chunks"], reverse=True)
         ],
     }
+    face_behavior_summary = build_face_behavior_summary(features)
+    if face_behavior_summary is not None:
+        report["face_behavior_summary"] = face_behavior_summary
     report["fusion"] = compute_fusion_meta(features, bucket_sec)
     return report

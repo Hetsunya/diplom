@@ -5,6 +5,21 @@ import { getSessions } from "../api/sessions";
 import type { Session } from "../types/db";
 
 type ReportMode = "single" | "team";
+type FaceBehaviorParticipant = {
+  participant_id: string;
+  events: number;
+  trackable_events: number;
+  trackable_ratio: number;
+  avg_engagement_proxy: number;
+};
+
+type FaceBehaviorSummary = {
+  events: number;
+  trackable_events: number;
+  trackable_ratio: number;
+  guard_reasons?: Record<string, number>;
+  participants?: FaceBehaviorParticipant[];
+};
 
 const Report = () => {
   const { id } = useParams();
@@ -96,6 +111,52 @@ const Report = () => {
     };
   }, [selectedSession]);
 
+  const faceBehaviorSummary = useMemo<FaceBehaviorSummary | null>(() => {
+    if (!serverReport || typeof serverReport !== "object") return null;
+    const top = serverReport as Record<string, unknown>;
+    const report =
+      top.report && typeof top.report === "object"
+        ? (top.report as Record<string, unknown>)
+        : top;
+    const raw = report.face_behavior_summary;
+    if (!raw || typeof raw !== "object") return null;
+    const m = raw as Record<string, unknown>;
+    const events = Number(m.events);
+    const trackableEvents = Number(m.trackable_events);
+    const trackableRatio = Number(m.trackable_ratio);
+    if (!Number.isFinite(events) || !Number.isFinite(trackableEvents) || !Number.isFinite(trackableRatio)) {
+      return null;
+    }
+    const guardReasonsRaw = m.guard_reasons;
+    let guard_reasons: Record<string, number> | undefined;
+    if (guardReasonsRaw && typeof guardReasonsRaw === "object") {
+      guard_reasons = Object.fromEntries(
+        Object.entries(guardReasonsRaw as Record<string, unknown>)
+          .filter(([, v]) => Number.isFinite(Number(v)))
+          .map(([k, v]) => [k, Number(v)])
+      );
+    }
+    const participantsRaw = m.participants;
+    const participants: FaceBehaviorParticipant[] = Array.isArray(participantsRaw)
+      ? participantsRaw
+          .filter((p): p is Record<string, unknown> => !!p && typeof p === "object")
+          .map((p) => ({
+            participant_id: String(p.participant_id ?? "unknown"),
+            events: Number(p.events ?? 0),
+            trackable_events: Number(p.trackable_events ?? 0),
+            trackable_ratio: Number(p.trackable_ratio ?? 0),
+            avg_engagement_proxy: Number(p.avg_engagement_proxy ?? 0),
+          }))
+      : [];
+    return {
+      events,
+      trackable_events: trackableEvents,
+      trackable_ratio: trackableRatio,
+      guard_reasons,
+      participants,
+    };
+  }, [serverReport]);
+
   return (
     <div className="report-container">
       <header>
@@ -154,6 +215,63 @@ const Report = () => {
                 <strong>{singleStats.title}</strong>
               </p>
             </>
+          )}
+          {faceBehaviorSummary && (
+            <div className="participant-section" style={{ marginTop: 20 }}>
+              <h3>Face Behavior Summary</h3>
+              <div className="metrics-grid" style={{ marginTop: 12 }}>
+                <div className="metric-card">
+                  <div className="metric-value engagement">{faceBehaviorSummary.events}</div>
+                  <div>Face events</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-value neutral">{faceBehaviorSummary.trackable_events}</div>
+                  <div>Trackable events</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-value stress">
+                    {Math.round(faceBehaviorSummary.trackable_ratio * 100)}%
+                  </div>
+                  <div>Trackable ratio</div>
+                </div>
+              </div>
+              {faceBehaviorSummary.guard_reasons &&
+                Object.keys(faceBehaviorSummary.guard_reasons).length > 0 && (
+                  <div style={{ marginTop: 14 }}>
+                    <strong>Guard reasons:</strong>{" "}
+                    {Object.entries(faceBehaviorSummary.guard_reasons)
+                      .map(([reason, count]) => `${reason} (${count})`)
+                      .join(", ")}
+                  </div>
+                )}
+              <table className="participants-table" style={{ marginTop: 14 }}>
+                <thead>
+                  <tr>
+                    <th>Участник</th>
+                    <th>Событий</th>
+                    <th>Trackable</th>
+                    <th>Trackable %</th>
+                    <th>Avg engagement</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(faceBehaviorSummary.participants ?? []).map((p) => (
+                    <tr key={p.participant_id}>
+                      <td>{p.participant_id}</td>
+                      <td>{p.events}</td>
+                      <td>{p.trackable_events}</td>
+                      <td>{Math.round(p.trackable_ratio * 100)}%</td>
+                      <td>{Number.isFinite(p.avg_engagement_proxy) ? p.avg_engagement_proxy.toFixed(2) : "—"}</td>
+                    </tr>
+                  ))}
+                  {(faceBehaviorSummary.participants ?? []).length === 0 && (
+                    <tr>
+                      <td colSpan={5}>Нет participant breakdown</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       ) : (

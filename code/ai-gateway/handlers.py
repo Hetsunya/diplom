@@ -3,6 +3,7 @@ import time
 from typing import Any, Protocol
 
 from observability import incr, log_event
+from modules.shared.session_modules import set_session_modules
 
 
 class Plugin(Protocol):
@@ -43,6 +44,13 @@ def _plugin_sort_key(p: Plugin) -> int:
 async def handle_message(msg: dict[str, Any], ws: Any) -> None:
     """Dispatch to all plugins that can handle the message (sorted by priority)."""
     global _LAST_CFG_POLL_MONO, _logged_first_ws_audio
+    if msg.get("type") == "join":
+        payload = msg.get("payload") if isinstance(msg.get("payload"), dict) else {}
+        modules = payload.get("analysis_modules") if isinstance(payload.get("analysis_modules"), dict) else None
+        sid = msg.get("session_id")
+        if modules is not None and isinstance(sid, int):
+            set_session_modules(sid, modules)
+
     if msg.get("type") == "audio":
         incr("inbound_ws_audio")
         if not _logged_first_ws_audio:

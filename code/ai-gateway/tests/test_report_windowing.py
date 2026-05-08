@@ -35,6 +35,50 @@ class TestBuildStubReportFusion(unittest.TestCase):
         self.assertIn("fusion", rep)
         self.assertEqual(rep["fusion"]["bucket_sec"], 10.0)
 
+    def test_stub_includes_face_behavior_summary(self) -> None:
+        now = time.time()
+        rep = build_stub_report(
+            99,
+            [
+                {
+                    "kind": "face",
+                    "participant_id": "p1",
+                    "trace_id": "t1",
+                    "ts": now,
+                    "data": {
+                        "face_behavior": {
+                            "schema_version": "face_behavior.v1",
+                            "provider": "deepface",
+                            "face_count": 1,
+                            "engagement_proxy": 0.76,
+                            "quality": {"trackable": True, "confidence": 0.9},
+                        }
+                    },
+                },
+                {
+                    "kind": "face",
+                    "participant_id": "p1",
+                    "trace_id": "t2",
+                    "ts": now + 1.0,
+                    "data": {
+                        "face_behavior": {
+                            "schema_version": "face_behavior.v1",
+                            "provider": "deepface",
+                            "face_count": 0,
+                            "engagement_proxy": 0.11,
+                            "quality": {"trackable": False, "guard_reason": "no_face"},
+                        }
+                    },
+                },
+            ],
+            bucket_sec=10.0,
+        )
+        self.assertIn("face_behavior_summary", rep)
+        fbs = rep["face_behavior_summary"]
+        self.assertEqual(fbs["events"], 2)
+        self.assertEqual(fbs["trackable_events"], 1)
+        self.assertEqual(fbs["guard_reasons"].get("no_face"), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

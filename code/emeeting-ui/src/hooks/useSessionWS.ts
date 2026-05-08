@@ -73,12 +73,19 @@ export const useSessionWS = (
         sessionStorage.getItem("participant_role") ||
         localStorage.getItem("participant_role") ||
         "participant";
+      let analysisModules: unknown = undefined;
+      try {
+        const raw = sessionStorage.getItem(`session_analysis_modules:${sessionIdRef.current}`);
+        if (raw) analysisModules = JSON.parse(raw);
+      } catch {
+        // ignore malformed session config cache
+      }
       ws.current?.send(
         JSON.stringify({
           type: "join",
           session_id: Number(sessionIdRef.current),
           participant_id: participantIdRef.current,
-          payload: { name, role },
+          payload: { name, role, analysis_modules: analysisModules },
           timestamp: new Date().toISOString(),
         })
       );

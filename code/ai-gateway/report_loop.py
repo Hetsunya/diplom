@@ -12,6 +12,7 @@ from gateway_config import config_snapshot, get_gateway_config
 from modules.report.data_quality import augment_report_data_quality
 from modules.report.orchestrator import build_report_ws_message, resolve_report_body
 from modules.report.stub_builder import build_stub_report
+from modules.shared.session_modules import is_module_enabled_for_session
 from observability import incr, log_event, monotonic_ms, snapshot_metrics
 
 # Backwards compatibility for tests importing `_stub_report`.
@@ -109,6 +110,46 @@ def _sanitize_fusion(v: Any) -> dict[str, Any] | None:
     return out if out else None
 
 
+def _sanitize_face_behavior_summary(v: Any) -> dict[str, Any] | None:
+    if not isinstance(v, dict):
+        return None
+    events = v.get("events")
+    trackable_events = v.get("trackable_events")
+    trackable_ratio = v.get("trackable_ratio")
+    if not isinstance(events, (int, float)) or not isinstance(trackable_events, (int, float)):
+        return None
+    out: dict[str, Any] = {
+        "events": int(max(0, events)),
+        "trackable_events": int(max(0, trackable_events)),
+        "trackable_ratio": _to_float(trackable_ratio, 0.0, lo=0.0, hi=1.0),
+    }
+    reasons = v.get("guard_reasons")
+    if isinstance(reasons, dict):
+        out["guard_reasons"] = {
+            str(k): int(val) for k, val in reasons.items() if isinstance(k, str) and isinstance(val, (int, float))
+        }
+    participants = v.get("participants")
+    if isinstance(participants, list):
+        out_p: list[dict[str, Any]] = []
+        for p in participants:
+            if not isinstance(p, dict):
+                continue
+            pid = p.get("participant_id")
+            if not isinstance(pid, str) or not pid.strip():
+                continue
+            out_p.append(
+                {
+                    "participant_id": pid,
+                    "events": int(_to_float(p.get("events"), 0.0, lo=0.0)),
+                    "trackable_events": int(_to_float(p.get("trackable_events"), 0.0, lo=0.0)),
+                    "trackable_ratio": _to_float(p.get("trackable_ratio"), 0.0, lo=0.0, hi=1.0),
+                    "avg_engagement_proxy": _to_float(p.get("avg_engagement_proxy"), 0.0, lo=0.0, hi=1.0),
+                }
+            )
+        out["participants"] = out_p
+    return out
+
+
 def sanitize_report_shape(raw: Any, *, session_id: int) -> dict[str, Any]:
     """
     Keep report JSON shape stable for UI regardless of remote model output.
@@ -132,6 +173,9 @@ def sanitize_report_shape(raw: Any, *, session_id: int) -> dict[str, Any]:
     fusion = _sanitize_fusion(raw.get("fusion"))
     if fusion is not None:
         out["fusion"] = fusion
+    fbs = _sanitize_face_behavior_summary(raw.get("face_behavior_summary"))
+    if fbs is not None:
+        out["face_behavior_summary"] = fbs
     dq = _sanitize_data_quality(raw.get("data_quality"))
     if dq is not None:
         out["data_quality"] = dq
@@ -245,6 +289,8 @@ async def report_loop(ws_holder: list[Any], session_id: int) -> None:
             store = get_feature_store()
             targets = [session_id] if session_id > 0 else store.session_ids()
             for sid in targets:
+                if not is_module_enabled_for_session(int(sid), "report"):
+                    continue
                 feats = store.snapshot_session(sid)
                 await _send_report(
                     ws,
@@ -261,6 +307,8 @@ async def report_loop(ws_holder: list[Any], session_id: int) -> None:
         store = get_feature_store()
         targets = [session_id] if session_id > 0 else store.session_ids()
         for sid in targets:
+            if not is_module_enabled_for_session(int(sid), "report"):
+                continue
             feats = store.snapshot_session(sid)
             await _send_report(
                 ws,

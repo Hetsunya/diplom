@@ -47,6 +47,104 @@ Facial emotion / presence.
 - `face_features` (object): `dominant_emotion`, `probs`, `face_detected`, `confidence`
 - optional `guard_reason` when `face_detected` is false (e.g. `no_face`) — UI should ignore emotion fields
 
+#### `face.behavior` extension draft (v1)
+
+Advanced behavior tracking should stay inside `face_analysis.payload` (same WS `type`) and be
+attached as an optional nested object `face_behavior`.
+
+Design goals:
+
+- keep backward compatibility for current UI (`face_features` stays unchanged),
+- allow separate feature flags for `face.emotion` and `face.behavior`,
+- provide report-friendly signals (engagement / attention / fatigue) with explicit quality flags.
+
+Recommended shape:
+
+- `face_behavior.schema_version` (string, required): contract version, e.g. `"face_behavior.v1"`
+- `face_behavior.provider` (string, required): detector backend, e.g. `"mediapipe_face_landmarker"`
+- `face_behavior.face_count` (number, required): detected faces in frame (`0..N`)
+- `face_behavior.blendshapes` (object, optional): normalized `[0..1]` coefficients
+  - canonical keys for v1 (subset):
+    - `smile`
+    - `jaw_open`
+    - `eye_closed_left`
+    - `eye_closed_right`
+    - `brow_inner_up`
+    - `mouth_pucker`
+- `face_behavior.head_pose` (object, optional): head orientation
+  - `yaw_deg` (number)
+  - `pitch_deg` (number)
+  - `roll_deg` (number)
+  - `transform_matrix` (`number[]`, optional, 16 values)
+- `face_behavior.eye_state` (object, optional):
+  - `left_closed_prob` (number `[0..1]`)
+  - `right_closed_prob` (number `[0..1]`)
+  - `blink_detected` (boolean)
+- `face_behavior.engagement_proxy` (number, optional): normalized proxy score `[0..1]`
+- `face_behavior.quality` (object, required):
+  - `trackable` (boolean): whether downstream should use this event in report fusion
+  - `guard_reason` (string, optional): e.g. `no_face`, `face_too_small`, `blurred_frame`, `low_light`
+  - `frame_laplacian_var` (number, optional)
+  - `min_face_side_px` (number, optional)
+  - `confidence` (number, optional)
+
+Suggested rules for producers:
+
+- if `quality.trackable=false`, still emit `face_behavior` with `guard_reason` for observability;
+- use only normalized numeric ranges in v1 (no model-specific raw scales);
+- always include `schema_version`, `provider`, `face_count`, `quality`.
+
+Suggested rules for consumers (UI/report):
+
+- UI live tile can ignore `face_behavior` when absent;
+- report fusion should include only events where `quality.trackable=true`;
+- when `trackable=false`, count reason under data quality metrics (not as neutral signal).
+
+Example payload fragment:
+
+```json
+{
+  "module": "face",
+  "version": "mediapipe-0.10-face-landmarker-v1",
+  "stage": "partial",
+  "trace_id": "8f730f2c-3b34-4982-9f7d-7a4e8c675d2b",
+  "face_features": {
+    "dominant_emotion": "happy",
+    "probs": { "happy": 0.71, "neutral": 0.19, "surprise": 0.06 },
+    "face_detected": true,
+    "confidence": 0.71
+  },
+  "face_behavior": {
+    "schema_version": "face_behavior.v1",
+    "provider": "mediapipe_face_landmarker",
+    "face_count": 1,
+    "blendshapes": {
+      "smile": 0.82,
+      "jaw_open": 0.14,
+      "eye_closed_left": 0.03,
+      "eye_closed_right": 0.04
+    },
+    "head_pose": {
+      "yaw_deg": -9.8,
+      "pitch_deg": 2.1,
+      "roll_deg": -1.6
+    },
+    "eye_state": {
+      "left_closed_prob": 0.03,
+      "right_closed_prob": 0.04,
+      "blink_detected": false
+    },
+    "engagement_proxy": 0.74,
+    "quality": {
+      "trackable": true,
+      "confidence": 0.88,
+      "frame_laplacian_var": 128.2,
+      "min_face_side_px": 56
+    }
+  }
+}
+```
+
 ### `emotion` (legacy alias)
 
 Same semantics as dominant face emotion for UI backwards compatibility.

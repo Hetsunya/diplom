@@ -5,6 +5,7 @@ import Sessions from "../pages/Sessions";
 import NewSession from "../pages/NewSession";
 import VideoMeet from "../pages/VideoMeet";
 import Report from "../pages/Report";
+import AnalysisConfigurator from "../pages/AnalysisConfigurator";
 
 export type FeatureNavItem = {
   label: string;
@@ -41,6 +42,13 @@ export const featureRoutes: FeatureRoute[] = [
     enabled: true,
     path: "/sessions/new",
     component: NewSession,
+  },
+  {
+    key: "analysis_configurator",
+    enabled: true,
+    path: "/analysis-configs",
+    component: AnalysisConfigurator,
+    nav: { label: "Конфигуратор", to: "/analysis-configs" },
   },
   {
     key: "video_meet",
