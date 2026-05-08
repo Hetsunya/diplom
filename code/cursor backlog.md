@@ -527,3 +527,31 @@ BL-AI-109 [ ]: CI: опциональный прогон hybrid/smoke на об�
 Файлы: `.github/workflows/ci.yml`, `ai-gateway/hybrid_pipeline_smoke.py`
 Оценка: 1–3 дн
 DoD: workflow документирован; не блокирует основной CI без железа/GPU.
+
+BL-UX-110 [ ]: Отчеты v2 — подключение реальных AI-метрик в UI
+
+Цель: убрать fallback-агрегацию и показывать содержательные отчеты по звонку и команде.
+Файлы: `emeeting-ui/src/pages/Report.tsx`, `emeeting-ui/src/api/reports.ts`, `emeeting-backend/internal/report/**`
+Оценка: 2–4 дн
+DoD: `/reports` и `/reports/:id` работают на боевом payload, без debug-блока и мок-логики.
+
+BL-BE-111 [ ]: Контракт отчетов под финальную НС (single/team/trends)
+
+Цель: стабилизировать формат данных до подключения итоговой нейронки.
+Файлы: `docs/api-contract.md`, `docs/ANALYSIS_WS_CONTRACTS.md`, `emeeting-backend/internal/report/**`, `ai-gateway/modules/report/**`
+Оценка: 1–2 дн
+DoD: описаны и реализованы endpoint-ы: `GET /reports/session/:sessionId`, `GET /reports/team`, `GET /reports/team/trends`.
+
+BL-AI-112 [ ]: Транскрибация realtime без накопительного буфера на сервере
+
+Цель: убрать искажения и шум от склейки чанков в длинный cumulative payload.
+Файлы: `ai-gateway/adapters/speech_service.py`, `speech-service/main.py`, `ai-gateway/modules/text/transcription.py`
+Оценка: 2–5 дн
+DoD: ASR принимает короткие независимые чанки, итоговый текст стабильнее на длинной речи.
+
+BL-BE-113 [ ]: История транскрибации в БД + REST endpoint
+
+Цель: хранить полную историю распознавания и восстанавливать ее при перезаходе.
+Файлы: `emeeting-backend/internal/session/**`, `emeeting-backend/migrations/*`, `emeeting-ui/src/pages/VideoMeet.tsx`
+Оценка: 2–4 дн
+DoD: `GET /sessions/:id/transcription` возвращает историю, UI подгружает ее перед live-обновлениями.

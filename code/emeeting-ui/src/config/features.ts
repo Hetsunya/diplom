@@ -51,6 +51,13 @@ export const featureRoutes: FeatureRoute[] = [
   {
     key: "report",
     enabled: true,
+    path: "/reports",
+    component: Report,
+    nav: { label: "Отчеты", to: "/reports" },
+  },
+  {
+    key: "report_details",
+    enabled: true,
     path: "/reports/:id",
     component: Report,
   },

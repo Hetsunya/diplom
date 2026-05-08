@@ -4,7 +4,7 @@ import { useAuthStore } from "../store/authStore";
 import { logout } from "../api/auth";
 
 const Sidebar = () => {
-  const { isAuthenticated, setAuth } = useAuthStore();
+  const { isAuthenticated, user, setAuth } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -22,11 +22,23 @@ const Sidebar = () => {
   return (
     <aside className="sidebar">
       <div className="sidebar__logo">
-        <div className="sidebar__logo-badge">e</div>
+        <div className="sidebar__logo-badge" aria-hidden>
+          <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="40" height="40" rx="12" fill="#3498db" />
+            <path
+              d="M12 26V14l8 6 8-6v12"
+              stroke="white"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+          </svg>
+        </div>
         <div className="sidebar__logo-title">
           <div className="sidebar__title">eMeeting</div>
           <div className="sidebar__subtitle">
-            {isAuthenticated ? "Authorized" : "Guest"}
+            {isAuthenticated ? user?.email ?? "Авторизован" : "Гость"}
           </div>
         </div>
       </div>

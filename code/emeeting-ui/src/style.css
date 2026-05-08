@@ -1711,12 +1711,10 @@ input[type="radio"]:checked + .session-type-card {
 .sidebar__logo-badge {
     width: 36px;
     height: 36px;
-    border-radius: 12px;
-    background: #3498db;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 800;
+    flex-shrink: 0;
 }
 
 .sidebar__logo-title {
@@ -1733,6 +1731,10 @@ input[type="radio"]:checked + .session-type-card {
 .sidebar__subtitle {
     font-size: 12px;
     color: #94a3b8;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .sidebar__nav {

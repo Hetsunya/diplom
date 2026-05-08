@@ -20,6 +20,7 @@ import {
 } from "../components/MeetingUiIcons";
 import { useMeetingAudioChunks } from "../features/meeting/useMeetingAudioChunks";
 import { getSessionChatMessages } from "../api/sessions";
+import { getSessionAnalysisEvents } from "../api/analysis";
 
 export type Emotion = "Happy" | "Neutral" | "Engaged" | "Focused" | "Surprised" | "Thoughtful";
 
@@ -218,6 +219,13 @@ const VideoMeet = () => {
     sessionStorage.getItem("participant_name") || localStorage.getItem("participant_name") || "You";
   const participantRole =
     sessionStorage.getItem("participant_role") || localStorage.getItem("participant_role") || "participant";
+  const normalizeSpeakerLabel = (pid: string, fallback?: string) => {
+    if (pid === participantId) return participantName;
+    const fromStore = useMeetingStore.getState().participants[pid]?.name;
+    if (typeof fromStore === "string" && fromStore.trim()) return fromStore.trim();
+    if (typeof fallback === "string" && fallback.trim()) return fallback.trim();
+    return "Участник";
+  };
 
   const {
     videoRef,
@@ -271,7 +279,7 @@ const VideoMeet = () => {
         const mapped: ChatLine[] = rows.map((r) => ({
           id: String(r.chat_message_id),
           participantId: r.participant_id,
-          name: r.sender_name?.trim() || `Participant ${r.participant_id}`,
+          name: r.sender_name?.trim() || normalizeSpeakerLabel(r.participant_id),
           text: r.body,
           at: r.created_at,
         }));
@@ -294,6 +302,60 @@ const VideoMeet = () => {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await getSessionAnalysisEvents(id, { module: "text", limit: 300 });
+        if (cancelled) return;
+        const next: TranscriptLine[] = [];
+        for (const row of rows) {
+          if (row.event_type !== "text_analysis") continue;
+          const payload = row.payload && typeof row.payload === "object" ? row.payload : {};
+          const participantId =
+            typeof row.participant_id === "string" && row.participant_id.trim()
+              ? row.participant_id.trim()
+              : undefined;
+          if (!participantId) continue;
+          const partial =
+            typeof (payload as Record<string, unknown>).transcript_partial === "string"
+              ? ((payload as Record<string, unknown>).transcript_partial as string)
+              : "";
+          const finalText =
+            typeof (payload as Record<string, unknown>).transcript_final === "string"
+              ? ((payload as Record<string, unknown>).transcript_final as string)
+              : "";
+          const text = (finalText || partial || "").trim();
+          if (!text) continue;
+          const traceId =
+            typeof row.trace_id === "string" && row.trace_id.trim()
+              ? row.trace_id
+              : `history-${row.analysis_event_id}`;
+          const stage = typeof row.stage === "string" ? row.stage.toLowerCase() : "";
+          next.push({
+            traceId,
+            participantId,
+            speakerLabel: normalizeSpeakerLabel(participantId),
+            text,
+            final: Boolean(finalText) || stage === "final",
+            at: row.created_at || new Date().toISOString(),
+          });
+        }
+        setTranscriptLines(
+          next
+            .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+            .slice(-160)
+        );
+      } catch {
+        // History is optional; live flow keeps working.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
   const onAnalysisMessage = useCallback(
     (msg: unknown) => {
       if (typeof msg !== "object" || msg === null) return;
@@ -302,7 +364,7 @@ const VideoMeet = () => {
       const pid = typeof m.participant_id === "string" ? m.participant_id : undefined;
 
       const store = useMeetingStore.getState();
-      const nameFor = (id: string) => store.participants[id]?.name ?? `Participant ${id}`;
+      const nameFor = (id: string) => normalizeSpeakerLabel(id, store.participants[id]?.name);
 
       if (type === "chat_message" && pid && m.payload && typeof m.payload === "object") {
         const p = m.payload as Record<string, unknown>;
@@ -377,37 +439,32 @@ const VideoMeet = () => {
           typeof final === "string" ||
           stage === "final" ||
           (typeof stage === "string" && stage.toLowerCase().includes("final"));
-
-        const draftTraceId = `asr-draft:${pid}`;
+        const normalizedText = text.trim();
+        if (!normalizedText) return;
 
         setTranscriptLines((prev) => {
-          if (isFinal) {
-            const withoutOpenDraft = prev.filter((l) => !(l.participantId === pid && !l.final));
-            const line: TranscriptLine = {
-              traceId: serverTraceId,
-              participantId: pid,
-              speakerLabel: nameFor(pid),
-              text,
-              final: true,
-              at: new Date().toISOString(),
-            };
-            return [...withoutOpenDraft, line].slice(-80);
+          const finalizedPrev = prev.map((line) =>
+            !line.final && line.participantId === pid ? { ...line, final: true } : line
+          );
+          const last = prev[prev.length - 1];
+          const looksDuplicate =
+            last &&
+            last.participantId === pid &&
+            last.text.trim() === normalizedText &&
+            last.final === isFinal;
+          if (looksDuplicate) {
+            return finalizedPrev;
           }
+
           const line: TranscriptLine = {
-            traceId: draftTraceId,
+            traceId: `${serverTraceId}:${isFinal ? "f" : "p"}:${Date.now()}`,
             participantId: pid,
             speakerLabel: nameFor(pid),
-            text,
-            final: false,
+            text: normalizedText,
+            final: isFinal,
             at: new Date().toISOString(),
           };
-          const draftIdx = prev.findIndex((l) => l.traceId === draftTraceId && l.participantId === pid);
-          if (draftIdx >= 0) {
-            const next = [...prev];
-            next[draftIdx] = { ...next[draftIdx], ...line };
-            return next;
-          }
-          return [...prev, line].slice(-80);
+          return [...finalizedPrev, line].slice(-160);
         });
         setLastTextAt(Date.now());
         return;
@@ -445,7 +502,7 @@ const VideoMeet = () => {
     enabled: micEnabled && connected,
     mediaReady,
     streamEpoch,
-    timesliceMs: 2000,
+    timesliceMs: 1000,
   });
 
   useEffect(() => {

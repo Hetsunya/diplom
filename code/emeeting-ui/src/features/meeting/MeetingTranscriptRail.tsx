@@ -70,9 +70,9 @@ export function MeetingTranscriptRail({
           className={`meeting-rail-toolbtn ${showTranscript ? "meeting-rail-toolbtn--on" : ""}`}
           onClick={() => setShowTranscript((v) => !v)}
           aria-pressed={showTranscript}
-          title={showTranscript ? "Скрыть транскрипт" : "Показать транскрипт"}
+          title={showTranscript ? "Скрыть транскрибацию" : "Показать транскрибацию"}
         >
-          <IconTranscript size={22} title="Транскрипт" />
+          <IconTranscript size={22} title="Транскрибация" />
         </button>
         <button
           type="button"
@@ -97,7 +97,7 @@ export function MeetingTranscriptRail({
       {showTranscript && (
         <div className="meeting-transcript-rail__section">
           <div className="meeting-transcript-rail__section-title-row">
-            <div className="meeting-transcript-rail__section-title">Транскрипт</div>
+            <div className="meeting-transcript-rail__section-title">Транскрибация</div>
             <span className="meeting-transcript-rail__asr-status">{asrStatus}</span>
           </div>
           <div

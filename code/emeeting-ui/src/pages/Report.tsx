@@ -1,139 +1,227 @@
-// src/pages/Report.tsx
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { getReport } from '../api/reports';
-import { useSessionWS } from '../hooks/useSessionWS';
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { getReport } from "../api/reports";
+import { getSessions } from "../api/sessions";
+import type { Session } from "../types/db";
+
+type ReportMode = "single" | "team";
 
 const Report = () => {
   const { id } = useParams();
-  const [report, setReport] = useState(null);
-  const [emotionCounts, setEmotionCounts] = useState<Record<string, number>>({});
-  const [emotionTotal, setEmotionTotal] = useState(0);
-  const participantId = sessionStorage.getItem('report_participant_id') || 'report_viewer';
-
-  const normalizeEmotionLabel = (raw: string) => {
-    const normalized = raw.toLowerCase();
-    if (normalized.includes("happy")) return "Happy";
-    if (normalized.includes("surpris")) return "Surprised";
-    if (normalized.includes("neutral")) return "Neutral";
-    if (normalized.includes("fear") || normalized.includes("disgust")) return "Engaged";
-    if (normalized.includes("sad")) return "Focused";
-    if (normalized.includes("angry")) return "Thoughtful";
-    return raw;
-  };
-
-  useSessionWS(id!, participantId, (msg) => {
-    if (typeof msg !== 'object' || msg === null) return;
-    const m = msg as {
-      type?: unknown;
-      participant_id?: unknown;
-      payload?: unknown;
-    };
-    if (m.type !== 'emotion') return;
-
-    const payload = m.payload;
-    const pid = typeof m.participant_id === 'string' ? m.participant_id : undefined;
-    if (!pid) return;
-
-    // Flexible parsing of emotion payload.
-    let label: string | undefined;
-    if (payload && typeof payload === 'object') {
-      const p = payload as Record<string, unknown>;
-      if (typeof p.emotion === 'string') label = p.emotion;
-      if (!label && p.probs && typeof p.probs === 'object') {
-        let bestKey: string | null = null;
-        let bestVal = -1;
-        for (const [k, v] of Object.entries(p.probs as Record<string, unknown>)) {
-          if (typeof v !== 'number') continue;
-          if (v > bestVal) {
-            bestVal = v;
-            bestKey = k;
-          }
-        }
-        if (bestKey) label = bestKey;
-      }
-    }
-
-    if (!label) return;
-
-    const normalizedLabel = normalizeEmotionLabel(label!);
-    setEmotionCounts((prev) => ({
-      ...prev,
-      [normalizedLabel]: (prev[normalizedLabel] ?? 0) + 1,
-    }));
-    setEmotionTotal((t) => t + 1);
-  });
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [serverReport, setServerReport] = useState<unknown>(null);
+  const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<ReportMode>(id ? "single" : "team");
 
   useEffect(() => {
-    const fetchReport = async () => {
-      try {
-        const data = await getReport(id!);
-        setReport(data);
-      } catch (error) {
-        console.error(error);
-      }
-    };
-    fetchReport();
+    setMode(id ? "single" : "team");
   }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await getSessions();
+        if (!cancelled) setSessions(Array.isArray(rows) ? rows : []);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getReport(id);
+        if (!cancelled) setServerReport(data);
+      } catch {
+        if (!cancelled) setServerReport(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const sortedSessions = useMemo(
+    () =>
+      [...sessions].sort(
+        (a, b) =>
+          new Date(b.startDatetime ?? b.createdAt).getTime() -
+          new Date(a.startDatetime ?? a.createdAt).getTime()
+      ),
+    [sessions]
+  );
+
+  const selectedSession = useMemo(
+    () => sortedSessions.find((s) => String(s.sessionId) === String(id)),
+    [sortedSessions, id]
+  );
+
+  const teamStats = useMemo(() => {
+    const total = sortedSessions.length;
+    const byType = sortedSessions.reduce<Record<string, number>>((acc, s) => {
+      const key = s.sessionType || "other";
+      acc[key] = (acc[key] ?? 0) + 1;
+      return acc;
+    }, {});
+    const thisMonth = sortedSessions.filter((s) => {
+      const d = new Date(s.startDatetime ?? s.createdAt);
+      const now = new Date();
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
+    return { total, byType, thisMonth };
+  }, [sortedSessions]);
+
+  const singleStats = useMemo(() => {
+    if (!selectedSession) return null;
+    const startedAt = selectedSession.startDatetime
+      ? new Date(selectedSession.startDatetime)
+      : null;
+    const endedAt = selectedSession.endDatetime ? new Date(selectedSession.endDatetime) : null;
+    const durationMinutes =
+      startedAt && endedAt
+        ? Math.max(1, Math.round((endedAt.getTime() - startedAt.getTime()) / (1000 * 60)))
+        : null;
+    return {
+      title: selectedSession.title || `Сессия #${selectedSession.sessionId}`,
+      type: selectedSession.sessionType,
+      durationMinutes,
+      startedAt: startedAt?.toLocaleString() ?? "Не указано",
+    };
+  }, [selectedSession]);
 
   return (
     <div className="report-container">
       <header>
-        <h1>Отчет по сессии {id}</h1>
+        <h1>Отчеты</h1>
+        <p className="subtitle">Режимы: по одному звонку и по группе звонков команды.</p>
       </header>
-      <div className="summary-box">
-        {/* Саммари */}
+
+      <div className="summary-box" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <button
+          type="button"
+          className="primary-btn"
+          onClick={() => setMode("single")}
+          style={{ opacity: mode === "single" ? 1 : 0.75 }}
+        >
+          По 1 звонку
+        </button>
+        <button
+          type="button"
+          className="primary-btn"
+          onClick={() => setMode("team")}
+          style={{ opacity: mode === "team" ? 1 : 0.75 }}
+        >
+          По группе звонков
+        </button>
       </div>
-      <div className="metrics-grid">
-        {/* Метрики */}
-      </div>
-      <div className="charts-section">
-        {/* Чарты */}
-      </div>
-      <div className="participant-section">
-        <table className="participants-table">
-          {/* Таблица участников */}
-        </table>
-      </div>
+
+      {mode === "single" ? (
+        <div className="summary-box">
+          <h3>Отчет по звонку</h3>
+          {!id && (
+            <p>
+              Выберите сессию из списка:{" "}
+              <Link to="/sessions">перейти к сессиям</Link>.
+            </p>
+          )}
+          {id && !selectedSession && <p>Сессия не найдена.</p>}
+          {singleStats && (
+            <>
+              <div className="metrics-grid">
+                <div className="metric-card">
+                  <div className="metric-value engagement">{singleStats.type}</div>
+                  <div>Тип сессии</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-value neutral">
+                    {singleStats.durationMinutes ?? "—"}
+                  </div>
+                  <div>Длительность, мин</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-value stress">{singleStats.startedAt}</div>
+                  <div>Старт</div>
+                </div>
+              </div>
+              <p style={{ marginTop: 12 }}>
+                <strong>{singleStats.title}</strong>
+              </p>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="summary-box">
+          <h3>Отчет по команде (группа звонков)</h3>
+          {loading ? (
+            <p>Загрузка...</p>
+          ) : (
+            <>
+              <div className="metrics-grid">
+                <div className="metric-card">
+                  <div className="metric-value engagement">{teamStats.total}</div>
+                  <div>Всего звонков</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-value neutral">{teamStats.thisMonth}</div>
+                  <div>За текущий месяц</div>
+                </div>
+                <div className="metric-card">
+                  <div className="metric-value stress">{Object.keys(teamStats.byType).length}</div>
+                  <div>Типов встреч</div>
+                </div>
+              </div>
+              <div className="participant-section">
+                <table className="participants-table">
+                  <thead>
+                    <tr>
+                      <th>Тип</th>
+                      <th>Количество</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(teamStats.byType).map(([type, count]) => (
+                      <tr key={type}>
+                        <td>{type}</td>
+                        <td>{count}</td>
+                      </tr>
+                    ))}
+                    {Object.keys(teamStats.byType).length === 0 && (
+                      <tr>
+                        <td colSpan={2}>Нет данных</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="recommendations">
-        <h3>Рекомендации</h3>
+        <h3>Черновой контракт бэка под отчеты</h3>
         <ul>
-          {/* Рекомендации */}
+          <li>GET `/reports/session/:sessionId` — итог по одному звонку.</li>
+          <li>GET `/reports/team?from=&to=&groupBy=` — агрегат по группе звонков.</li>
+          <li>GET `/reports/team/trends?metric=` — временные ряды для графиков.</li>
+          <li>Рекомендуемый payload: `summary`, `transcription`, `participants`, `qualityFlags`.</li>
+          <li>Пока AI-модуль не финален, UI использует fallback на `sessions`.</li>
         </ul>
       </div>
 
-      <div className="summary-box" style={{ marginTop: 20 }}>
-        <h2>Эмоции (aggregated)</h2>
-        {emotionTotal === 0 ? (
-          <p style={{ color: '#7f8c8d' }}>Пока AI не прислал данные об эмоциях.</p>
-        ) : (
-          <table className="participants-table" style={{ marginTop: 10 }}>
-            <thead>
-              <tr>
-                <th>Эмоция</th>
-                <th>Доля</th>
-                <th>Событий</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(emotionCounts)
-                .sort((a, b) => b[1] - a[1])
-                .map(([emotion, count]) => {
-                  const pct = Math.round((count / emotionTotal) * 100);
-                  return (
-                    <tr key={emotion}>
-                      <td>{emotion}</td>
-                      <td>{pct}%</td>
-                      <td>{count}</td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {report && <pre>{JSON.stringify(report, null, 2)}</pre>}
+      {Boolean(serverReport) && mode === "single" && (
+        <div className="summary-box">
+          <h3>Сырые данные отчета (debug)</h3>
+          <pre style={{ overflow: "auto", maxHeight: 320 }}>{JSON.stringify(serverReport, null, 2)}</pre>
+        </div>
+      )}
     </div>
   );
 };
