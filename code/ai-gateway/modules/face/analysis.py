@@ -18,6 +18,7 @@ from modules.shared.session_modules import is_module_enabled_for_session
 from modules.face.schema import (
     build_face_features_guard,
     build_face_behavior_v1,
+    build_face_behavior_v1_mediapipe,
     build_face_features_positive,
     is_no_face_deepface_error,
     normalize_deepface_result,
@@ -159,9 +160,10 @@ class FaceAnalysisPlugin:
         region_y: int | None,
         region_w: int | None,
         region_h: int | None,
+        landmarks: list[dict[str, int]] | None = None,
     ) -> None:
         region = None
-        landmarks: list[dict[str, int]] = []
+        lm_out: list[dict[str, int]] = []
         if (
             region_x is not None
             and region_y is not None
@@ -171,14 +173,17 @@ class FaceAnalysisPlugin:
             and region_h > 0
         ):
             region = {"x": region_x, "y": region_y, "w": region_w, "h": region_h}
-            # DeepFace does not return dense landmarks; expose stable anchor points for UI overlay.
-            landmarks = [
-                {"x": region_x, "y": region_y},
-                {"x": region_x + region_w, "y": region_y},
-                {"x": region_x, "y": region_y + region_h},
-                {"x": region_x + region_w, "y": region_y + region_h},
-                {"x": region_x + region_w // 2, "y": region_y + region_h // 2},
-            ]
+            if landmarks:
+                lm_out = landmarks
+            else:
+                # DeepFace does not return dense landmarks; expose stable anchor points for UI overlay.
+                lm_out = [
+                    {"x": region_x, "y": region_y},
+                    {"x": region_x + region_w, "y": region_y},
+                    {"x": region_x, "y": region_y + region_h},
+                    {"x": region_x + region_w, "y": region_y + region_h},
+                    {"x": region_x + region_w // 2, "y": region_y + region_h // 2},
+                ]
         dbg = {
             "type": "face_debug",
             "session_id": session_id,
@@ -188,7 +193,7 @@ class FaceAnalysisPlugin:
                 "frame_width": frame_w,
                 "frame_height": frame_h,
                 "region": region,
-                "landmarks": landmarks,
+                "landmarks": lm_out,
                 "dominant_emotion": dominant,
                 "model_confidence": round(float(model_confidence), 4),
                 "gate_passed": gate_passed,
@@ -199,6 +204,27 @@ class FaceAnalysisPlugin:
         }
         await ws.send(json.dumps(dbg))
         incr("face_debug_sent")
+
+    def _downsample_landmarks(
+        self, lms_norm: list[dict[str, float]], *, frame_w: int, frame_h: int, max_points: int
+    ) -> list[dict[str, int]]:
+        if not lms_norm or max_points <= 0:
+            return []
+        step = max(1, int(len(lms_norm) / max_points))
+        out: list[dict[str, int]] = []
+        for i in range(0, len(lms_norm), step):
+            lm = lms_norm[i]
+            x = lm.get("x")
+            y = lm.get("y")
+            if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
+                continue
+            px = int(round(float(x) * frame_w))
+            py = int(round(float(y) * frame_h))
+            if 0 <= px < frame_w and 0 <= py < frame_h:
+                out.append({"x": px, "y": py})
+            if len(out) >= max_points:
+                break
+        return out
 
     async def process(self, msg: dict[str, Any], ws: Any) -> None:
         cfg = get_gateway_config()
@@ -332,17 +358,63 @@ class FaceAnalysisPlugin:
 
             gate_passed = face_features is not None
             face_behavior: dict[str, Any] | None = None
+            mp_landmarks_px: list[dict[str, int]] | None = None
+            mp_face_count: int | None = None
+            mp_blend: dict[str, float] | None = None
+            mp_mat16: list[float] | None = None
+
+            # Optional MediaPipe add-on: dense landmarks for UI + behavior (blendshapes/head pose).
+            if fp.mediapipe_enabled and (fp.emit_debug_face or fp.emit_face_behavior):
+                try:
+                    from modules.face.mediapipe_landmarker import detect_face_landmarks_and_blendshapes
+
+                    mp_res = await asyncio.to_thread(
+                        detect_face_landmarks_and_blendshapes,
+                        img_rgb,
+                        model_path=fp.mediapipe_model_path or None,
+                        model_url=fp.mediapipe_model_url or None,
+                    )
+                    mp_face_count = int(mp_res.face_count)
+                    mp_blend = mp_res.blendshapes0
+                    mp_mat16 = mp_res.transform_matrix0
+                    if fp.emit_debug_face and mp_res.landmarks0:
+                        mp_landmarks_px = self._downsample_landmarks(
+                            mp_res.landmarks0,
+                            frame_w=fw,
+                            frame_h=fh,
+                            max_points=int(fp.mediapipe_max_landmarks),
+                        )
+                except Exception as exc:
+                    incr("face_mediapipe_errors")
+                    log_event(
+                        "face_mediapipe_failed",
+                        trace_id=trace_id,
+                        module="face",
+                        extra={"err": str(exc)[:200]},
+                    )
+
             if fp.emit_face_behavior:
-                provider_name = mod.provider or "deepface"
-                face_behavior = build_face_behavior_v1(
-                    provider=provider_name,
-                    schema_version=fp.face_behavior_schema_version,
-                    confidence=confidence_val,
-                    probs=probs,
-                    face_detected=gate_passed,
-                    guard_reason=skip_reason,
-                    min_face_side_px=fp.min_face_side_px if fp.min_face_side_px > 0 else None,
-                )
+                if fp.mediapipe_enabled and mp_face_count and mp_face_count > 0 and mp_blend is not None:
+                    face_behavior = build_face_behavior_v1_mediapipe(
+                        schema_version=fp.face_behavior_schema_version,
+                        confidence=confidence_val,
+                        blendshapes=mp_blend,
+                        transform_matrix16=mp_mat16,
+                        face_detected=gate_passed,
+                        guard_reason=skip_reason,
+                        min_face_side_px=fp.min_face_side_px if fp.min_face_side_px > 0 else None,
+                    )
+                else:
+                    provider_name = mod.provider or "deepface"
+                    face_behavior = build_face_behavior_v1(
+                        provider=provider_name,
+                        schema_version=fp.face_behavior_schema_version,
+                        confidence=confidence_val,
+                        probs=probs,
+                        face_detected=gate_passed,
+                        guard_reason=skip_reason,
+                        min_face_side_px=fp.min_face_side_px if fp.min_face_side_px > 0 else None,
+                    )
 
             if fp.emit_debug_face:
                 dx = dy = dw = dh = None
@@ -372,6 +444,7 @@ class FaceAnalysisPlugin:
                     region_y=dy,
                     region_w=dw,
                     region_h=dh,
+                    landmarks=mp_landmarks_px,
                 )
 
             if skip_reason == "low_confidence":

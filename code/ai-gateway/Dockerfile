@@ -9,6 +9,8 @@ RUN apt-get update \
        libxext6 \
        libxrender1 \
        libgl1 \
+       libegl1 \
+       libgles2 \
        libxcb1 \
     && rm -rf /var/lib/apt/lists/*
 

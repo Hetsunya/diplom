@@ -23,6 +23,10 @@ class FaceRuntimeParams:
     debug_max_face_area_frac: float
     emit_face_behavior: bool
     face_behavior_schema_version: str
+    mediapipe_enabled: bool
+    mediapipe_model_path: str
+    mediapipe_model_url: str
+    mediapipe_max_landmarks: int
 
     @staticmethod
     def from_dict(p: dict[str, Any]) -> FaceRuntimeParams:
@@ -42,4 +46,8 @@ class FaceRuntimeParams:
             debug_max_face_area_frac=float(p.get("debug_max_face_area_frac", 0.45)),
             emit_face_behavior=bool(p.get("emit_face_behavior", False)),
             face_behavior_schema_version=str(p.get("face_behavior_schema_version", "face_behavior.v1")),
+            mediapipe_enabled=bool(p.get("mediapipe_enabled", False)),
+            mediapipe_model_path=str(p.get("mediapipe_model_path", "") or ""),
+            mediapipe_model_url=str(p.get("mediapipe_model_url", "") or ""),
+            mediapipe_max_landmarks=max(0, int(p.get("mediapipe_max_landmarks", 120))),
         )

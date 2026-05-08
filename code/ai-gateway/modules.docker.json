@@ -37,7 +37,11 @@
         "debug_bbox_smooth_alpha": 0.92,
         "debug_max_face_area_frac": 0.42,
         "emit_face_behavior": true,
-        "face_behavior_schema_version": "face_behavior.v1"
+        "face_behavior_schema_version": "face_behavior.v1",
+        "mediapipe_enabled": true,
+        "mediapipe_model_path": "",
+        "mediapipe_model_url": "",
+        "mediapipe_max_landmarks": 120
       }
     },
     "report": {
