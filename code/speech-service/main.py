@@ -6,13 +6,19 @@ import asyncio
 import base64
 import logging
 import os
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
+import numpy as np
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from asr_whisper import suffix_from_mime, transcribe_media_bytes
+from asr_whisper import (
+    decode_media_bytes_to_mono16k_float32,
+    suffix_from_mime,
+    transcribe_float32_window,
+)
 
 app = FastAPI(title="emeeting-speech-service", version="0.2.0")
 
@@ -39,6 +45,9 @@ _logger.info(
     _engine,
     _ENGINE_RAW,
 )
+
+_stream_lock = threading.Lock()
+_stream_state: dict[str, dict[str, Any]] = {}
 
 
 class TranscribeRequest(BaseModel):
@@ -91,7 +100,53 @@ def _whisper_sync(req: TranscribeRequest) -> dict[str, Any]:
         }
 
     suffix = suffix_from_mime(mime)
-    text, meta = transcribe_media_bytes(raw, suffix, language=lang)
+    pcm, decode_meta = decode_media_bytes_to_mono16k_float32(raw, suffix)
+    if decode_meta.get("error"):
+        return {
+            "transcript_partial": "",
+            "transcript_final": None,
+            "language": lang or "unknown",
+            "text_features": {
+                "confidence": 0.0,
+                "note": "decode_failed",
+                "error": decode_meta.get("error"),
+                "message": decode_meta.get("message"),
+            },
+        }
+    if pcm.size == 0:
+        return {
+            "transcript_partial": "",
+            "transcript_final": None,
+            "language": lang or "unknown",
+            "text_features": {"confidence": 0.0, "note": "empty_pcm"},
+        }
+
+    window_seconds = float(os.getenv("WHISPER_WINDOW_SECONDS", "4.0"))
+    step_seconds = float(os.getenv("WHISPER_STEP_SECONDS", "2.0"))
+    sample_rate = int(decode_meta.get("sample_rate", 16000) or 16000)
+    duration_sec = float(pcm.size) / float(sample_rate)
+
+    stream_key = f"{req.session_id}:{req.participant_id}"
+    with _stream_lock:
+        st = _stream_state.get(stream_key, {"last_text": "", "last_duration": 0.0})
+        last_duration = float(st.get("last_duration", 0.0))
+        last_text = str(st.get("last_text", ""))
+
+    final_marker = bool(audio.get("final_chunk")) or bool(audio.get("is_final"))
+    should_run = final_marker or (
+        duration_sec >= window_seconds and (duration_sec - last_duration >= step_seconds)
+    )
+    if not should_run:
+        return {
+            "transcript_partial": "",
+            "transcript_final": None,
+            "language": lang or "unknown",
+            "text_features": {"confidence": 0.0, "note": "step_wait"},
+        }
+
+    window_samples = max(1, int(window_seconds * sample_rate))
+    segment = pcm[-window_samples:] if pcm.size > window_samples else pcm
+    text, meta = transcribe_float32_window(segment.astype(np.float32), language=lang)
     if meta.get("error"):
         _logger.warning(
             "whisper_transcribe_failed trace_id=%s participant=%s error=%s msg=%s",
@@ -100,18 +155,32 @@ def _whisper_sync(req: TranscribeRequest) -> dict[str, Any]:
             meta.get("error"),
             meta.get("message"),
         )
-    final_marker = bool(audio.get("final_chunk")) or bool(audio.get("is_final"))
+    emit_text = text.strip()
+    if emit_text and emit_text == last_text and not final_marker:
+        emit_text = ""
+
+    with _stream_lock:
+        if final_marker:
+            _stream_state.pop(stream_key, None)
+        else:
+            _stream_state[stream_key] = {
+                "last_text": text.strip() or last_text,
+                "last_duration": duration_sec,
+            }
+
     text_features: dict[str, object] = {
         "confidence": meta.get("confidence"),
         "model_size": meta.get("model_size"),
         "sentiment": "neutral",
+        "window_seconds": window_seconds,
+        "step_seconds": step_seconds,
     }
     if meta.get("error"):
         text_features["error"] = meta["error"]
         text_features["message"] = meta.get("message")
     return {
-        "transcript_partial": text,
-        "transcript_final": text if final_marker and text else None,
+        "transcript_partial": emit_text,
+        "transcript_final": emit_text if final_marker and emit_text else None,
         "language": meta.get("language") or lang or "unknown",
         "text_features": text_features,
     }

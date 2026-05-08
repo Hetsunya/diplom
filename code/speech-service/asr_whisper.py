@@ -10,9 +10,12 @@ See also: https://github.com/davabase/whisper_real_time (cumulative buffer idea)
 from __future__ import annotations
 
 import os
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 _model_cache: dict[str, Any] = {}
 
@@ -84,13 +87,16 @@ def transcribe_media_bytes(data: bytes, suffix: str, *, language: str | None) ->
         tmp.write(data)
         tmp.close()
 
-        kwargs: dict[str, Any] = {"beam_size": int(os.getenv("WHISPER_BEAM_SIZE", "5"))}
+        kwargs: dict[str, Any] = {"beam_size": int(os.getenv("WHISPER_BEAM_SIZE", "1"))}
         lang = _effective_asr_language(language)
         if lang:
             kwargs["language"] = lang
 
         # Streaming-ish chunks: defaults tuned vs original faster-whisper (vad off, condition on).
         kwargs["vad_filter"] = _env_bool("WHISPER_VAD_FILTER", True)
+        kwargs["vad_parameters"] = {
+            "min_silence_duration_ms": int(os.getenv("WHISPER_VAD_MIN_SILENCE_MS", "500"))
+        }
         kwargs["condition_on_previous_text"] = _env_bool("WHISPER_CONDITION_ON_PREVIOUS_TEXT", False)
 
         nst = _env_float_optional("WHISPER_NO_SPEECH_THRESHOLD")
@@ -136,6 +142,87 @@ def transcribe_media_bytes(data: bytes, suffix: str, *, language: str | None) ->
             path.unlink(missing_ok=True)
         except OSError:
             pass
+
+
+def decode_media_bytes_to_mono16k_float32(data: bytes, suffix: str) -> tuple[np.ndarray, dict[str, Any]]:
+    """
+    Decode container bytes (webm/ogg/...) to mono 16k PCM float32 via ffmpeg.
+    Returns waveform in [-1, 1] and diagnostics meta.
+    """
+    tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+    path = Path(tmp.name)
+    try:
+        tmp.write(data)
+        tmp.close()
+        proc = subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-i",
+                str(path),
+                "-f",
+                "s16le",
+                "-acodec",
+                "pcm_s16le",
+                "-ac",
+                "1",
+                "-ar",
+                "16000",
+                "pipe:1",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if proc.returncode != 0 or not proc.stdout:
+            msg = (proc.stderr.decode("utf-8", errors="replace") or "ffmpeg decode failed").strip()[:240]
+            return np.array([], dtype=np.float32), {"error": "FFmpegDecodeError", "message": msg}
+        pcm = np.frombuffer(proc.stdout, dtype=np.int16).astype(np.float32) / 32768.0
+        return pcm, {"sample_rate": 16000}
+    finally:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def transcribe_float32_window(segment: np.ndarray, *, language: str | None) -> tuple[str, dict[str, Any]]:
+    """Transcribe already-decoded 16k mono float32 segment."""
+    model_size = os.getenv("WHISPER_MODEL_SIZE", "base")
+    model = _get_model(model_size)
+    kwargs: dict[str, Any] = {"beam_size": int(os.getenv("WHISPER_BEAM_SIZE", "1"))}
+    lang = _effective_asr_language(language)
+    if lang:
+        kwargs["language"] = lang
+    kwargs["vad_filter"] = _env_bool("WHISPER_VAD_FILTER", True)
+    kwargs["vad_parameters"] = {
+        "min_silence_duration_ms": int(os.getenv("WHISPER_VAD_MIN_SILENCE_MS", "500"))
+    }
+    kwargs["condition_on_previous_text"] = _env_bool("WHISPER_CONDITION_ON_PREVIOUS_TEXT", False)
+    try:
+        segments, info = model.transcribe(segment, **kwargs)
+    except Exception as exc:
+        return "", {
+            "confidence": 0.0,
+            "language": lang or "unknown",
+            "model_size": model_size,
+            "error": type(exc).__name__,
+            "message": str(exc)[:240],
+        }
+    parts: list[str] = []
+    for seg in segments:
+        t = (seg.text or "").strip()
+        if t:
+            parts.append(t)
+    text = " ".join(parts).strip()
+    meta = {
+        "confidence": float(getattr(info, "language_probability", 0.5) or 0.5),
+        "language": getattr(info, "language", None) or lang or "unknown",
+        "duration_after_vad": getattr(info, "duration", None),
+        "model_size": model_size,
+    }
+    return text, meta
 
 
 def suffix_from_mime(mime: str) -> str:

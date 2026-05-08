@@ -47,6 +47,19 @@ Response JSON (пример):
 | `WHISPER_COMPUTE_TYPE` | `int8`, `float16`, … | Тип вычислений |
 | `WHISPER_LANGUAGE` | ISO-код или пусто | Фиксированный язык; если пусто — авто |
 | `WHISPER_VAD_FILTER` | `false` (рекомендуется для стабильности) | Встроенный VAD faster-whisper может выкидывать тихую речь; `true` уменьшает ложные срабатывания на шум |
+| `WHISPER_WINDOW_SECONDS` | `4.0` | Размер окна транскрибации (как в `test.py`) |
+| `WHISPER_STEP_SECONDS` | `2.0` | Шаг повторной транскрибации окна (overlap = window - step) |
+| `WHISPER_VAD_MIN_SILENCE_MS` | `500` | Порог тишины для VAD |
+
+### Режим окна/шага (как в `test.py`)
+
+Сервис декодирует входной media-чанк в mono 16k PCM и применяет sliding-window:
+
+- окно `WHISPER_WINDOW_SECONDS` (по умолчанию 4s),
+- сдвиг `WHISPER_STEP_SECONDS` (по умолчанию 2s),
+- `beam_size=1`, `condition_on_previous_text=false`, `vad_filter=true`.
+
+Если очередной результат совпадает с предыдущим текстом, сервис не дублирует его в partial.
 
 Локально без Docker чаще удобно `SPEECH_ASR_ENGINE=stub` для быстрых проверок контракта; для реального текста — `whisper`.
 
