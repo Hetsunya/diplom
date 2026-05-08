@@ -332,13 +332,13 @@ const VideoMeet = () => {
             typeof row.trace_id === "string" && row.trace_id.trim()
               ? row.trace_id
               : `history-${row.analysis_event_id}`;
-          const stage = typeof row.stage === "string" ? row.stage.toLowerCase() : "";
           next.push({
             traceId,
             participantId,
             speakerLabel: normalizeSpeakerLabel(participantId),
             text,
-            final: Boolean(finalText) || stage === "final",
+            // Persisted history is immutable; show it as completed utterances.
+            final: true,
             at: row.created_at || new Date().toISOString(),
           });
         }
