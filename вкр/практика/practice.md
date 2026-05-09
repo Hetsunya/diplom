@@ -1,6 +1,6 @@
 # Материалы для отчёта по практике: система EMeeting
 
-Документ сжимает **техническую базу**, **алгоритмы**, **схему взаимодействия сервисов** и **ориентиры по коду** монорепозитория. **Корень репозитория:** `diplom/` (этот файл — `diplom/practice.md`); **исходный код** — в `diplom/code/`. Пути к файлам в таблицах ниже — **от `code/`**, если не указано иначе. Полные контракты и планы — в `code/docs/`, runbook — в `diplom/README.md`.
+Документ сжимает **техническую базу**, **алгоритмы**, **научные основания модулей анализа**, **схемы взаимодействия сервисов** и **ориентиры по коду** монорепозитория. **Корень репозитория:** `diplom/`; **этот файл:** `diplom/вкр/практика/practice.md`; **исходный код:** `diplom/code/`. Пути к файлам в таблицах ниже — **от `code/`**, если не указано иначе. Полные контракты и планы — в `code/docs/`, runbook — в корневом `README.md`.
 
 Ранний прототип интерфейса (до текущей реализации) можно сопоставить с материалами в каталоге **`вкр/`** (например, `вкр/ui/схема ui.drawio`). Нижеследующие схемы отражают **актуальную** архитектуру стека EMeeting.
 
@@ -18,7 +18,7 @@
 |-----------|---------|------|
 | **Frontend** | `emeeting-ui/` | SPA: React 19, TypeScript, Vite; маршруты, встреча, авторизация |
 | **Backend** | `emeeting-backend/` | Go (Gin), JWT, PostgreSQL, REST + WS комнаты сессии |
-| **AI Gateway** | `ai-gateway/` | Python: подключение к backend по WS, плагины анализа, вызов `speech-service` |
+| **AI Gateway** | `ai-gateway/` | Python: WS к backend; модули `modules/*` (лицо, аудио, отчёт), вызов `speech-service` |
 | **Speech service** | `speech-service/` | FastAPI: HTTP `/v1/transcribe` (stub или faster-whisper) |
 | **Документация** | `docs/` | API, контракты WS аналитики, наблюдаемость, дорожные карты AI |
 
@@ -27,14 +27,21 @@
 **Схема потоков (упрощённо):**
 
 ```
-[Браузер UI] --REST/JWT--> [emeeting-backend] <--SQL--> [PostgreSQL]
-      |                           ^
-      | WS /ws/sessions/:id       | WS (ai-gateway подписан как клиент)
-      v                           |
-[Та же комната WS] <------------+ [ai-gateway] --HTTP--> [speech-service]
+[Браузер UI]
+  | REST/JWT ───────────────────────────────────► [emeeting-backend] ◄──SQL──► [PostgreSQL]
+  |                                                      ▲
+  | WS /ws/sessions/:id (join, audio, frame, chat, …)    | WS-подключение шлюза
+  └──────────────────────────────────────────────────────┤
+                                                         │
+  Ответы WS (аналитика, чат): ◄──────────────────────────┘
+        ▲                    ▲
+        │                    │
+        └── publish ─────────┴── [ai-gateway] ──HTTP──► [speech-service /v1/transcribe]
+
+Организатор: страницы /reports → GET /sessions/:id/analysis/report (итог из analysis_report в БД)
 ```
 
-Клиент встречи шлёт по WS: `join`, `frame` (кадр для эмоций), `audio` (чанки), `chat_message`, `leave` / `end_meeting`. Backend рассылает события участникам и при необходимости пишет аналитику в БД. `ai-gateway` подписан на тот же канал (или multiplex), обрабатывает медиа и может эмитить обогащённые сообщения обратно в комнату (см. `docs/ANALYSIS_WS_CONTRACTS.md`).
+Клиент встречи шлёт по WS: `join`, `frame` (кадр лица для DeepFace/MediaPipe-пайплайна), `audio` (чанки WebM/opus для ASR), `chat_message`, `leave`, `end_meeting`. Backend рассылает события и для типов **`text_analysis`**, **`audio_analysis`**, **`face_analysis`**, **`analysis_report`*** , **`emotion`** выполняет **запись в `analysis_event` / отчёт** плюс broadcast. Тип **`face_debug`** только **рассылка** живым клиентам (в БД не пишется), но попадает в **in-memory `feature_store`** шлюза и влияет на заглушечный отчёт (`face_tracking_summary` и др.) — см. `code/docs/REPORTS_AND_ANALYTICS_STORAGE.md`.
 
 ---
 
@@ -46,7 +53,8 @@
 - **react-router-dom** — маршрутизация, **TanStack Query** — серверное состояние  
 - **Zustand** — локальное состояние встречи (участники, тосты)  
 - **Vitest** + Testing Library — unit-тесты  
-- Ключевые страницы: `src/pages/Dashboard.tsx`, `Sessions.tsx`, `NewSession.tsx`, `VideoMeet.tsx`, `Login.tsx`, `Report.tsx`
+- Маршруты отчётов: **`/reports`** (выбор сессии), **`/reports/:sessionId`** (детализация); конфиг роутера: `src/config/features.ts`
+- Ключевые страницы: `Dashboard.tsx`, `Sessions.tsx` (ссылка «Отчёт»), `NewSession.tsx`, `VideoMeet.tsx`, `Login.tsx`, `Report.tsx`
 
 ### 3.2. Backend (`emeeting-backend`)
 
@@ -59,8 +67,10 @@
 
 ### 3.3. AI и речь
 
-- **ai-gateway:** Python 3.11, конфиг модулей JSON, плагины в `plugins/`  
-- **speech-service:** FastAPI, режимы `SPEECH_ASR_ENGINE=stub|whisper` (см. `speech-service/README.md`)
+- **ai-gateway:** Python **3.11** (ориентир для Docker и `mediapipe` в `requirements.txt` ограничен `python_version < "3.13"`); декларативный конфиг **`modules*.json`**, исполняемая логика в **`modules/`** (`modules/face/`, `modules/audio/`, `modules/report/`), реестр `modules/registry.py`; legacy-шимы в `plugins/` при необходимости  
+- **Лицо:** DeepFace → события `face_analysis` + legacy `emotion`; опционально **MediaPipe Face Landmarker** → `face_behavior`, отладочные **`face_debug`** (флаги `mediapipe_*`, `emit_debug_face`). В Dockerfile gateway — **`libegl1`**, **`libgles2`** для vision-задач  
+- **Отчёт:** `report_loop` + `stub_builder` — правило-based агрегат (`meeting_summary`, `participant_tiles`, таймлайны, `face_tracking_summary` при наличии `face_debug` в feature store и т.д.)  
+- **speech-service:** FastAPI, режимы `SPEECH_ASR_ENGINE=stub|whisper` (см. `speech-service/README.md`; faster-whisper / CTranslate2 при `whisper`)
 
 ---
 
@@ -92,12 +102,14 @@
 
 *Детали контрактов:* `docs/api-contract.md`, код `internal/auth/`.
 
+**Замечание про отчёт:** просмотр агрегированной аналитики по завершённой сессии в UI связан не с общим ресурсом `GET /reports/:id` legacy, а с **`GET /sessions/:id/analysis/report`** для организатора (`docs/api-contract.md`).
+
 ### 5.2. Подключение к встрече по WebSocket
 
 1. Клиент открывает `WebSocket` на URL вида `…/ws/sessions/:sessionId` (в dev — `ws://localhost:8080/ws/sessions/:id`; за прокси — относительный префикс из `VITE_WS_URL`).  
 2. После `onopen` клиент шлёт сообщение **`join`** с `participant_id`, в `payload` — имя и роль (`host` / `participant`).  
 3. **Backend** (`joinHandler` в `ws_handler.go`): сохраняет метаданные соединения, рассылает legacy `join`, затем событие **`user_joined`**, новому клиенту — **`participants_snapshot`** со списком уже подключённых.  
-4. Дальнейшие сообщения (`chat_message`, `frame`, `audio`, …) обрабатываются зарегистрированными обработчиками: часть только **broadcast** в комнату, часть ещё **персистит** аналитику через `analysisSvc.RecordInbound`.
+4. Дальнейшие сообщения (`chat_message`, `frame`, `audio`, …) обрабатываются зарегистрированными обработчиками: тип **`face_debug`** только **broadcast**; типы **`text_analysis`**, **`audio_analysis`**, **`face_analysis`**, **`analysis_report`**, **`analysis_report_partial`**, **`emotion`** — **persist + broadcast** в `analysis_event` (при ошибке записи клиент может не узнать, см. логи backend).
 
 ### 5.3. Список участников и завершение встречи
 
@@ -133,9 +145,74 @@
 
 ### 5.8. AI Gateway (концептуально)
 
-- Читает конфиг модулей (`modules.default.json` / `modules.docker.json`).  
-- Поддерживает цепочки: аудио → HTTP в speech-service → нормализация в события `text_analysis`; видеокадры → модуль лица; агрегация → `analysis_report` / partial.  
-- Подробности: `ai-gateway/MEMO.md`, `docs/ANALYSIS_WS_CONTRACTS.md`.
+- Читает конфиг модулей (`modules.default.json` / `modules.docker.json`), hot-reload по `AI_GATEWAY_CONFIG_POLL_SEC`.  
+- Цепочки: **аудио** → признаки `audio_analysis` и при включённом `text` модуле HTTP в **speech-service** → `text_analysis`; **кадр** (`frame`) → `face_analysis`, опционально `face_behavior`, `face_debug`; **report_loop** → периодические `analysis_report_partial` и финальный `analysis_report` при остановке цикла (отключение WS шлюза).  
+- Ограничение параллелизма лицевого инференса: семафор **`max_concurrent_inferences`** (по умолчанию 2).  
+- Подробности: `ai-gateway/MEMO.md`, `docs/ANALYSIS_WS_CONTRACTS.md`, `docs/REPORTS_AND_ANALYTICS_STORAGE.md`.
+
+### 5.9. Отчёт и доступ к нему в реализации
+
+- **UI:** `Report.tsx`, REST **`GET /sessions/:id/analysis/report`** (только **организатор** — см. backend и `docs/api-contract.md`).  
+- **Структура stub-ответа** (расширяемая): `meeting_summary` (распределение эмоций с полями `emotion`/`events`/доли, текстовые `highlights_ru`, рейтинг вовлечённости, `coverage`), `participant_tiles`, `timelines`, `observations`, при наличии данных — `face_tracking_summary`, `face_behavior_summary`; базовые `summary`, `participants`, `fusion`. Источник логики: `ai-gateway/modules/report/stub_builder.py`.
+
+---
+
+## 5A. Научные и инженерные основания модулей (для раздела ВКР / теории)
+
+Ниже — краткая выжимка **для ссылок в пояснительной записке**. Формулировки можно перенести почти дословно с указанием источников; DOI/arXiv даны там, где стандартны.
+
+### 5A.1. Детекция лица и трекинг: от ограничивающего прямоугольника к «точкам»
+
+**Задача:** на изображении $I$ локализовать лицо и оценить набор ключевых **ландмарок** $\{(x_k, y_k)\}_{k=1}^{K}$ (контуры глаз, носа, рта, околовиличная область).
+
+**Исторический контекст:** классический подход — **Active Shape Models (ASM)** и **Active Appearance Models (AAM)** (компактное параметрическое представление формы лица статистикой формы и текстуры) [Cootes et al.](https://www.sciencedirect.com/science/article/abs/pii/S1077314202909041). Современный стандарт для практических систем — полносверточные **регрессоры**, предсказывающие координаты точек напрямую по изображению или по ROI после детектора (семейства BlazeFace/MediaPipe Face Detection, MTCNN и др.).
+
+**Как связано с текущей реализацией:** кадры с камеры браузера кодируются и передаются на шлюз; модуль лица выполняет **детект**, при необходимости **выравнивание (alignment)** перед DeepFace (`align` в конфиге), затем классификацию эмоции. Опциональный **Face Landmarker** **MediaPipe** строит **плотную сетку** (сотни 3D-подобных опорных точек на лицевой меше с последующей проекцией) для оценки **blendshape**-коэффициентов (приближение активности групп лицевых мышц) и **ориентации головы** (углы yaw/pitch/roll). Инженерное описание и ссылки на whitepaper/Google AI: официальный хаб решения **[Face landmarks detection (MediaPipe)](https://developers.google.com/mediapipe/solutions/vision/face_landmarker)**; обзор идеи смежных задач можно опереть на публикации по **«facial landmarks» + deep learning**, например обзоры FERA / CVPR-tutorial материалы.
+
+**Дополнительно для текста отчёта:** различите **геометрический трекинг** (устойчивая нумерация точек между кадрами при стабильном детекте) и **семантический смысл** точек как базиса для **описания выражения**; в приложении см. расширение контракта `face_behavior` в `docs/ANALYSIS_WS_CONTRACTS.md`.
+
+### 5A.2. Распознавание эмоции по лицу (FER)
+
+**Эмоция как класс:** типичная постановка — многоклассовая классификация по изображению лица (**Facial Expression Recognition**). Продуктивные решения объединяют детект/выравнивание и **CNN**/`EfficientNet`-подобные бэкенды; в коде используется **DeepFace** (мета-библиотека с несколькими предобученными моделями). Для научной ссылки имеет смысл цитировать **обзоры FER** (напр. журнальные обзоры 2019–2023 по deep FER и датасетам FER2013/AffectNet) или оригинальные архитектуры конкретных бэкендов, которые включаете в текст (см. список провайдеров в документации DeepFace на GitHub — ссылочно на первоисточники моделей).
+
+### 5A.3. Транскрибация речи в текст (ASR): цепочка в системе и теория
+
+**В приложении:** поток браузера `MediaRecorder` → чанки **WebM/opus** (бинарное сжатие речи без явного разделения на фонемы на клиенте) → **ai-gateway** → HTTP **POST `/v1/transcribe`** → в режиме `whisper` — **Whisper-small/medium/etc.** через **[faster-whisper](https://github.com/SYSTRAN/faster-whisper)** (ускорение на базе **[CTranslate2](https://github.com/OpenNMT/CTranslate2)**.
+
+**Научное ядро Whisper:** аудиокодек на входе переводится в частотную плоскость (**лог-Мел спектрограмма** коротких окон FFT), затем **encoder-decoder Transformer** с кросс-вниманием последовательно генерирует текстовые токены; обучение на большом смесевом массиве слабых супервизий. Оригинальная работа для библиографии:
+
+> Radford A. et al. **Robust Speech Recognition via Large-Scale Weak Supervision**. Proc. ICML **2023**; также технический препринт **arXiv:2212.04356** — `https://arxiv.org/abs/2212.04356`
+
+Темы для раздела «теория» в отчёте: **attention / Transformer** (общие работы Vaswani et al., «Attention Is All You Need», NeurIPS 2017, arXiv:1706.03762); **CTC / seq2seq** как альтернативы (для исторического сравнения с энкодер-декодер ASR до эры LLM-whisper-подхода); ограничения **streaming** против **батч-декода** файлом (partial/final в контракте UI).
+
+### 5A.4. Простые признаки аудиочанков (до «тяжёлого» SER)
+
+В режиме `audio_analysis` на шлюзе считаются **прокси-признаки** активности речи без полного ASR по каждому кадру декодированного PCM: энергия, предполагаемая **битрейт-связность**, грубая оценка **пауз**. Для усиления теоретической части можно сослаться на классические **VAD (Voice Activity Detection)** и описания признаков **MFCC**/энергетических контуров (Rabiner & Schafer по основам ЦОС речи либо учебники ASR Huang, Acero, Hon).
+
+### 5A.5. Агрегирование отчёта без финальной НС в разработческой версии
+
+В проекте **итог по встрече** формируется **правилами** по накопленным фичам (окна по времени, счётчики эмодоминант, вклад транскрипта, качество прохождения «gate» для `face_debug`). Для ВКР это можно охарактеризовать как **late fusion** многомодальных сигналов на уровне статистик (с отсылкой к обзорам multimodal sentiment / meeting understanding), а путь с **«своей НН»** оставить как этап `own_nn_url` в конфигурации gateway.
+
+---
+
+## 5B. Краткая библиография и ссылки для дальнейшего оформления по ГОСТу
+
+Форматы оформления (ГОСТ Р 7.0.5 / 7.0.100) нужно будет привести к требованиям вашей кафедры самостоятельно; здесь дан **поисковый ключ** или стабильный URL.
+
+| Тема | Куда сослаться в пояснительной записке |
+|------|---------------------------------------|
+| AAM/ASM статистических моделей лица | Cootes T., Edwards G., Taylor C. Active appearance models (*устаревшие, но хороши для истории темы ASM*) |
+| Transformer (общая база Whisper и современных ASR/LLM) | Vaswani et al., 2017, arXiv:1706.03762 |
+| Whisper (основная ссылка на ASR в стеке) | Radford et al., Robust Speech Recognition…, ICML 2023 / arXiv:2212.04356 |
+| faster-whisper / CTranslate2 | репозитории GitHub SYSTRAN/faster-whisper, OpenNMT/CTranslate2 (как инженерный ускоритель) |
+| MediaPipe Face Landmarker | официальная документация Google + раздел citations на странице решения |
+| DeepFace как обёртка FER-моделей | репозиторий [serengil/deepFace](https://github.com/serengil/deepface) — в тексте перечислить выбранный `detector_backend`/`model_name` и дать первоисточники соответствующих сетей (VGG-Face, Facenet512, … как в документации пакета) |
+| Обзор deep-learning FER | Li Y., Deng S. Deep Facial Expression Recognition: A Survey. *IEEE Trans. Pattern Anal. Mach. Intell.* (TPAMI); препринт на arXiv (поиск по названию для актуальной версии) |
+| Датасеты выражений | **FER2013**, **AffectNet** — для обоснования постановки классификации эмоций в разделе «аналоги и литература» |
+| Детект лица (скорость) | BlazeFace ([Bazarevsky et al., CVPR Workshops 2019](https://research.google/pubs/pub49958/)) как пример архитектур для real-time ROI |
+| Multimodal / emotional meeting analysis | обзоры по запросам *multimodal emotion recognition*, *multimodal meeting understanding* — для абзаца про перспективу отчётной НН и late fusion |
+
+PDF по открытым источникам: **arxiv.org/abs/2212.04356**, **arxiv.org/abs/1706.03762**; для платных изданий — библиотека вуза / DOI.
 
 ---
 
@@ -151,8 +228,9 @@
 
 | Тема | Файл |
 |------|------|
-| REST v1 (логин, сессии, чат, аналитика) | `docs/api-contract.md` |
-| WS-типы аналитики (`text_analysis`, `face_analysis`, отчёты) | `docs/ANALYSIS_WS_CONTRACTS.md` |
+| REST v1 (логин, сессии, чат, аналитика, права отчёта организатору) | `docs/api-contract.md` |
+| Отчёт UI (`/reports`), матрица persist, поля stub-отчёта | `docs/REPORTS_AND_ANALYTICS_STORAGE.md` |
+| WS-типы аналитики (`text_analysis`, `face_analysis`, `face_debug`, отчёты) | `docs/ANALYSIS_WS_CONTRACTS.md` |
 | Метрики и логирование | `docs/ANALYSIS_OBSERVABILITY.md` |
 | План развития AI | `docs/AI_STUB_TO_PRODUCTION_ROADMAP.md` |
 
@@ -392,12 +470,13 @@ def _stub_response(req: TranscribeRequest) -> dict[str, Any]:
 
 Можно напрямую разворачивать в разделы отчёта:
 
-1. **Постановка задачи:** веб-платформа сессий и видеовстреч с аналитикой и отчётностью.  
-2. **Проектирование:** клиент–сервер, REST + WebSocket, выделение ASR и AI в отдельные сервисы.  
-3. **Реализация:** стек по табл. §3; модульность backend; компонентный UI; хуки для медиа и WS.  
-4. **Безопасность:** HTTPS/wss в проде; bcrypt; JWT; rate limit на логин; разграничение доступа к аналитике (организатор / участник).  
-5. **Проверка:** unit-тесты, CI, ручной сценарий Docker Compose.  
-6. **Заключение:** достигнутые результаты, ограничения (stub-режимы, зависимость от профиля `ai`, размер WS-сообщений).
+1. **Постановка задачи:** веб-платформа сессий и видеовстреч с аналитикой по речи/лицу и отчётностью для организатора.
+2. **Проектирование:** клиент–сервер, REST + WebSocket, вынос ASR (`speech-service`) и мультимодального анализа (`ai-gateway`) в отдельные сервисы; маршруты `/reports`.
+3. **Реализация:** стек по табл. §3; модули backend; UI (страницы встречи и отчёт); `ai-gateway/modules/*`, `report_loop`, hot-reload конфига.
+4. **Безопасность:** HTTPS/wss в проде; bcrypt; JWT; rate limit на логин; разграничение REST-аналитики (организатор / участник с `participant_id`); отчёт сессии — организатор (`docs/api-contract.md`).
+5. **Проверка:** unit-тесты, CI, ручной сценарий `docker compose` (при необходимости `--profile ai`).
+6. **Научная часть:** ландмарки и blendshapes, FER, ASR Whisper/Transformer, простые аудиопризнаки, late fusion для отчёта (§5A, §5B).
+7. **Заключение:** достигнутые результаты; ограничения: эвристический stub-отчёт, `face_debug` не сохраняется в `analysis_event`, латентность/partial ASR, большие WS-сообщения медиа.
 
 ---
 
@@ -409,12 +488,16 @@ def _stub_response(req: TranscribeRequest) -> dict[str, Any]:
 | WS сессии, join/leave/audio | `emeeting-backend/internal/session/ws_handler.go`, `hub.go` |
 | Авторизация | `emeeting-backend/internal/auth/` |
 | Страница встречи | `emeeting-ui/src/pages/VideoMeet.tsx` |
+| Отчёт аналитики, маршруты `/reports` | `emeeting-ui/src/pages/Report.tsx`, `emeeting-ui/src/config/features.ts` |
 | Правая панель (транскрипт, чат, люди) | `emeeting-ui/src/features/meeting/MeetingTranscriptRail.tsx` |
 | События встречи в state | `emeeting-ui/src/features/meeting/handleMeetingEvent.ts` |
 | WS hook | `emeeting-ui/src/hooks/useSessionWS.ts` |
 | Аудио-чанки | `emeeting-ui/src/features/meeting/useMeetingAudioChunks.ts` |
 | ASR HTTP | `speech-service/main.py`, `speech-service/asr_whisper.py` |
-| Конфиг gateway | `ai-gateway/modules.default.json`, `ai-gateway/gateway_config.py` |
+| Stub-отчёт, оркестрация | `ai-gateway/modules/report/stub_builder.py`, `ai-gateway/report_loop.py` |
+| Face: DeepFace / MediaPipe | `ai-gateway/modules/face/analysis.py`, `mediapipe_landmarker.py`, `params.py` |
+| Конфиг gateway | `ai-gateway/modules.default.json`, `modules.docker.json`, `gateway_config.py` |
+| Анализ: persist, REST | `emeeting-backend/internal/analysis/`, регистрация WS в `session/ws_handler.go` |
 
 ---
 
@@ -435,6 +518,7 @@ flowchart TB
     D --> E[Получить access + refresh]
     E --> C
     C -->|Да| F[REST: сессии / открыть встречу]
+    F --> F2[Организатор: /reports →\nGET …/analysis/report]
     F --> G[WebSocket /ws/sessions/:id]
     G --> H[join + медиа / чат]
     H --> I[leave или end_meeting]
@@ -443,24 +527,27 @@ flowchart TB
 
   subgraph LaneB["Дорожка: emeeting-backend"]
     HB[join → user_joined +\nparticipants_snapshot]
-    IB[broadcast + опционально\nзапись analysis_event]
+    IB[v1-аналитика:\npersist analysis_event +\nbroadcast]
+    ID[face_debug:\nтолько broadcast]
     JB[meeting_ended / disconnect]
   end
 
   subgraph LaneX["Дорожка: ai-gateway + speech-service\n(compose profile ai)"]
     IX[Приём audio / frame]
-    IY[ASR HTTP + плагины]
+    IY[faster-whisper + модули\nface/report]
   end
 
   H -.-> HB
   H -.-> IB
+  H -.-> ID
   H -.-> IX
   IX --> IY
-  IY -.->|события аналитики в комнату| IB
+  IY -.->|WS аналитика| IB
+  IY -.->|опц. WS face_debug| ID
   I -.-> JB
 ```
 
-**События и артефакты:** JWT; сообщения WS (`join`, `frame`, `audio`, `chat_message`); при включённом AI — HTTP в `speech-service`, обратные WS-сообщения по контракту `docs/ANALYSIS_WS_CONTRACTS.md`.
+**События и артефакты:** JWT; WS (`join`, `frame`, `audio`, `chat_message`); от шлюза — `text_analysis`, `audio_analysis`, `face_analysis`, `analysis_report*`; **`face_debug`** не пишется в БД (`docs/REPORTS_AND_ANALYTICS_STORAGE.md`). Контракт: `docs/ANALYSIS_WS_CONTRACTS.md`.
 
 ---
 
@@ -549,7 +636,25 @@ flowchart TB
   P6 -->|JSON отчёта| U
 ```
 
-*Примечание:* внешний контур `ai-gateway` на DFD уровня 1 можно показать отдельным процессом **P7 «Обогащение аналитики»** между P3 и P4; здесь он свёрнут в поток «WS → gateway → обратно в комнату» для краткости.
+**Пояснение к потокам:** **P7 (внешний)** — процесс **`ai-gateway` + speech-service`: WS получает клиентские `audio`/`frame`, шлюз отправляет назад сообщения типов **`text_analysis`**, **`face_analysis`**, **`emotion`**, **`face_debug`**, **`analysis_report*`**; backend в **P3** принимает их как входящие WS и пересылает участникам. **P4** записывает в **D4** только те типы, для которых в `ws_handler.go` включён `persistBroadcast` (**`face_debug` не попадает** в таблицы аналитики). Для аккуратной DFD второго уровня нарисуйте **отдельно** узел «AI-шлюз» и два разных входа из него в P3: прозрачный broadcast против «с persist».
+
+#### 12.3.1. Потоки аналитики: persist vs только live (`face_debug`)
+
+```mermaid
+flowchart LR
+  GW[["ai-gateway"]]
+  BK[["emeeting-backend\nWS handler"]]
+  DB[["PostgreSQL"]]
+  CL[["Клиенты\nкомнаты"]]
+
+  GW -->|face_analysis,\ntext_analysis, …| BK
+  BK -->|INSERT| DB
+  BK -->|broadcast| CL
+
+  GW -->|face_debug| BK
+  BK -->|только broadcast| CL
+  BK -.->|нет INSERT| DB
+```
 
 ---
 
@@ -654,4 +759,4 @@ erDiagram
 
 ---
 
-*Файл подготовлен как консолидированная шпаргалка; при изменении кода обновляйте разделы 5–8 и §12 по актуальным коммитам и миграциям.*
+*Файл подготовлен как консолидированная шпаргалка; при изменении кода обновляйте разделы §5–§9, блоки §5A–§5B (теория + библиография) и §12 по актуальным коммитам и миграциям.*
