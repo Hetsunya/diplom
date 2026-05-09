@@ -9,6 +9,7 @@
 - **Report latency**: wrap ML / HTTP calls with `t0 = monotonic_ms()` and log `latency_ms` on completion (see `report_loop`).
 - **Hot-reload modules JSON**: mount `AI_GATEWAY_MODULES_CONFIG` (e.g. `/app/modules.docker.json`) and set **`AI_GATEWAY_CONFIG_POLL_SEC`** (default `10` in prod compose; use `0` to disable). On file **mtime** change, gateway reloads module flags/params **without** restarting the process (`handlers.handle_message` polls).
 - **Heavy modules**: Face inference runs under **`max_concurrent_inferences`** (default `2`) via `asyncio.Semaphore` + `asyncio.to_thread` so frames don’t pile unbounded synchronous GPU/CPU work on one thread.
+- **MediaPipe (optional)**: on landmarker failures the gateway increments **`face_mediapipe_errors`** and emits **`face_mediapipe_failed`** via `log_event` — учитывать при алертинге и при диагностике Docker (EGL/GLES, см. `ai-gateway/Dockerfile`).
 - **Degraded pipeline visibility**: each `analysis_report_partial` / final `analysis_report` includes **`report.data_quality`**: `complete`, `degraded_sources` (`text_asr`, `face_inference`, …), `notes`, `counters_window` (counter deltas since the previous report tick). Derived from `speech_service_circuit_open`, `text_analysis_errors`, `face_inference_errors`, etc.
 
 ## Suggested SLO targets (tune per deployment)

@@ -17,6 +17,7 @@
 | Документ | Назначение |
 |----------|------------|
 | [api-contract.md](./api-contract.md) | REST v1 (UI ↔ backend) |
+| [**REPORTS_AND_ANALYTICS_STORAGE.md**](./REPORTS_AND_ANALYTICS_STORAGE.md) | Отчёты UI (`/reports`), REST отчёта, матрица persistence (`analysis_event` vs `face_debug`), поля stub-отчёта |
 | [ANALYSIS_WS_CONTRACTS.md](./ANALYSIS_WS_CONTRACTS.md) | WS-события аналитики v1 (`text_analysis`, `face_analysis`, отчёты, legacy `emotion`) |
 | [ANALYSIS_OBSERVABILITY.md](./ANALYSIS_OBSERVABILITY.md) | Логи, счётчики, latency, hot-reload конфига, `data_quality` в отчётах |
 | [UI_AI_ANALYSIS_PLAN.md](./UI_AI_ANALYSIS_PLAN.md) | План UI (транскрипт, чат, вердикт) |

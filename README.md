@@ -11,6 +11,7 @@
 ## Документация
 
 - **Индекс (`code/docs/README.md`):** контракты API/WS, наблюдаемость, планы UI и AI, ссылки на README сервисов.
+- **Отчёты и хранение аналитики (`code/docs/REPORTS_AND_ANALYTICS_STORAGE.md`):** маршруты `/reports`, что пишется в БД, поля stub-отчёта, `face_debug` без persist.
 - **Замена заглушек AI (`code/docs/AI_STUB_TO_PRODUCTION_ROADMAP.md`):** фазы и связь с беклогом **BL-AI-101…** в `code/cursor backlog.md`.
 - **Беклог задач:** `code/cursor backlog.md`.
 
@@ -116,7 +117,7 @@ uvicorn main:app --host 0.0.0.0 --port 8090
 
 - `docker compose up --build` starts all services without crash loops.
 - `GET http://localhost:8080/ws/health` returns status `ok`.
-- UI opens and can call backend endpoints (`/sessions`, `/auth/login`, `/reports/:id`).
+- UI opens and can call backend endpoints (`/sessions`, `/auth/login`, `/sessions/:id/analysis/report` для организатора, страницы `/reports`).
 - Backend tests pass locally: `go test ./...`.
 - UI quality checks pass locally: `npm run lint && npm run build`.
 - Для AI-пайплайна (профиль `ai`) в live-сессии появляются WS события `text_analysis` и `audio_analysis`.

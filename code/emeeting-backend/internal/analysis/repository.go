@@ -233,3 +233,40 @@ func (r *Repository) ListEvents(ctx context.Context, sessionID int, f EventsFilt
 	}
 	return json.Marshal(items)
 }
+
+type ReportEventRow struct {
+	EventType     string
+	ParticipantID string
+	Payload       []byte
+	CreatedAt     time.Time
+}
+
+func (r *Repository) ListEventsForStubReport(ctx context.Context, sessionID int, limit int) ([]ReportEventRow, error) {
+	if limit <= 0 || limit > 20000 {
+		limit = 5000
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT event_type, COALESCE(participant_id, ''), payload, created_at
+		FROM analysis_event
+		WHERE session_id = $1
+		ORDER BY created_at ASC
+		LIMIT $2
+	`, sessionID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]ReportEventRow, 0, 256)
+	for rows.Next() {
+		var rrow ReportEventRow
+		if err := rows.Scan(&rrow.EventType, &rrow.ParticipantID, &rrow.Payload, &rrow.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, rrow)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}

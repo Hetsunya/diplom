@@ -151,6 +151,14 @@ Same semantics as dominant face emotion for UI backwards compatibility.
 
 Gateways **may** emit both `face_analysis` and `emotion` for the same frame.
 
+### `face_debug` (debug / overlays)
+
+Диагностические сообщения с дорожки лица (bounding box, признак прохождения gate, компактные признаки вроде `landmarks_n`, опционально эмоция/уверенность). Используются для live UI и для пополнения in-memory **`feature_store`** заглушки отчёта.
+
+**Persistence:** в текущем backend сообщения **`face_debug` только broadcast** и **не** записываются в таблицу `analysis_event` (в отличие от `face_analysis`). Подробности см. [`REPORTS_AND_ANALYTICS_STORAGE.md`](./REPORTS_AND_ANALYTICS_STORAGE.md).
+
+Рекомендуется сохранять на payload те же обязательные поля v1 (`module`, `stage`, `trace_id`, `version`), если клиенты группируют события по контракту.
+
 ### `analysis_report` / `analysis_report_partial`
 
 Aggregated report from the report orchestrator / own NN.
@@ -168,6 +176,15 @@ Current stub orchestrator may include inside `report` (optional):
 - `participants[]` entries with fields such as
   `audio_chunks`, `avg_speech_activity_proxy`, `avg_bitrate_kbps`, `last_emotion`, `last_transcript`
 - `fusion` (object, optional): `bucket_sec`, `trace_ids_by_participant`, `buckets[]` (per-window kind counts + trace_ids) — produced by the gateway stub / merged from stub when the remote NN omits it
+- `emotion_summary`, `transcript_summary` — недавняя история по участникам
+- `face_behavior_summary` — если в потоке были события с `face_behavior`
+- `face_tracking_summary` — агрегация по **`face_debug`** из feature store (не из БД напрямую)
+- `timelines` — побuket-сводки эмоций и транскрипта
+- `observations` — правило-based строки без отдельной НС
+- `participant_tiles` — компактные карточки участника для UI
+- `meeting_summary` — сводка по встрече: `emotion_distribution_top` (поля **`emotion`**, **`events`**, `share`), `highlights_ru`, `participation_rank`, `coverage`, сравнения verbal / face-tracking между участниками
+
+Полный перечень и семантика хранения см. [`REPORTS_AND_ANALYTICS_STORAGE.md`](./REPORTS_AND_ANALYTICS_STORAGE.md).
 
 ## trace_id
 

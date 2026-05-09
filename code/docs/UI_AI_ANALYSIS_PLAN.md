@@ -36,8 +36,9 @@
 
 ## 4. Привязка к существующему коду UI
 
-- Сейчас эмоции: `emeeting-ui/src/pages/VideoMeet.tsx` — только `emotion`. Оставить для совместимости; дополнительно подписаться на `face_analysis` (опционально дублировать или постепенно мигрировать).
-- Отчёт по эмоциям: `emeeting-ui/src/pages/Report.tsx` — только `emotion`; позже добавить агрегацию по `face_analysis` или по REST events.
+- Эмоции live: `emeeting-ui/src/pages/VideoMeet.tsx` — совместимость с legacy `emotion` и события `face_analysis`.
+- Отчёт: `emeeting-ui/src/pages/Report.tsx` — данные из **`GET /sessions/:id/analysis/report`** (организатор); отображаются расширения заглушки (`meeting_summary`, `participant_tiles`, таймлайны и др.). Маршруты **`/reports`** и **`/reports/:sessionId`**; см. `docs/REPORTS_AND_ANALYTICS_STORAGE.md`.
+- **`face_debug`** можно использовать для отладочного оверлея live — сообщения **не** сохраняются в `analysis_event`, см. контракт.
 
 ## 5. Фазы внедрения
 
@@ -57,5 +58,6 @@
 
 - Пользователь видит live-транскрипт без перезагрузки страницы.
 - Чат и транскрипт визуально разделены.
-- Вердикт partial report виден и раскрывается в детали.
+- Вердикт partial report виден и раскрывается в детали (правый рейл встречи).
 - Состояние загрузки не вводит в заблуждение (нет вечного «analyzing» без событий).
+- Организатор открывает отчёт по сессии с **`/reports`** без расхождения с сохранённым телом отчёта на backend.

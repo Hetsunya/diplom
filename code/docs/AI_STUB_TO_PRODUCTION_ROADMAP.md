@@ -9,11 +9,11 @@
 | **speech-service** | `stub`, опционально **faster-whisper** (`SPEECH_ASR_ENGINE=whisper`), ffmpeg | Нет стриминга partial из модели «как в Zoom»; stub без текста; качество/латентность зависят от модели без авто-масштабирования |
 | **ai-gateway → text** | HTTP адаптер + CB/retry, нормализация в `text_analysis`, эвристический `text_features` | NLP не модельный; нет diarization → текст не привязан к спикеру автоматически |
 | **ai-gateway → audio** | Сигнальные признаки по сырым чанкам (energy, pause, jitter/shimmer proxy и т.д.) | Нет полноценного PCM decode WebRTC; нет SER/стресс-моделей по контенту речи |
-| **ai-gateway → face** | DeepFace emotion, guards, semaphore, legacy `emotion` | Зависимость от TF/Keras; не onnx/lightweight edge path |
-| **ai-gateway → report** | Локальный stub + `fusion` окна + `data_quality`; опционально `own_nn_url` | Эвристический summary; «своя НС» вне репо или не обучена |
+| **ai-gateway → face** | DeepFace emotion, guards, semaphore, legacy `emotion`; опционально **MediaPipe** для `face_behavior` и `emit_debug_face` (`mediapipe_*` в конфиге; GLES в Docker) | Полный ONNX/light edge-путь не выбран как единственный; TF/MediaPipe тяжёлые для малого CPU |
+| **ai-gateway → report** | Локальный stub + `fusion` + `data_quality` + расширения UI (`meeting_summary`, тайлы участников, таймлайны); опционально `own_nn_url` | Эвристический текст и ранжирования; «своя НС» вне репо или не обучена |
 | **Наблюдаемость** | Счётчики, latency rings, `snapshot_health`, логи | Нет обязательного Prometheus scrape на gateway (опционально BL-AI-107) |
 
-Контракты и точки расширения зафиксированы в [`ANALYSIS_WS_CONTRACTS.md`](./ANALYSIS_WS_CONTRACTS.md) и [`ANALYSIS_OBSERVABILITY.md`](./ANALYSIS_OBSERVABILITY.md).
+Контракты и точки расширения зафиксированы в [`ANALYSIS_WS_CONTRACTS.md`](./ANALYSIS_WS_CONTRACTS.md), [`ANALYSIS_OBSERVABILITY.md`](./ANALYSIS_OBSERVABILITY.md), [`REPORTS_AND_ANALYTICS_STORAGE.md`](./REPORTS_AND_ANALYTICS_STORAGE.md).
 
 ## Фазы внедрения (рекомендуемый порядок)
 
@@ -34,7 +34,7 @@
 
 ### Фаза 3 — Лицо и приватность
 
-1. Оценить **ONNX / MediaPipe / InsightFace** для снижения веса образа и времени cold start.
+1. Уже есть опциональный путь **MediaPipe Face Landmarker** в gateway; дальше — выбор **ONNX / InsightFace** или упрощение образа и времени cold start при сохранении контракта `face_analysis`.
 2. Политики: разрешение пользователя, локальный inference, минимизация хранения кадров.
 
 **Беклог:** BL-AI-103.

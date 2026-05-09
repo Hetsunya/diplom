@@ -55,7 +55,14 @@ func (h *HTTPHandler) GetReport(c *gin.Context) {
 		return
 	}
 	if raw == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "no report yet"})
+		// Fallback: build local stub report from persisted analysis events.
+		stub, err := h.svc.BuildStubReportJSON(c.Request.Context(), id)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		h.auditAccess(c, id, uid, "analysis.report.stub", true)
+		c.Data(http.StatusOK, "application/json", stub)
 		return
 	}
 	h.auditAccess(c, id, uid, "analysis.report", true)

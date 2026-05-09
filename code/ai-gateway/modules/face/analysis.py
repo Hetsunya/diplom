@@ -204,6 +204,23 @@ class FaceAnalysisPlugin:
         }
         await ws.send(json.dumps(dbg))
         incr("face_debug_sent")
+        # Store only lightweight debug meta for stub reports (avoid persisting dense landmarks in RAM).
+        payload = dbg.get("payload")
+        if isinstance(payload, dict):
+            lm_n = 0
+            lmr = payload.get("landmarks")
+            if isinstance(lmr, list):
+                lm_n = len(lmr)
+            slim = dict(payload)
+            slim.pop("landmarks", None)
+            slim["landmarks_n"] = lm_n
+            get_feature_store().push(
+                int(session_id),
+                kind="face_debug",
+                participant_id=str(participant_id),
+                trace_id=trace_id,
+                data={"payload": slim},
+            )
 
     def _downsample_landmarks(
         self, lms_norm: list[dict[str, float]], *, frame_w: int, frame_h: int, max_points: int

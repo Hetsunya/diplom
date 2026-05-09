@@ -20,6 +20,17 @@ _stub_report = build_stub_report
 
 _PIPELINE_STAGES = {"idle", "listening", "transcribing", "visual_only"}
 
+# Passthrough keys for stub / multimodal UI (remote NN may omit them).
+_REPORT_SHAPE_EXTENSIONS: tuple[tuple[str, type], ...] = (
+    ("emotion_summary", dict),
+    ("transcript_summary", dict),
+    ("face_tracking_summary", dict),
+    ("timelines", dict),
+    ("observations", list),
+    ("participant_tiles", list),
+    ("meeting_summary", dict),
+)
+
 _REPORT_QUALITY_PREV: dict[str, int] | None = None
 
 
@@ -179,6 +190,10 @@ def sanitize_report_shape(raw: Any, *, session_id: int) -> dict[str, Any]:
     dq = _sanitize_data_quality(raw.get("data_quality"))
     if dq is not None:
         out["data_quality"] = dq
+    for key, typ in _REPORT_SHAPE_EXTENSIONS:
+        val = raw.get(key)
+        if isinstance(val, typ):
+            out[key] = val
     return out
 
 

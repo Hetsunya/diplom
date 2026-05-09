@@ -79,6 +79,53 @@ class TestBuildStubReportFusion(unittest.TestCase):
         self.assertEqual(fbs["trackable_events"], 1)
         self.assertEqual(fbs["guard_reasons"].get("no_face"), 1)
 
+    def test_stub_meeting_summary_when_face_emotions(self) -> None:
+        now = time.time()
+        rep = build_stub_report(
+            42,
+            [
+                {
+                    "kind": "face",
+                    "participant_id": "alice",
+                    "trace_id": "t1",
+                    "ts": now,
+                    "data": {
+                        "face_features": {
+                            "face_detected": True,
+                            "dominant_emotion": "happy",
+                            "confidence": 70.0,
+                        }
+                    },
+                },
+                {
+                    "kind": "face",
+                    "participant_id": "alice",
+                    "trace_id": "t2",
+                    "ts": now + 1,
+                    "data": {
+                        "face_features": {
+                            "face_detected": True,
+                            "dominant_emotion": "neutral",
+                            "confidence": 55.0,
+                        }
+                    },
+                },
+                {
+                    "kind": "text",
+                    "participant_id": "alice",
+                    "trace_id": "t3",
+                    "ts": now + 2,
+                    "data": {"payload": {"transcript_final": "Привет"}},
+                },
+            ],
+            bucket_sec=30.0,
+        )
+        self.assertIn("meeting_summary", rep)
+        ms = rep["meeting_summary"]
+        self.assertEqual(ms["session_id"], 42)
+        self.assertGreaterEqual(ms["participant_count"], 1)
+        self.assertTrue(any(x.get("emotion") == "happy" for x in ms.get("emotion_distribution_top", [])))
+
 
 if __name__ == "__main__":
     unittest.main()

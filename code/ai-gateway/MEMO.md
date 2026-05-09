@@ -31,6 +31,9 @@
 - Throttling: `min_interval_sec`.
 - Качество: `min_confidence`, `min_laplacian_var`, `min_face_side_px`, `enforce_detection`, `detector_backend`, `align`, `emit_no_face_face_analysis`.
 - Нагрузка: **`max_concurrent_inferences`** (default `2`) — `Semaphore` + `asyncio.to_thread` для DeepFace.
+- Отладка: **`emit_debug_face`**, **`debug_bbox_smooth_alpha`**, **`debug_max_face_area_frac`** → исходящий WS **`face_debug`** (broadcast в backend **без** записи в `analysis_event`; см. `docs/REPORTS_AND_ANALYTICS_STORAGE.md`).
+- Поведение лица (draft v1): **`emit_face_behavior`**, **`face_behavior_schema_version`**; опционально **MediaPipe** — **`mediapipe_enabled`**, **`mediapipe_model_path`** / **`mediapipe_model_url`**, **`mediapipe_max_landmarks`** (зависимость `mediapipe` только для Python **\< 3.13** в `requirements.txt`).
+- Docker: образ ставит **`libegl1`** и **`libgles2`** (Mesa) для задач vision/MediaPipe.
 
 ### report
 
@@ -72,7 +75,7 @@
 
 ## Backend integration
 
-- WS `GET /ws/sessions/:id` (auth). Типы с persist + broadcast: `text_analysis`, `audio_analysis`, `face_analysis`, `analysis_report`, `analysis_report_partial`, `emotion` (legacy).
+- WS `GET /ws/sessions/:id` (auth). Типы с **persist + broadcast**: `text_analysis`, `audio_analysis`, `face_analysis`, `analysis_report`, `analysis_report_partial`, `emotion` (legacy). Тип **`face_debug`** — **только broadcast** (не `analysis_event`).
 - REST: `GET /sessions/:id/analysis/report`, `GET /sessions/:id/analysis/events?limit=`.
 
 ## Local checks

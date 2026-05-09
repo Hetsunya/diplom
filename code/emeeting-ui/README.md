@@ -43,8 +43,12 @@ UI depends on these backend routes:
 - `GET /sessions`
 - `POST /sessions`
 - `GET /sessions/:id`
-- `GET /reports/:id`
+- **`GET /sessions/:id/analysis/report`** — отчёт по аналитике встречи (организатор сессии)
+- **`GET /sessions/:id/analysis/events`** — история событий аналитики (с ограничениями доступа)
+- `GET /reports/:id` — legacy отчёт, если используется в backend
 - `GET /ws/sessions/:id` (WebSocket)
+
+Маршруты приложения: **`/reports`** (список/выбор), **`/reports/:sessionId`** (детализация). Фичи роутера: `src/config/features.ts`.
 
 ## Troubleshooting
 

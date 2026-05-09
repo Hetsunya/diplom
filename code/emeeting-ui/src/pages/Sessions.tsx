@@ -71,7 +71,8 @@ const Sessions = () => {
             <th>Название</th>
             <th>Тип</th>
             <th>Старт</th>
-            <th>Открыть</th>
+            <th>Встреча</th>
+            <th>Отчёт</th>
           </tr>
         </thead>
         <tbody>
@@ -83,11 +84,14 @@ const Sessions = () => {
               <td>
                 <Link to={`/sessions/${s.sessionId}`}>Открыть</Link>
               </td>
+              <td>
+                <Link to={`/reports/${s.sessionId}`}>Отчёт</Link>
+              </td>
             </tr>
           ))}
           {filtered.length === 0 && (
             <tr>
-              <td colSpan={4} style={{ textAlign: "center", color: "#7f8c8d" }}>
+              <td colSpan={5} style={{ textAlign: "center", color: "#7f8c8d" }}>
                 Нет сессий по фильтру
               </td>
             </tr>

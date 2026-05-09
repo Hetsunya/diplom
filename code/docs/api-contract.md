@@ -100,10 +100,17 @@ Query-параметры:
 
 Успешные и отклонённые обращения пишутся в серверный лог с префиксом `[ANALYSIS_ACCESS]`.
 
-## Reports
+## Отчёт по аналитике встречи (продуктовый путь)
+
+Страница отчёта в UI (`/reports`, `/reports/:sessionId`) использует **`GET /sessions/:id/analysis/report`** (см. раздел выше про доступ организатора). Тело ответа — сохранённый JSON отчёта аналитики (в т.ч. поля заглушки `meeting_summary`, `participant_tiles`, … — см. `docs/REPORTS_AND_ANALYTICS_STORAGE.md`).
+
+## Reports (legacy)
 
 ### `GET /reports/:id`
-Response `200`:
+
+Legacy-эндпоинт отчётов (если включён в backend): формат может отличаться от аналитического отчёта выше. Для новых интеграций предпочтителен **`GET /sessions/:id/analysis/report`**.
+
+Пример ответа `200` (иллюстративный):
 
 ```json
 {

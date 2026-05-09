@@ -11,7 +11,7 @@
 | **Контракты WS v1** (`docs/ANALYSIS_WS_CONTRACTS.md`) и **backward compat `emotion`** | Уже согласованы с UI и backend; ломать только осознанно с версией контракта. |
 | **Backend: валидация, сохранение `analysis_event` / `analysis_report`, REST read** | Инфраструктура для отчётов и истории готова; расширять полями, а не выкидывать. |
 | **Модульность конфига `ai-gateway`** (`modules.default.json`, `gateway_config.py`, реестрь плагинов) | Включение/выключение модулей без правки кода — правильная ось для диплома и эксплуатации. |
-| **`face` через DeepFace + dual emit `emotion` + `face_analysis`** | Рабочий production-путь для MVP; тонкая настройка — через параметры (`min_interval_sec`, `min_confidence`), не через перепись ядра. |
+| **`face` через DeepFace + dual emit `emotion` + `face_analysis`** | Рабочий production-путь для MVP; тонкая настройка — через параметры (`min_interval_sec`, `min_confidence`), не через перепись ядра. Опционально **MediaPipe Face Landmarker** для `face_behavior` и `emit_debug_face` (`mediapipe_*` в конфиге); в Docker нужны EGL/GLES-библиотеки (см. `ai-gateway/Dockerfile`). |
 | **Адаптер `speech_service.py`** (ретраи, backoff, маппинг в `text_analysis`) | Обвязка правильная; меняется только URL и поведение внешнего сервиса. |
 | **UI: правый рейл транскрипта/вердикта + обработка новых типов WS** | Уже привязано к контракту; доработки — контент и UX, не архитектурный откат. |
 | **`feature_store` + `report_loop` как каркас оркестрации** | Логика «снимок фич → partial report» остаётся; меняется содержимое отчёта и источники фич. |
@@ -24,10 +24,10 @@
 | Что | Текущее состояние | Направление работ |
 |-----|-------------------|-------------------|
 | **`speech-service/`** | Реализованы режимы **stub** и **whisper** (faster-whisper + ffmpeg); см. `speech-service/Dockerfile` | По желанию — заменить движок на сторонний FastAPI/WhisperX (upstream на GitHub) или коммерческий API, сохранив контракт `/v1/transcribe`. |
-| **`plugins/audio.py` — блок `audio_analysis`** | Уже считаются proxy-фичи по чанку (`chunk_size_bytes`, `bitrate_kbps_est`, `speech_activity_proxy`), UI шлёт `type: "audio"` | Следующий шаг: заменить proxy на реальный DSP/SER и добавить калибровку/нормализацию по участнику. |
+| **`modules/audio/pipeline.py`** (ранее `plugins/audio`) — блок `audio_analysis` | Уже считаются proxy-фичи по чанку (`chunk_size_bytes`, `bitrate_kbps_est`, `speech_activity_proxy`), UI шлёт `type: "audio"` | Следующий шаг: заменить proxy на реальный DSP/SER и добавить калибровку/нормализацию по участнику. |
 | **`report_loop` / `own_nn_client`** | Stub-агрегат v2 (pipeline_stage, speech_ratio, per-participant proxy) + опциональный HTTP к «своей НС» | Интерфейс оставить; следующий шаг — заменить эвристики на модельный расчёт при наличии `own_nn_url` и добавить валидацию структуры `report`. |
 | **Дублирование документации** (`ai-gateway/MEMO.md`, `CONTRACTS.md` vs `docs/*`) | Частичное пересечение | Роли разведены: **`docs/README.md`** — индекс; **`ANALYSIS_WS_CONTRACTS.md`** — канон контракта; **`MEMO.md`** — операционная памятка gateway; **`CONTRACTS.md`** — краткая отсылка. |
-| **Структура плагинов внутри `ai-gateway`** (если по backlog вынос в `modules/`) | Плагины лежат в `plugins/` | По желанию — **рефакторинг раскладки файлов** без смены протокола (косметика для масштабирования). |
+| **Legacy shims `plugins/*.py`** | Основная логика перенесена в **`modules/`**; shims для совместимости могут оставаться | Новые анализаторы добавлять в `modules/<domain>/` и реестр; протокол не менять. |
 
 ---
 
@@ -47,7 +47,7 @@
 
 1. **Зафиксировать в конфиге URL реального ASR** и заменить stub `speech-service` → проверка `text_analysis` end-to-end (gateway → backend → UI).
 2. **Аудио-фаза 2**: заменить proxy-фичи на real DSP/SER, оставить текущий клиентский поток чанков как fallback.
-3. **Уточнить формат отчёта** под диплом (поля `report.summary`, per-participant) и подключить HTTP к модели или улучшить stub.
+3. **Уточнить формат отчёта** под продукт (база уже есть: `meeting_summary`, `participant_tiles`, таймлайны в stub) и подключить HTTP к модели или заменить эвристики.
 4. **Дальнейшая замена заглушек** — см. **`docs/AI_STUB_TO_PRODUCTION_ROADMAP.md`** и беклог **BL-AI-101…** в `cursor backlog.md`.
 
 ---
@@ -63,4 +63,4 @@
 
 ---
 
-*Версия плана: 2026-05 (удалён каталог `code/AI/`, обновлены ссылки). Обновляйте таблицы при изменении архитектуры.*
+*Версия плана: 2026-05 (отчётный stub расширен, опциональный MediaPipe face, матрица persistence — `docs/REPORTS_AND_ANALYTICS_STORAGE.md`). Обновляйте таблицы при изменении архитектуры.*
