@@ -713,7 +713,7 @@
             <mxPoint x="1000" y="-1350" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="I3rj0Wl5Ufjz3qvvDxKM-2" value="&lt;strong&gt;&lt;span style=&quot;font-size: 14pt;&quot;&gt;Сообщение встречи&lt;/span&gt;&lt;/strong&gt;" style="shape=table;startSize=30;container=1;collapsible=1;childLayout=tableLayout;fixedRows=1;rowLines=0;fontStyle=1;align=center;resizeLast=1;verticalAlign=middle;horizontal=1;spacingTop=0;html=1;fontSize=14;fontColor=light-dark(default, #ffffff);strokeColor=light-dark(#000000,#FFFFFF);" parent="1" vertex="1">
+        <mxCell id="I3rj0Wl5Ufjz3qvvDxKM-2" value="&lt;strong&gt;&lt;span style=&quot;font-size: 14pt;&quot;&gt;Событие встречи&lt;/span&gt;&lt;/strong&gt;" style="shape=table;startSize=30;container=1;collapsible=1;childLayout=tableLayout;fixedRows=1;rowLines=0;fontStyle=1;align=center;resizeLast=1;verticalAlign=middle;horizontal=1;spacingTop=0;html=1;fontSize=14;fontColor=light-dark(default, #ffffff);strokeColor=light-dark(#000000,#FFFFFF);" parent="1" vertex="1">
           <mxGeometry x="1040" y="-1340" width="340" height="150" as="geometry">
             <mxRectangle x="560" y="-950" width="70" height="30" as="alternateBounds" />
           </mxGeometry>
