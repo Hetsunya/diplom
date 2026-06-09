@@ -20,7 +20,7 @@ import {
 } from "../components/MeetingUiIcons";
 import { useMeetingAudioChunks } from "../features/meeting/useMeetingAudioChunks";
 import { getSession, getSessionChatMessages } from "../api/sessions";
-import { getSessionAnalysisEvents } from "../api/analysis";
+import { getSessionTranscription } from "../api/analysis";
 
 export type Emotion = "Happy" | "Neutral" | "Engaged" | "Focused" | "Surprised" | "Thoughtful";
 
@@ -289,6 +289,9 @@ const VideoMeet = () => {
   const [faceDebugByParticipant, setFaceDebugByParticipant] = useState<
     Record<string, FaceDebugPayload>
   >({});
+  const [verdictSummary, setVerdictSummary] = useState<string | null>(null);
+  const [verdictDetail, setVerdictDetail] = useState<string | null>(null);
+  const [verdictOpen, setVerdictOpen] = useState(false);
 
   useEffect(() => {
     resetMeetingStore();
@@ -357,41 +360,16 @@ const VideoMeet = () => {
     let cancelled = false;
     (async () => {
       try {
-        const rows = await getSessionAnalysisEvents(id, { module: "text", limit: 300 });
+        const history = await getSessionTranscription(id, { limit: 300 });
         if (cancelled) return;
-        const next: TranscriptLine[] = [];
-        for (const row of rows) {
-          if (row.event_type !== "text_analysis") continue;
-          const payload = row.payload && typeof row.payload === "object" ? row.payload : {};
-          const participantId =
-            typeof row.participant_id === "string" && row.participant_id.trim()
-              ? row.participant_id.trim()
-              : undefined;
-          if (!participantId) continue;
-          const partial =
-            typeof (payload as Record<string, unknown>).transcript_partial === "string"
-              ? ((payload as Record<string, unknown>).transcript_partial as string)
-              : "";
-          const finalText =
-            typeof (payload as Record<string, unknown>).transcript_final === "string"
-              ? ((payload as Record<string, unknown>).transcript_final as string)
-              : "";
-          const text = (finalText || partial || "").trim();
-          if (!text) continue;
-          const traceId =
-            typeof row.trace_id === "string" && row.trace_id.trim()
-              ? row.trace_id
-              : `history-${row.analysis_event_id}`;
-          next.push({
-            traceId,
-            participantId,
-            speakerLabel: normalizeSpeakerLabel(participantId),
-            text,
-            // Persisted history is immutable; show it as completed utterances.
-            final: true,
-            at: row.created_at || new Date().toISOString(),
-          });
-        }
+        const next: TranscriptLine[] = history.lines.map((row) => ({
+          traceId: row.traceId || `history-${row.participantId}`,
+          participantId: row.participantId,
+          speakerLabel: normalizeSpeakerLabel(row.participantId),
+          text: row.text,
+          final: row.final,
+          at: row.at || new Date().toISOString(),
+        }));
         setTranscriptLines(
           next
             .sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
@@ -472,6 +450,39 @@ const VideoMeet = () => {
         if (parsed) {
           setFaceDebugByParticipant((prev) => ({ ...prev, [pid]: parsed }));
         }
+        return;
+      }
+
+      if (
+        (type === "analysis_report_partial" || type === "analysis_report") &&
+        m.payload &&
+        typeof m.payload === "object"
+      ) {
+        const p = m.payload as Record<string, unknown>;
+        const report =
+          p.report && typeof p.report === "object" ? (p.report as Record<string, unknown>) : p;
+        let summary =
+          typeof report.summary === "string" && report.summary.trim()
+            ? report.summary.trim()
+            : "";
+        const meetingSummary =
+          report.meeting_summary && typeof report.meeting_summary === "object"
+            ? (report.meeting_summary as Record<string, unknown>)
+            : null;
+        if (!summary && meetingSummary) {
+          const highlights = meetingSummary.highlights_ru;
+          if (Array.isArray(highlights) && typeof highlights[0] === "string") {
+            summary = highlights[0];
+          }
+        }
+        if (!summary && type === "analysis_report") {
+          summary = "Финальный отчёт готов";
+        }
+        if (!summary) {
+          summary = "Промежуточный вердикт обновлён";
+        }
+        setVerdictSummary(summary);
+        setVerdictDetail(JSON.stringify(report, null, 2));
         return;
       }
 
@@ -826,6 +837,10 @@ const VideoMeet = () => {
           currentParticipantId={participantId}
           onSendChat={sendChatMessage}
           chatConnected={connected}
+          verdictSummary={verdictSummary}
+          verdictDetail={verdictDetail}
+          verdictOpen={verdictOpen}
+          onToggleVerdict={() => setVerdictOpen((v) => !v)}
           participants={Object.values(participants).map((p) => ({
             id: p.id,
             name: p.name,

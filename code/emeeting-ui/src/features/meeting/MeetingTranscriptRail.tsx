@@ -38,6 +38,10 @@ type MeetingTranscriptRailProps = {
   onSendChat: (text: string) => void;
   chatConnected?: boolean;
   participants: MeetingParticipantRow[];
+  verdictSummary?: string | null;
+  verdictDetail?: string | null;
+  verdictOpen?: boolean;
+  onToggleVerdict?: () => void;
 };
 
 export function MeetingTranscriptRail({
@@ -48,6 +52,10 @@ export function MeetingTranscriptRail({
   onSendChat,
   chatConnected = true,
   participants,
+  verdictSummary = null,
+  verdictDetail = null,
+  verdictOpen = false,
+  onToggleVerdict,
 }: MeetingTranscriptRailProps) {
   const [showTranscript, setShowTranscript] = useState(true);
   const [showChat, setShowChat] = useState(true);
@@ -135,6 +143,34 @@ export function MeetingTranscriptRail({
               ))
             )}
           </div>
+        </div>
+      )}
+
+      {showTranscript && (
+        <div className="meeting-transcript-rail__section">
+          <div className="meeting-transcript-rail__section-title-row">
+            <div className="meeting-transcript-rail__section-title">Вердикт AI</div>
+          </div>
+          {verdictSummary ? (
+            <>
+              <button
+                type="button"
+                className="meeting-transcript-rail__verdict-btn"
+                onClick={onToggleVerdict}
+                aria-expanded={verdictOpen}
+              >
+                <span>{verdictSummary}</span>
+                <span className="meeting-transcript-rail__chevron">{verdictOpen ? "▲" : "▼"}</span>
+              </button>
+              {verdictOpen && verdictDetail ? (
+                <pre className="meeting-transcript-rail__verdict-detail">{verdictDetail}</pre>
+              ) : null}
+            </>
+          ) : (
+            <p className="meeting-transcript-rail__muted">
+              Промежуточный вердикт появится после накопления данных анализа.
+            </p>
+          )}
         </div>
       )}
 

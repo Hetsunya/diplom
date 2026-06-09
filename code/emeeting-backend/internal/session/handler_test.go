@@ -61,6 +61,31 @@ func (r *fakeRepo) Get(id int) (*models.Session, error) {
 	return &s, nil
 }
 
+func (r *fakeRepo) ListAnalysisConfigs(userID int) ([]AnalysisConfig, error) {
+	_ = userID
+	return nil, nil
+}
+
+func (r *fakeRepo) CreateAnalysisConfig(userID int, name string, modulesJSON any, isDefault bool) (*AnalysisConfig, error) {
+	_ = userID
+	_ = name
+	_ = modulesJSON
+	_ = isDefault
+	return &AnalysisConfig{AnalysisConfigID: 1, AuthUserID: userID, Name: name}, nil
+}
+
+func (r *fakeRepo) DeleteAnalysisConfig(userID, configID int) error {
+	_ = userID
+	_ = configID
+	return nil
+}
+
+func (r *fakeRepo) GetAnalysisConfigForUser(userID, configID int) (*AnalysisConfig, error) {
+	_ = userID
+	_ = configID
+	return nil, errors.New("not found")
+}
+
 func withAuthUser(uid int) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Set("authUserID", uid)
@@ -71,7 +96,7 @@ func withAuthUser(uid int) gin.HandlerFunc {
 func setupRouterForSessionTests(repo Repository) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	svc := NewService(repo)
-	handler := NewHandler(svc, NewSessionHub(), nil, nil)
+	handler := NewHandler(svc, NewSessionHub(), nil, nil, nil)
 	r := gin.New()
 	r.Use(withAuthUser(1))
 	r.GET("/sessions", handler.List)

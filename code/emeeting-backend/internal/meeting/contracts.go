@@ -55,6 +55,9 @@ type Repository interface {
 }
 
 type Service interface {
+	GetStatus(sessionID int) (Status, error)
+	GetActiveParticipants(sessionID int) ([]Participant, error)
+
 	StartMeeting(sessionID int, at time.Time) error
 	EndMeeting(sessionID int, at time.Time) error
 

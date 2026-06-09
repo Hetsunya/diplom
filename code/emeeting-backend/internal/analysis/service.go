@@ -8,6 +8,7 @@ import (
 	"log"
 	"math"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -58,6 +59,79 @@ func (s *Service) ListEventsJSON(ctx context.Context, sessionID int, f EventsFil
 		return nil, fmt.Errorf("analysis service unavailable")
 	}
 	return s.repo.ListEvents(ctx, sessionID, f)
+}
+
+// BuildTranscriptionJSON returns a stable REST shape for ASR history (text_analysis events).
+func (s *Service) BuildTranscriptionJSON(ctx context.Context, sessionID int, f EventsFilter) ([]byte, error) {
+	if s == nil || s.repo == nil {
+		return nil, fmt.Errorf("analysis service unavailable")
+	}
+	limit := f.Limit
+	if limit <= 0 || limit > 500 {
+		limit = 300
+	}
+	rows, err := s.repo.ListEventsForStubReport(ctx, sessionID, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	participantFilter := strings.TrimSpace(f.GuestParticipantID)
+	if participantFilter == "" {
+		participantFilter = strings.TrimSpace(f.ParticipantID)
+	}
+
+	type lineDTO struct {
+		ParticipantID string `json:"participantId"`
+		TraceID       string `json:"traceId"`
+		Text          string `json:"text"`
+		Final         bool   `json:"final"`
+		At            string `json:"at"`
+	}
+
+	lines := make([]lineDTO, 0, len(rows))
+	for _, r := range rows {
+		if r.EventType != TypeTextAnalysis {
+			continue
+		}
+		if participantFilter != "" && r.ParticipantID != participantFilter {
+			continue
+		}
+		var payload map[string]any
+		if err := json.Unmarshal(r.Payload, &payload); err != nil {
+			continue
+		}
+		finalText, _ := payload["transcript_final"].(string)
+		partialText, _ := payload["transcript_partial"].(string)
+		text := strings.TrimSpace(finalText)
+		isFinal := text != ""
+		if !isFinal {
+			text = strings.TrimSpace(partialText)
+		}
+		if text == "" {
+			continue
+		}
+		traceID, _ := payload["trace_id"].(string)
+		if traceID == "" {
+			traceID = fmt.Sprintf("evt-%d", sessionID)
+		}
+		stage, _ := payload["stage"].(string)
+		if !isFinal && strings.Contains(strings.ToLower(stage), "final") {
+			isFinal = true
+		}
+		lines = append(lines, lineDTO{
+			ParticipantID: r.ParticipantID,
+			TraceID:       traceID,
+			Text:          text,
+			Final:         isFinal,
+			At:            r.CreatedAt.UTC().Format(time.RFC3339Nano),
+		})
+	}
+
+	out := map[string]any{
+		"sessionId": sessionID,
+		"lines":     lines,
+	}
+	return json.Marshal(out)
 }
 
 func (s *Service) BuildStubReportJSON(ctx context.Context, sessionID int) ([]byte, error) {

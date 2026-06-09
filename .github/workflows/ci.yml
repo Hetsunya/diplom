@@ -82,3 +82,6 @@ jobs:
 
       - name: Syntax check
         run: python -m compileall .
+
+      - name: Unit tests
+        run: python -m pytest tests/ -q

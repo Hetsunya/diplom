@@ -7,6 +7,7 @@ import (
 
 	"emeeting/internal/analysis"
 	"emeeting/internal/chat"
+	"emeeting/internal/meeting"
 )
 
 type Module struct {
@@ -20,8 +21,9 @@ func NewModule(database *sql.DB) *Module {
 	hub := NewSessionHub()
 	analysisSvc := analysis.NewService(database)
 	chatRepo := chat.NewRepository(database)
+	meetingSvc := meeting.NewService(meeting.NewRepository(database))
 	return &Module{
-		handler:  NewHandler(service, hub, analysisSvc, chatRepo),
+		handler:  NewHandler(service, hub, analysisSvc, chatRepo, meetingSvc),
 		chatHTTP: chat.NewHTTPHandler(chatRepo),
 	}
 }

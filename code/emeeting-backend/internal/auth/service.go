@@ -128,6 +128,9 @@ func (s *service) Refresh(refreshToken string) (*TokenPair, error) {
 		return nil, fmt.Errorf("store refresh token: %w", err)
 	}
 	_ = s.repo.RevokeRefreshToken(tokenHash, now, &newHash)
+	uid := stored.UserID
+	refreshPayload, _ := json.Marshal(map[string]any{"ok": true})
+	_ = s.repo.AppendAuthEvent(&uid, "token_refresh", nil, refreshPayload)
 
 	access, err := middleware.MintAccessToken(stored.UserID, nil, accessTTL)
 	if err != nil {
@@ -171,4 +174,12 @@ func randomToken(nBytes int) (string, error) {
 func hashToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
+}
+
+func (s *service) RecordAuthEvent(authUserID *int, eventType string, ip *string, payload map[string]any) {
+	var payloadJSON []byte
+	if len(payload) > 0 {
+		payloadJSON, _ = json.Marshal(payload)
+	}
+	_ = s.repo.AppendAuthEvent(authUserID, eventType, ip, payloadJSON)
 }

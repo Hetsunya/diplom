@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"emeeting/middleware"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -99,8 +101,22 @@ func (h *Handler) Refresh(c *gin.Context) {
 }
 
 func (h *Handler) Logout(c *gin.Context) {
+	if uid, ok := middleware.AuthUserID(c); ok {
+		ip := clientIP(c)
+		h.service.RecordAuthEvent(&uid, "logout", &ip, nil)
+	}
 	clearTokenCookies(c)
 	c.Status(http.StatusNoContent)
+}
+
+func clientIP(c *gin.Context) string {
+	if c == nil || c.Request == nil {
+		return ""
+	}
+	if host, _, err := net.SplitHostPort(strings.TrimSpace(c.ClientIP())); err == nil && host != "" {
+		return host
+	}
+	return strings.TrimSpace(c.ClientIP())
 }
 
 func setTokenCookies(c *gin.Context, pair *TokenPair) {

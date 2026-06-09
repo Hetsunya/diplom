@@ -24,6 +24,30 @@ func (r *repoSpy) Get(id int) (*models.Session, error) {
 	return &models.Session{SessionID: id}, nil
 }
 
+func (r *repoSpy) ListAnalysisConfigs(userID int) ([]AnalysisConfig, error) {
+	_ = userID
+	return nil, nil
+}
+
+func (r *repoSpy) CreateAnalysisConfig(userID int, name string, modulesJSON any, isDefault bool) (*AnalysisConfig, error) {
+	_ = name
+	_ = modulesJSON
+	_ = isDefault
+	return &AnalysisConfig{AnalysisConfigID: 1, AuthUserID: userID}, nil
+}
+
+func (r *repoSpy) DeleteAnalysisConfig(userID, configID int) error {
+	_ = userID
+	_ = configID
+	return nil
+}
+
+func (r *repoSpy) GetAnalysisConfigForUser(userID, configID int) (*AnalysisConfig, error) {
+	_ = userID
+	_ = configID
+	return nil, nil
+}
+
 func TestServiceCreateUsesRepositoryPort(t *testing.T) {
 	spy := &repoSpy{}
 	svc := NewService(spy)

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"emeeting/internal/analysis"
+	"emeeting/middleware"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -58,10 +59,14 @@ func (h *Handler) registerDefaultWSHandlers() {
 	}
 	joinHandler := func(sessionID int, conn *websocket.Conn, msg WSMessage) {
 		var name string
+		var wsRole string
 		if msg.Payload != nil {
 			if m, ok := msg.Payload.(map[string]any); ok {
 				if v, ok := m["name"].(string); ok {
 					name = v
+				}
+				if v, ok := m["role"].(string); ok {
+					wsRole = v
 				}
 			}
 		}
@@ -84,6 +89,8 @@ func (h *Handler) registerDefaultWSHandlers() {
 			Timestamp: time.Now().UTC(),
 		})
 
+		h.meetingJoin(sessionID, conn, name, wsRole, time.Now().UTC())
+
 		// Полный список уже подключённых — чтобы поздние вкладки видели ранних без перезагрузки.
 		if conn != nil {
 			snap := h.hub.ParticipantSnapshot(sessionID)
@@ -97,6 +104,7 @@ func (h *Handler) registerDefaultWSHandlers() {
 	}
 	leaveHandler := func(sessionID int, conn *websocket.Conn, msg WSMessage) {
 		h.hub.RemoveConnJoinMeta(sessionID, conn)
+		h.meetingLeave(sessionID, conn, time.Now().UTC())
 
 		// Keep backwards compatibility: still broadcast "leave" WSMessage.
 		h.hub.Broadcast(sessionID, msg)
@@ -121,21 +129,13 @@ func (h *Handler) registerDefaultWSHandlers() {
 			Timestamp: time.Now().UTC(),
 		})
 	}
-	endMeetingHandler := func(sessionID int, _ *websocket.Conn, msg WSMessage) {
-		// Only host should be allowed to end meeting. We accept role passed in payload
-		// (server also tracks roles per connection for disconnect rules).
-		role := ""
-		if msg.Payload != nil {
-			if m, ok := msg.Payload.(map[string]any); ok {
-				if v, ok := m["role"].(string); ok {
-					role = v
-				}
-			}
-		}
-		if role != "host" {
+	endMeetingHandler := func(sessionID int, conn *websocket.Conn, _ WSMessage) {
+		now := time.Now().UTC()
+		if h.meetingSvc != nil {
+			h.meetingEnd(sessionID, conn, now, "host_ended")
 			return
 		}
-		now := time.Now().UTC()
+		// Fallback when meeting service is not wired (unit tests).
 		endPayload, _ := json.Marshal(map[string]any{
 			"ended_at": now,
 			"reason":   "host_ended",
@@ -257,6 +257,11 @@ func (h *Handler) WS(c *gin.Context) {
 	conn.SetReadLimit(wsMaxMessageBytes)
 	defer conn.Close()
 
+	if authUID, ok := middleware.AuthUserID(c); ok {
+		h.setConnAuthUser(conn, authUID)
+	}
+	defer h.clearConnAuthUser(conn)
+
 	log.Printf("[WS] CONNECTED session=%d remote=%s", sessionID, conn.RemoteAddr())
 	done := make(chan struct{})
 
@@ -317,8 +322,10 @@ func (h *Handler) WS(c *gin.Context) {
 				Timestamp: leaveAt,
 			})
 
-			// If host left and there is no co-host, end the meeting.
-			if participantRole == "host" {
+			h.meetingLeave(sessionID, conn, leaveAt)
+			if h.meetingSvc != nil {
+				h.meetingMaybeEndOnHostDisconnect(sessionID, participantRole, endAt, remainingRoles)
+			} else if participantRole == "host" {
 				hasCoHost := false
 				for _, r := range remainingRoles {
 					if r == "co-host" {

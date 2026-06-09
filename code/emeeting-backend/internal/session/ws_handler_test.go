@@ -16,7 +16,7 @@ import (
 func TestWSSessionConnectionSmoke(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil, nil)
+	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil, nil, nil)
 	r := gin.New()
 	r.GET("/ws/sessions/:id", handler.WS)
 
@@ -54,7 +54,7 @@ func TestWSSessionConnectionSmoke(t *testing.T) {
 func TestE2E_MeetingFlow(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil, nil)
+	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil, nil, nil)
 	r := gin.New()
 	r.GET("/ws/sessions/:id", handler.WS)
 
@@ -118,7 +118,7 @@ func TestE2E_MeetingFlow(t *testing.T) {
 
 func TestWSDispatchUsesRegisteredHandler(t *testing.T) {
 	hub := NewSessionHub()
-	handler := NewHandler(NewService(newFakeRepo()), hub, nil, nil)
+	handler := NewHandler(NewService(newFakeRepo()), hub, nil, nil, nil)
 
 	var invoked bool
 	handler.RegisterWSHandler("custom", func(sessionID int, _ *websocket.Conn, msg WSMessage) {
@@ -136,7 +136,7 @@ func TestWSDispatchUsesRegisteredHandler(t *testing.T) {
 func TestMeeting_UserDisconnect_HostOnly(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil, nil)
+	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil, nil, nil)
 	r := gin.New()
 	r.GET("/ws/sessions/:id", handler.WS)
 	server := httptest.NewServer(r)
@@ -187,7 +187,7 @@ func TestMeeting_UserDisconnect_HostOnly(t *testing.T) {
 func TestMeeting_UserDisconnect_WithCoHost(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil, nil)
+	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil, nil, nil)
 	r := gin.New()
 	r.GET("/ws/sessions/:id", handler.WS)
 	server := httptest.NewServer(r)
@@ -247,7 +247,7 @@ func TestMeeting_UserDisconnect_WithCoHost(t *testing.T) {
 func TestWS_AnalysisInboundBroadcast(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil, nil)
+	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil, nil, nil)
 	r := gin.New()
 	r.GET("/ws/sessions/:id", handler.WS)
 
@@ -310,7 +310,7 @@ func TestWS_AnalysisInboundBroadcast(t *testing.T) {
 func TestAnalysisWS_FanoutsAudioFromAnySession(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil, nil)
+	handler := NewHandler(NewService(newFakeRepo()), NewSessionHub(), nil, nil, nil)
 	r := gin.New()
 	r.GET("/ws/sessions/:id", handler.WS)
 	r.GET("/ws/analysis", handler.AnalysisWS)

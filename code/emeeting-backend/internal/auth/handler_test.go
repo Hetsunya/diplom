@@ -29,6 +29,13 @@ func (m *authServiceMock) IssueTokens(userID int) (*TokenPair, error) {
 	return m.issueFn(userID)
 }
 
+func (m *authServiceMock) RecordAuthEvent(authUserID *int, eventType string, ip *string, payload map[string]any) {
+	_ = authUserID
+	_ = eventType
+	_ = ip
+	_ = payload
+}
+
 func TestLoginHandlerUsesServicePort(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

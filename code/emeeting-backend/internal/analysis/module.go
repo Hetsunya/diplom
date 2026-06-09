@@ -18,4 +18,5 @@ func NewModule(db *sql.DB) *Module {
 func (m *Module) RegisterRoutes(r *gin.Engine) {
 	r.GET("/sessions/:id/analysis/report", m.h.GetReport)
 	r.GET("/sessions/:id/analysis/events", m.h.ListEvents)
+	r.GET("/sessions/:id/transcription", m.h.GetTranscription)
 }

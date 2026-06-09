@@ -12,6 +12,7 @@ import (
 
 	"emeeting/internal/analysis"
 	"emeeting/internal/chat"
+	"emeeting/internal/meeting"
 	"emeeting/internal/models"
 	"emeeting/middleware"
 )
@@ -21,21 +22,27 @@ type Handler struct {
 	hub         *SessionHub
 	analysisSvc *analysis.Service
 	chatRepo    *chat.Repository
+	meetingSvc  meeting.Service
 	wsMu        sync.RWMutex
 	wsMap       map[string]WSMessageHandler
 
 	roleMu    sync.RWMutex
 	connRoles map[int]map[*websocket.Conn]string
+
+	authMu   sync.RWMutex
+	connAuth map[*websocket.Conn]int
 }
 
-func NewHandler(service Service, hub *SessionHub, analysisSvc *analysis.Service, chatRepo *chat.Repository) *Handler {
+func NewHandler(service Service, hub *SessionHub, analysisSvc *analysis.Service, chatRepo *chat.Repository, meetingSvc meeting.Service) *Handler {
 	h := &Handler{
 		service:     service,
 		hub:         hub,
 		analysisSvc: analysisSvc,
 		chatRepo:    chatRepo,
+		meetingSvc:  meetingSvc,
 		wsMap:       make(map[string]WSMessageHandler),
-		connRoles: make(map[int]map[*websocket.Conn]string),
+		connRoles:   make(map[int]map[*websocket.Conn]string),
+		connAuth:    make(map[*websocket.Conn]int),
 	}
 	h.registerDefaultWSHandlers()
 	return h

@@ -136,6 +136,55 @@ func (h *HTTPHandler) ListEvents(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", raw)
 }
 
+func (h *HTTPHandler) GetTranscription(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid session id"})
+		return
+	}
+	uid, ok := middleware.AuthUserID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	createdBy, err := SessionCreatedBy(c.Request.Context(), h.db, id)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	owner := IsSessionOwner(createdBy, uid)
+	participantQP := strings.TrimSpace(c.Query("participant_id"))
+	if !owner && participantQP == "" {
+		h.auditAccess(c, id, uid, "transcription", false)
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "participant_id query is required when you are not the session organizer",
+		})
+		return
+	}
+
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "300"))
+	f := EventsFilter{Limit: limit}
+	if owner {
+		f.ParticipantID = participantQP
+	} else {
+		f.GuestParticipantID = participantQP
+	}
+
+	raw, err := h.svc.BuildTranscriptionJSON(c.Request.Context(), id, f)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	h.auditAccess(c, id, uid, "transcription", true)
+	c.Data(http.StatusOK, "application/json", raw)
+}
+
 func parseRFC3339Query(c *gin.Context, key string) (*time.Time, error) {
 	raw := strings.TrimSpace(c.Query(key))
 	if raw == "" {

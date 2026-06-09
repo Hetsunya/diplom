@@ -100,6 +100,29 @@ Query-параметры:
 
 Успешные и отклонённые обращения пишутся в серверный лог с префиксом `[ANALYSIS_ACCESS]`.
 
+#### `GET /sessions/:id/transcription`
+
+Стабильный REST-контур истории ASR (на основе `text_analysis` в `analysis_event`).
+
+Query-параметры: `limit` (по умолчанию `300`, максимум `500`), `participant_id` (для не-организатора **обязателен**).
+
+Пример ответа `200`:
+
+```json
+{
+  "sessionId": 12,
+  "lines": [
+    {
+      "participantId": "p_abc",
+      "traceId": "trace-1",
+      "text": "Добрый день",
+      "final": true,
+      "at": "2026-06-10T12:00:01.123456789Z"
+    }
+  ]
+}
+```
+
 ## Отчёт по аналитике встречи (продуктовый путь)
 
 Страница отчёта в UI (`/reports`, `/reports/:sessionId`) использует **`GET /sessions/:id/analysis/report`** (см. раздел выше про доступ организатора). Тело ответа — сохранённый JSON отчёта аналитики (в т.ч. поля заглушки `meeting_summary`, `participant_tiles`, … — см. `docs/REPORTS_AND_ANALYTICS_STORAGE.md`).

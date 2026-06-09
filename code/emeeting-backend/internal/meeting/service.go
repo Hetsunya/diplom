@@ -22,6 +22,14 @@ func NewService(repo Repository) Service {
 	return &service{repo: repo}
 }
 
+func (s *service) GetStatus(sessionID int) (Status, error) {
+	return s.repo.GetStatus(sessionID)
+}
+
+func (s *service) GetActiveParticipants(sessionID int) ([]Participant, error) {
+	return s.repo.GetActiveParticipants(sessionID)
+}
+
 func (s *service) StartMeeting(sessionID int, at time.Time) error {
 	current, err := s.repo.GetStatus(sessionID)
 	if err != nil {

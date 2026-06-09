@@ -53,7 +53,7 @@
 | BL-004 | Backend autotests | нет coverage gate, meeting tests изолированы | Интеграционные тесты + wire meeting |
 | BL-005 | CI lint+test+build | Go без golangci-lint; ai-gateway только compileall | pytest + опц. golangci-lint |
 | BL-007 | Миграции | README до 007, есть 009 | Обновить `migrations/README.md` |
-| BL-014…018 | Meeting state machine | **✅ в бэклоге, но `internal/meeting` не импортируется** | Подключить meeting service к WS/HTTP |
+| BL-014…018 | Meeting state machine | подключено к WS (`meeting_wire.go`) | host_started, DB join/leave/end |
 | BL-015 | Participants DB | таблица есть, runtime — только hub | Join/Leave через meeting repo |
 | BL-016 | WS events | нет `host_started`, `user_removed` | Добавить события + тесты |
 | BL-017 | Reconnect | WS-only, без DB rejoin | Rejoin через meeting service |
@@ -65,10 +65,10 @@
 | BL-029 | Observability | health/ready/metrics есть | RED-метрики, алерты |
 | BL-032 | Audio v1 | эвристики по сырым байтам | Документировать v1 limits или decode v2 |
 | BL-035 | Analysis RBAC | organizer vs guest, не host/co-host | Роли из meeting_participant |
-| BL-040 | Вердикт UI | **✅ в бэклоге, в коде нет** | WS `analysis_report_partial` в VideoMeet |
+| ~~BL-040~~ | Вердикт UI | реализовано в `VideoMeet` + `MeetingTranscriptRail` | — |
 | BL-UX-110 | Report UI v2 | single API есть; team mock, debug JSON | Убрать stub UX, team API |
 | BL-BE-111 | Контракт отчётов team/trends | только stub `/reports/:id` | Новые endpoints + docs |
-| BL-BE-113 | История транскрибации | workaround через analysis/events | `GET /sessions/:id/transcription` |
+| ~~BL-BE-113~~ | История транскрибации | endpoint + UI через `getSessionTranscription` | — |
 | BL-AI-112 | Realtime ASR без буфера | window/step в speech-service; UI шлёт growing WebM | Независимые чанки end-to-end |
 | BL-AI-117 | Provider layer config | gateway JSON богатый; UI — boolean flags | Configurator + `text.transcription` |
 
@@ -80,11 +80,11 @@
 
 | ID | Задача | Оценка |
 |----|--------|--------|
-| **BL-MEET-WIRE** *(новая)* | Подключить `internal/meeting` к session/WS | 2–3 дн |
+| ~~BL-MEET-WIRE~~ | Подключить `internal/meeting` к session/WS | **сделано 2026-06-10** |
 | BL-UX-110 | Report UI без моков и debug-блоков | 2–4 дн |
 | BL-BE-111 | `GET /reports/session/:id`, `/team`, `/team/trends` | 1–2 дн |
-| BL-BE-113 | Dedicated transcription endpoint + UI | 2–4 дн |
-| BL-040 | Live verdict panel (`analysis_report_partial`) | 1 дн |
+| ~~BL-BE-113~~ | `GET /sessions/:id/transcription` + UI | **сделано 2026-06-10** |
+| ~~BL-040~~ | Live verdict panel (`analysis_report_partial`) | **сделано 2026-06-10** |
 | BL-025 | VDS checklist: DNS, TLS, getUserMedia smoke | 1 дн |
 | BL-027 | Cookie/auth E2E на prod origin | 0.5–1 дн |
 | BL-029 | Минимальные алерты / runbook observability | 1 дн |
@@ -97,7 +97,7 @@
 | BL-AI-101 | Production ASR engine + метрики WER/latency | 3–10 дн |
 | BL-AI-109 | CI: pytest ai-gateway + nightly hybrid smoke | 1–3 дн |
 | BL-AI-107 | Prometheus scrape / dashboard AI | 2–5 дн |
-| BL-024 | Завершить auth audit (refresh/logout events) | 0.5 дн |
+| ~~BL-024~~ (частично) | auth audit refresh/logout | **сделано 2026-06-10** | RequireRole на роутах — остаётся |
 | BL-005 | Усилить CI (golangci-lint, pytest) | 1 дн |
 
 ### P2 — Post-Prod R&D (Track C, не в активный спринт)
