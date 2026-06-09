@@ -13,12 +13,13 @@
 
 Оркестрация: `docker-compose.yml` / `docker-compose.prod.yml` в корне репозитория.
 
-## Текущее состояние (актуально)
+## Текущее состояние (актуально, аудит 2026-06-10)
 
-- **Аутентификация:** bcrypt для паролей, JWT access + refresh, ротация refresh-токенов, часть эндпоинтов публичная (`/auth/login`, `/auth/refresh`, health). Подробности — код в `code/emeeting-backend/internal/auth/`.
-- **Встречи / сессии:** WebSocket по сессиям, состояние митинга и участники — см. `code/emeeting-backend/internal/session/`, UI — `code/emeeting-ui/src/features/meeting/`.
-- **Документация:** индекс — `code/docs/README.md`; контракты WS — `code/docs/ANALYSIS_WS_CONTRACTS.md`. Каталог **`code/AI/`** (черновики исследований) **не входит в репозиторий** — удалён для уменьшения размера клона.
-- **Правила по подсистемам:** `.cursor/rules/meeting-service.mdc`, `.cursor/rules/auth-system.mdc` (globs относительно корня workspace — при открытом `code/` без префикса `code/`).
+- **Аутентификация:** bcrypt, JWT HS256 (`access_token`/`refresh_token` cookies), ротация refresh. Код: `code/emeeting-backend/internal/auth/`.
+- **Встречи / сессии:** runtime — `internal/session` (WS hub). Пакет `internal/meeting` (state machine, participants DB) **существует, но не подключён к серверу** — приоритет BL-MEET-WIRE.
+- **AI:** `code/ai-gateway/modules/` (face, audio, text, report); ASR — `code/speech-service`.
+- **Документация:** `code/docs/README.md`; бэклог — `code/cursor backlog.md`; сверка статусов — `.cursor/BACKLOG_SYNC.md`.
+- **Правила:** `.cursor/rules/monorepo-standards.mdc` (всегда), `meeting-service.mdc`, `auth-system.mdc`.
 
 ## Команды
 

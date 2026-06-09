@@ -10,6 +10,8 @@ alwaysApply: false
 
 ## Meeting Service Patterns
 
+> **Аудит 2026-06-10:** бизнес-логика в `internal/meeting` должна вызываться из `internal/session` (WS/HTTP). Не дублировать participants/status только в `SessionHub` без записи в БД.
+
 ### State Machine
 - Meeting status: `created` | `active` | `paused` | `ended` | `cancelled`
 - Переходы только через сервис-методы с валидацией: `StartMeeting()`, `EndMeeting()`
