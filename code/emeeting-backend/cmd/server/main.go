@@ -57,7 +57,7 @@ func main() {
 		auth.NewModule(database),
 		session.NewModule(database),
 		analysis.NewModule(database),
-		reports.NewModule(),
+		reports.NewModule(database),
 		ws.NewModule(),
 	}
 	for _, module := range modules {

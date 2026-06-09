@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { getReport } from "../api/reports";
+import {
+  getSessionReport,
+  getTeamReport,
+  getTeamTrends,
+  type TeamReportResponse,
+  type TeamTrendsResponse,
+} from "../api/reports";
 import { getSessions } from "../api/sessions";
 import type { Session } from "../types/db";
 
@@ -158,6 +164,8 @@ const Report = () => {
   const { id } = useParams();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [serverReport, setServerReport] = useState<unknown>(null);
+  const [teamReport, setTeamReport] = useState<TeamReportResponse | null>(null);
+  const [teamTrends, setTeamTrends] = useState<TeamTrendsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<ReportMode>(id ? "single" : "team");
 
@@ -171,6 +179,19 @@ const Report = () => {
       try {
         const rows = await getSessions();
         if (!cancelled) setSessions(Array.isArray(rows) ? rows : []);
+        const [team, trends] = await Promise.all([
+          getTeamReport(),
+          getTeamTrends({ metric: "sessions_count", groupBy: "month" }),
+        ]);
+        if (!cancelled) {
+          setTeamReport(team);
+          setTeamTrends(trends);
+        }
+      } catch {
+        if (!cancelled) {
+          setTeamReport(null);
+          setTeamTrends(null);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -185,7 +206,7 @@ const Report = () => {
     let cancelled = false;
     (async () => {
       try {
-        const data = await getReport(id);
+        const data = await getSessionReport(id);
         if (!cancelled) setServerReport(data);
       } catch {
         if (!cancelled) setServerReport(null);
@@ -212,6 +233,14 @@ const Report = () => {
   );
 
   const teamStats = useMemo(() => {
+    if (teamReport) {
+      return {
+        total: teamReport.totalSessions,
+        byType: teamReport.bySessionType,
+        thisMonth: teamReport.sessionsThisMonth,
+        items: teamReport.sessions,
+      };
+    }
     const total = sortedSessions.length;
     const byType = sortedSessions.reduce<Record<string, number>>((acc, s) => {
       const key = s.sessionType || "other";
@@ -223,8 +252,14 @@ const Report = () => {
       const now = new Date();
       return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
     }).length;
-    return { total, byType, thisMonth };
-  }, [sortedSessions]);
+    return { total, byType, thisMonth, items: [] as TeamReportResponse["sessions"] };
+  }, [sortedSessions, teamReport]);
+
+  const trendMax = useMemo(() => {
+    const pts = teamTrends?.points ?? [];
+    if (pts.length === 0) return 1;
+    return Math.max(1, ...pts.map((p) => p.value));
+  }, [teamTrends]);
 
   const singleStats = useMemo(() => {
     if (!selectedSession) return null;
@@ -477,13 +512,13 @@ const Report = () => {
             <div className="participant-section">
               <div className="report-section">
                 <h3 className="report-section__title">Мультимодальная аналитика</h3>
-                <p className="session-meta" style={{ marginBottom: 16 }}>
-                  Эмоции лица, транскрипт и качество трекинга собираются из событий в реальном времени. Итоговое
-                  заключение нейросети будет добавлено позже.
-                </p>
                 <div className="report-placeholder-nn">
-                  <strong>Итог нейросети</strong>
-                  <span>Пока недоступен. Ниже — автоматическая сводка по событиям встречи.</span>
+                  <strong>Итог анализа</strong>
+                  <span>
+                    {reportBody.summary?.trim() ||
+                      (Array.isArray(meetingSummary?.highlights_ru) && meetingSummary.highlights_ru[0]) ||
+                      "Сводка формируется из событий встречи в реальном времени."}
+                  </span>
                 </div>
               </div>
 
@@ -1052,21 +1087,6 @@ const Report = () => {
                 )}
               </div>
 
-              <details className="report-debug-details report-subpanel" style={{ marginTop: 20 }}>
-                <summary>Сырые счётчики и машиночитаемая сводка</summary>
-                <pre style={{ overflow: "auto", maxHeight: 240, fontSize: "0.8rem", margin: 0 }}>
-                  {JSON.stringify(
-                    {
-                      pipeline_stage: reportBody.pipeline_stage,
-                      speech_ratio: reportBody.speech_ratio,
-                      meeting_summary: reportBody.meeting_summary,
-                      observations: reportBody.observations,
-                    },
-                    null,
-                    2
-                  )}
-                </pre>
-              </details>
             </div>
           )}
         </div>
@@ -1114,27 +1134,61 @@ const Report = () => {
                   </tbody>
                 </table>
               </div>
+
+              {teamTrends && teamTrends.points.length > 0 && (
+                <div className="report-section" style={{ marginTop: 24 }}>
+                  <h3 className="report-section__title">Динамика звонков по месяцам</h3>
+                  <div className="report-trends-bars">
+                    {teamTrends.points.map((p) => (
+                      <div key={p.period} className="report-trend-row">
+                        <span>{p.label}</span>
+                        <div className="report-trend-bar">
+                          <div
+                            className="report-trend-bar__fill"
+                            style={{ width: `${Math.round((p.value / trendMax) * 100)}%` }}
+                          />
+                        </div>
+                        <span>{p.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {teamStats.items.length > 0 && (
+                <div className="report-section" style={{ marginTop: 24 }}>
+                  <h3 className="report-section__title">Звонки с метриками</h3>
+                  <table className="participants-table">
+                    <thead>
+                      <tr>
+                        <th>Сессия</th>
+                        <th>Тип</th>
+                        <th>Отчёт</th>
+                        <th>Участники</th>
+                        <th>Топ эмоция</th>
+                        <th>ASR событий</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {teamStats.items.map((s) => (
+                        <tr key={s.sessionId}>
+                          <td>
+                            <Link to={`/reports/${s.sessionId}`}>{s.title || `#${s.sessionId}`}</Link>
+                          </td>
+                          <td>{s.sessionType}</td>
+                          <td>{s.hasReport ? "да" : "—"}</td>
+                          <td>{s.participantCount || "—"}</td>
+                          <td>{s.topEmotion || "—"}</td>
+                          <td>{s.textEvents || 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </>
           )}
         </div>
-      )}
-
-      <div className="recommendations">
-        <h3>Черновой контракт бэка под отчеты</h3>
-        <ul>
-          <li>GET `/reports/session/:sessionId` — итог по одному звонку.</li>
-          <li>GET `/reports/team?from=&to=&groupBy=` — агрегат по группе звонков.</li>
-          <li>GET `/reports/team/trends?metric=` — временные ряды для графиков.</li>
-          <li>Рекомендуемый payload: `summary`, `transcription`, `participants`, `qualityFlags`.</li>
-          <li>Пока AI-модуль не финален, UI использует fallback на `sessions`.</li>
-        </ul>
-      </div>
-
-      {Boolean(serverReport) && mode === "single" && (
-        <details className="report-debug-details summary-box">
-          <summary>Полный ответ API (debug)</summary>
-          <pre style={{ overflow: "auto", maxHeight: 420, marginTop: 12 }}>{JSON.stringify(serverReport, null, 2)}</pre>
-        </details>
       )}
     </div>
   );

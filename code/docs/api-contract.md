@@ -127,11 +127,27 @@ Query-параметры: `limit` (по умолчанию `300`, максиму
 
 Страница отчёта в UI (`/reports`, `/reports/:sessionId`) использует **`GET /sessions/:id/analysis/report`** (см. раздел выше про доступ организатора). Тело ответа — сохранённый JSON отчёта аналитики (в т.ч. поля заглушки `meeting_summary`, `participant_tiles`, … — см. `docs/REPORTS_AND_ANALYTICS_STORAGE.md`).
 
-## Reports (legacy)
+## Reports API (канонический контракт)
 
-### `GET /reports/:id`
+### `GET /reports/session/:sessionId`
 
-Legacy-эндпоинт отчётов (если включён в backend): формат может отличаться от аналитического отчёта выше. Для новых интеграций предпочтителен **`GET /sessions/:id/analysis/report`**.
+Итог по одному звонку. Доступ — только организатор (`session.created_by`). Тело совпадает с аналитическим отчётом + поля `sessionId`, `source` (`analysis_report` | `stub_from_events`).
+
+### `GET /reports/team`
+
+Query: `from`, `to` (RFC3339), `groupBy` (по умолчанию `type`).
+
+Ответ: `totalSessions`, `sessionsThisMonth`, `bySessionType`, `sessions[]` с краткими метриками (`hasReport`, `participantCount`, `topEmotion`, `textEvents`).
+
+### `GET /reports/team/trends`
+
+Query: `metric` (`sessions_count` | `text_events` | `reports_count`), `groupBy` (`day` | `week` | `month`), `from`, `to`.
+
+Ответ: `{ metric, groupBy, points: [{ period, label, value }] }`.
+
+### `GET /reports/:id` (legacy)
+
+Обратная совместимость — проксирует `GET /reports/session/:id`.
 
 Пример ответа `200` (иллюстративный):
 

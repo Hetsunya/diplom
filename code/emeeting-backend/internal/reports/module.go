@@ -1,32 +1,26 @@
 package reports
 
 import (
-	"fmt"
-	"net/http"
-	"time"
+	"database/sql"
 
 	"github.com/gin-gonic/gin"
+
+	"emeeting/internal/analysis"
 )
 
-type Module struct{}
+type Module struct {
+	handler *HTTPHandler
+}
 
-func NewModule() *Module {
-	return &Module{}
+func NewModule(database *sql.DB) *Module {
+	repo := NewRepository(database)
+	svc := NewService(repo, analysis.NewService(database))
+	return &Module{handler: NewHTTPHandler(svc)}
 }
 
 func (m *Module) RegisterRoutes(router *gin.Engine) {
-	router.GET("/reports/:id", func(c *gin.Context) {
-		id := c.Param("id")
-		c.JSON(http.StatusOK, gin.H{
-			"reportId":   id,
-			"sessionId":  id,
-			"version":    1,
-			"createdAt":  time.Now().UTC().Format(time.RFC3339),
-			"updatedAt":  time.Now().UTC().Format(time.RFC3339),
-			"summaryJson": gin.H{
-				"status": "stub",
-				"note":   fmt.Sprintf("Report %s is not generated yet", id),
-			},
-		})
-	})
+	router.GET("/reports/session/:sessionId", m.handler.GetSessionReport)
+	router.GET("/reports/team", m.handler.GetTeamReport)
+	router.GET("/reports/team/trends", m.handler.GetTeamTrends)
+	router.GET("/reports/:id", m.handler.GetLegacyReport)
 }
